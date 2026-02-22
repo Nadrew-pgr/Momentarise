@@ -1,0 +1,161 @@
+---
+description: Conventions frontend web Next.js — apps/web/
+globs: apps/web/**
+alwaysApply: false
+---
+
+# Frontend Web Next.js — Patterns et conventions
+
+## Stack
+
+- Next.js 16 App Router
+- shadcn/ui (composants)
+- Tailwind CSS v4 (styling)
+- TanStack Query (server state)
+- Zustand (client state)
+- Zod (validation)
+- i18next + react-i18next (i18n)
+
+## Commandes courantes
+
+```bash
+cd apps/web
+npm install            # Installer les dépendances
+npm run dev            # Lancer le serveur dev (port 3000)
+```
+
+## Architecture BFF (Backend For Frontend)
+
+Le navigateur n'appelle JAMAIS FastAPI directement.
+Flux : `Browser → Next.js Route Handler → FastAPI`
+
+Le cookie `mm_access_token` (HTTPOnly) est géré côté serveur Next.js.
+FastAPI ne connaît que le header `Authorization: Bearer`.
+
+## Comment ajouter une route BFF (proxy)
+
+Créer `src/app/api/<resource>/route.ts` :
+
+```typescript
+import { proxyWithAuth } from "@/lib/bff";
+
+export async function GET() {
+  return proxyWithAuth("/api/v1/<resource>");
+}
+
+export async function POST(request: Request) {
+  const body = await request.json();
+  return proxyWithAuth("/api/v1/<resource>", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+```
+
+Référence : `src/app/api/auth/me/route.ts` et `src/lib/bff.ts`
+
+## Comment ajouter un hook TanStack Query
+
+Créer `src/hooks/use-<resource>.ts` :
+
+```typescript
+"use client";
+import { useQuery } from "@tanstack/react-query";
+
+export function use<Resource>() {
+  return useQuery({
+    queryKey: ["<resource>"],
+    queryFn: async () => {
+      const res = await fetch("/api/<resource>");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+}
+```
+
+Référence : `src/hooks/use-me.ts`
+
+Pour les mutations (POST/PATCH/DELETE) :
+
+```typescript
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+export function useCreate<Resource>() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data) => {
+      const res = await fetch("/api/<resource>", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["<resource>"] }),
+  });
+}
+```
+
+## Comment ajouter une page
+
+1. Créer `src/app/(dashboard)/<route>/page.tsx`
+2. Le composant est un Client Component si il utilise i18n ou des hooks :
+
+```typescript
+"use client";
+import { useTranslation } from "react-i18next";
+
+export default function <Route>Page() {
+  const { t } = useTranslation();
+  return <div>{t("pages.<route>.title")}</div>;
+}
+```
+
+3. Ajouter les clés i18n dans `src/i18n/fr.json` et `src/i18n/en.json`
+
+Référence : `src/app/(dashboard)/today/page.tsx`
+
+## Comment ajouter un composant shadcn/ui
+
+```bash
+npx shadcn@latest add <component>
+```
+
+Les composants sont installés dans `src/components/ui/`.
+
+## Regle shadcn/ui : blocks first
+
+Avant de coder un composant ou une page from scratch, TOUJOURS verifier :
+1. Les **blocks shadcn/ui** disponibles : `npx shadcn@latest add --list` ou https://ui.shadcn.com/blocks
+2. Si un block correspond (meme partiellement), l'utiliser comme base et l'adapter
+
+Exemples deja utilises dans ce projet :
+- Login : adapte du block `login-03` (card centree sur fond muted)
+- Sidebar : adapte du block `sidebar-07` (collapsible to icons, style Notion/Linear)
+
+## Layout cockpit
+
+Les routes authentifiées utilisent le layout `(dashboard)/layout.tsx` :
+- Sidebar (collapsible) à gauche
+- Contenu principal (SidebarInset) à droite
+- Header avec breadcrumb
+
+## Design tokens
+
+Les couleurs sont définies dans `src/app/globals.css` via des variables CSS OKLCH.
+Pour changer le thème : modifier uniquement les variables CSS, tout s'adapte.
+
+## i18n
+
+- Fichiers : `src/i18n/fr.json`, `src/i18n/en.json`
+- Langue par défaut : `fr`
+- Utiliser `useTranslation()` dans les Client Components
+- JAMAIS de string en dur dans l'UI
+
+## Auth web
+
+- Cookie : `mm_access_token` (HTTPOnly, SameSite: lax)
+- Middleware (`src/middleware.ts`) : redirige vers `/login` si pas de cookie
+- Logout : `POST /api/auth/logout` efface le cookie

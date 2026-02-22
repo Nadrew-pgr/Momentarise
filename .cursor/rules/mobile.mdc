@@ -1,0 +1,216 @@
+---
+description: Conventions frontend mobile Expo — apps/mobile/
+globs: apps/mobile/**
+alwaysApply: false
+---
+
+# Frontend Mobile Expo — Patterns et conventions
+
+## Stack
+
+- Expo + Expo Router (file-based routing)
+- Expo Go (Phase 1, Custom Dev Client en Phase 2)
+- NativeWind (Tailwind CSS pour React Native)
+- react-native-reusables (composants UI)
+- TanStack Query (server state)
+- Zustand (client state)
+- Zod (validation)
+- expo-secure-store (stockage token)
+- @gorhom/bottom-sheet (Bottom Sheet global)
+- react-native-calendars (Timeline, Slice 1+)
+
+## Commandes courantes
+
+```bash
+cd apps/mobile
+npm install              # Installer les dépendances
+npx expo start           # Lancer Expo (scanner le QR code avec Expo Go)
+```
+
+## Connexion API
+
+Le mobile appelle FastAPI **directement** (pas de BFF).
+Variable d'env : `EXPO_PUBLIC_API_URL`
+
+Options de connexion (dev) :
+- IP locale : `http://192.168.x.x:8000` (Mac et iPhone sur le même WiFi)
+- ngrok : `ngrok http 8000` pour un tunnel HTTPS
+
+## Auth mobile (différence avec le web)
+
+- **Pas de cookie** : le token est stocké dans `expo-secure-store`
+- **Auth guard** : dans `app/_layout.tsx`, vérifier si un token existe dans SecureStore
+- **Headers** : ajouter `Authorization: Bearer <token>` à chaque requête API
+
+Pattern de fetch :
+
+```typescript
+import * as SecureStore from "expo-secure-store";
+
+async function apiFetch(path: string, init?: RequestInit) {
+  const token = await SecureStore.getItemAsync("access_token");
+  const url = `${process.env.EXPO_PUBLIC_API_URL}${path}`;
+  return fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
+  });
+}
+```
+
+Référence : `lib/api.ts`
+
+## Comment ajouter un écran
+
+1. Créer `app/(tabs)/<screen>.tsx` (ou `app/<screen>.tsx` pour les écrans hors tabs)
+2. Utiliser i18n :
+
+```typescript
+import { useTranslation } from "react-i18next";
+
+export default function ScreenName() {
+  const { t } = useTranslation();
+  return <View><Text>{t("pages.<screen>.title")}</Text></View>;
+}
+```
+
+3. Ajouter les clés i18n dans `i18n/fr.json` et `i18n/en.json`
+
+## Navigation : 5 onglets
+
+Configurés dans `app/(tabs)/_layout.tsx` :
+1. Today
+2. Inbox
+3. [+] (Create — tab factice, intercepté)
+4. Timeline
+5. Me
+
+## Bottom Sheet global (bouton [+])
+
+Le tab "create" est intercepté :
+
+```typescript
+// Dans (tabs)/_layout.tsx
+<Tabs.Screen
+  name="create"
+  listeners={{
+    tabPress: (e) => {
+      e.preventDefault();
+      useCreateSheet.getState().open();
+    },
+  }}
+/>
+```
+
+Le `BottomSheetCreate` est rendu dans `app/_layout.tsx` (au-dessus des tabs).
+State géré via Zustand : `lib/store.ts` → `useCreateSheet`
+
+## Adapter Pattern (Timeline, Slice 1+)
+
+Pour la Timeline, utiliser `react-native-calendars` avec un adapter :
+`lib/adapters/calendarAdapter.ts` convertit les events API en format calendrier.
+
+Pattern :
+
+```typescript
+export function eventsToCalendarFormat(events: EventOut[]) {
+  // Convertir les events backend en format requis par react-native-calendars
+}
+```
+
+## Design tokens
+
+Les couleurs sont définies en **hex dans `tailwind.config.js`** (pas dans `global.css`).
+Le fichier `global.css` contient uniquement les directives Tailwind (`@tailwind base/components/utilities`).
+
+NativeWind utilise les couleurs du `tailwind.config.js` via `className="bg-background text-foreground"`.
+
+Pour changer le thème : modifier les valeurs hex dans `tailwind.config.js`.
+
+**ATTENTION** : le web utilise des variables CSS OKLCH dans `globals.css` ; le mobile utilise des hex dans `tailwind.config.js`. Ce sont deux mécanismes différents — ne PAS essayer de les unifier.
+
+## i18n mobile
+
+- Fichiers : `i18n/fr.json`, `i18n/en.json`
+- Mêmes clés que le web + clés spécifiques mobile
+- Langue par défaut : `fr`
+
+## Icônes — hiérarchie stricte
+
+1. **Lucide** (`lucide-react-native`) — icônes UI générales (même set que shadcn/ui côté web)
+2. **Remix Icons** (`react-native-remix-icon`) — logos et marques non disponibles dans Lucide (Google, Apple, GitHub, ChatGPT, Notion, etc.)
+3. **SVG custom** — dernier recours uniquement si absent de Lucide ET Remix Icons
+
+**Ne JAMAIS utiliser d'emojis** comme icônes (ni dans le tab bar, ni dans les boutons, ni dans les listes).
+
+```typescript
+// 1. Lucide — UI (import individuel)
+import { Sun, Inbox, Plus, Calendar, User } from "lucide-react-native";
+<Sun size={24} color="#171717" />
+```
+
+```typescript
+// 2. Remix Icons — logos/marques
+import Icon from "react-native-remix-icon";
+<Icon name="google-fill" size={20} color="#000" />
+<Icon name="notion-fill" size={20} color="#000" />
+```
+
+```typescript
+// Wrappers disponibles dans components/icons/BrandIcons.tsx
+import { GoogleIcon, AppleIcon, GitHubIcon } from "@/components/icons/BrandIcons";
+<GoogleIcon size={18} />
+```
+
+Catalogue Remix Icons : https://remixicon.com — chercher le nom et ajouter `-fill` ou `-line`.
+
+## ATTENTION — Pièges courants
+
+### Tailwind v3 (PAS v4)
+
+NativeWind v4 ne supporte QUE Tailwind CSS v3 (3.4.x).
+Le web utilise Tailwind CSS v4 — ce sont deux versions différentes.
+Ne PAS essayer de mettre à jour vers Tailwind v4 dans `apps/mobile/`.
+
+### npx expo install (obligatoire pour les packages natifs)
+
+Pour tout package lié à Expo ou React Native (react-native-*, expo-*, @gorhom/*, react-native-reanimated, etc.), utiliser :
+
+```bash
+npx expo install <package>
+```
+
+Cette commande choisit automatiquement la version compatible avec la version d'Expo installée. `npm install` risque d'installer une version incompatible avec Expo Go.
+
+### npm --legacy-peer-deps
+
+Pour les packages purement JS (zod, i18next, zustand, etc.), utiliser `npm install`.
+Si `npm install` échoue avec ERESOLVE, utiliser :
+
+```bash
+npm install --legacy-peer-deps <package>
+```
+
+### Variables d'environnement Expo
+
+Expo ne lit que les variables préfixées par `EXPO_PUBLIC_`.
+`process.env.API_URL` ne fonctionnera PAS — utiliser `process.env.EXPO_PUBLIC_API_URL`.
+
+### Ne pas tuer tous les ports
+
+Si tu dois tuer le serveur Expo, ne tuer que le port utilisé :
+
+```bash
+lsof -ti:8081 | xargs kill
+```
+
+Ne JAMAIS faire `pkill -f "next dev"` ou tuer tous les ports — d'autres apps peuvent tourner.
+
+### CORS pour le mobile
+
+Le mobile appelle FastAPI directement depuis l'IP du téléphone.
+L'API doit autoriser cette origine dans `CORS_ORIGINS` (voir `apps/api/.env`).
+Ajouter l'IP locale du Mac : `CORS_ORIGINS=http://localhost:3000,http://192.168.x.x:8000`

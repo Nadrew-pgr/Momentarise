@@ -1,0 +1,57 @@
+{
+  "common": {
+    "appName": "Momentarise"
+  },
+  "nav": {
+    "today": "Aujourd'hui",
+    "inbox": "Boîte de réception",
+    "timeline": "Timeline",
+    "me": "Moi"
+  },
+  "auth": {
+    "login": "Connexion",
+    "cardDescription": "Connectez-vous pour continuer",
+    "email": "Email",
+    "password": "Mot de passe",
+    "submit": "Se connecter",
+    "logout": "Déconnexion",
+    "continueWith": "Ou continuer avec",
+    "continueWithGoogle": "Continuer avec Google",
+    "continueWithApple": "Continuer avec Apple",
+    "continueWithGitHub": "Continuer avec GitHub",
+    "comingSoon": "Bientôt disponible",
+    "invalidCredentials": "Email ou mot de passe incorrect",
+    "forgotPassword": "Mot de passe oublié ?",
+    "noAccount": "Vous n'avez pas de compte ?",
+    "signUp": "Créer un compte",
+    "signUpTitle": "Créer un compte",
+    "signUpDescription": "Entrez votre email pour commencer",
+    "signUpSubmit": "Créer mon compte",
+    "hasAccount": "Vous avez déjà un compte ?",
+    "signIn": "Se connecter",
+    "emailExists": "Un compte avec cet email existe déjà",
+    "termsNotice": "En continuant, vous acceptez nos <terms>Conditions d'utilisation</terms> et notre <privacy>Politique de confidentialité</privacy>."
+  },
+  "workspace": {
+    "switcher": "Espace de travail",
+    "addWorkspace": "Ajouter un espace"
+  },
+  "pages": {
+    "today": {
+      "title": "Aujourd'hui",
+      "placeholder": "Cette section arrive dans la Slice 1."
+    },
+    "inbox": {
+      "title": "Boîte de réception",
+      "placeholder": "Cette section arrive dans la Slice 2."
+    },
+    "timeline": {
+      "title": "Timeline",
+      "placeholder": "Cette section arrive dans la Slice 1."
+    },
+    "me": {
+      "title": "Moi",
+      "placeholder": "Profil et paramètres — bientôt disponible."
+    }
+  }
+}

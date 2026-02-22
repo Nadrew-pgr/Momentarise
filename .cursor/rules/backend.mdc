@@ -1,0 +1,145 @@
+---
+description: Conventions backend FastAPI — apps/api/
+globs: apps/api/**
+alwaysApply: false
+---
+
+# Backend FastAPI — Patterns et conventions
+
+## Stack
+
+- Python 3.12 via **uv**
+- FastAPI (async)
+- SQLAlchemy 2 (async, asyncpg)
+- PostgreSQL 15 (Docker)
+- Alembic (migrations)
+- Pydantic v2 (validation)
+- PyJWT + bcrypt (auth)
+
+## Commandes courantes
+
+```bash
+cd apps/api
+uv sync                                         # Installer les dépendances
+uv run alembic upgrade head                     # Appliquer les migrations
+uv run python -m src.seed                       # Créer le user de test
+uv run uvicorn src.main:app --reload --port 8000  # Lancer l'API
+```
+
+## Comment ajouter un modèle
+
+1. Créer `src/models/<resource>.py`
+2. Hériter de `Base` et `BaseMixin` :
+
+```python
+from src.models.base import Base, BaseMixin
+
+class Item(BaseMixin, Base):
+    __tablename__ = "items"
+    # colonnes...
+```
+
+Référence : `src/models/user.py`
+
+3. Importer le modèle dans les fichiers qui en ont besoin
+4. Générer la migration :
+
+```bash
+uv run alembic revision --autogenerate -m "add_<resource>"
+uv run alembic upgrade head
+```
+
+## Comment ajouter un schema Pydantic
+
+Créer `src/schemas/<resource>.py` :
+
+```python
+from pydantic import BaseModel
+import uuid
+
+class ItemOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    model_config = {"from_attributes": True}
+```
+
+Référence : `src/schemas/auth.py`
+
+## Comment ajouter une route API
+
+1. Créer `src/api/v1/<resource>.py` :
+
+```python
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.core.database import get_db
+from src.core.deps import get_current_workspace
+from src.models.workspace import WorkspaceMember
+
+router = APIRouter(prefix="/<resource>", tags=["<resource>"])
+
+@router.get("/")
+async def list_resources(
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+):
+    # Filtrer par workspace.workspace_id
+    ...
+```
+
+Référence : `src/api/v1/auth.py`
+
+2. Enregistrer le routeur dans `src/main.py` :
+
+```python
+from src.api.v1.<resource> import router as <resource>_router
+app.include_router(<resource>_router, prefix="/api/v1")
+```
+
+## Filtrage par workspace
+
+Toutes les routes métier (hors auth) DOIVENT filtrer par `workspace_id`.
+Utiliser `get_current_workspace` depuis `src/core/deps.py`.
+
+Signature (déjà implémentée) :
+
+```python
+async def get_current_workspace(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> WorkspaceMember:
+```
+
+Retourne le `WorkspaceMember` le plus ancien du user. 404 si aucun workspace.
+
+Pattern de query dans les routes :
+
+```python
+from src.core.deps import get_current_workspace
+from src.models.workspace import WorkspaceMember
+
+@router.get("/")
+async def list_items(
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Item).where(
+            Item.workspace_id == workspace.workspace_id,
+            Item.deleted_at.is_(None),
+        )
+    )
+```
+
+## Conventions de nommage
+
+- Routes : `/api/v1/<resource>` (pluriel)
+- Modèles : `PascalCase` singulier (`Item`, `Event`)
+- Tables : `snake_case` pluriel (`items`, `events`)
+- Schemas : `<Resource>Out`, `Create<Resource>Request`, `Update<Resource>Request`
+
+## Auth
+
+- Le token JWT est stateless, signé avec `JWT_SECRET`
+- `get_current_user` extrait le user du token Bearer
+- FastAPI ne connaît PAS les cookies (c'est le BFF Next.js qui les gère)

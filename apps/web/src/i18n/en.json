@@ -1,0 +1,57 @@
+{
+  "common": {
+    "appName": "Momentarise"
+  },
+  "nav": {
+    "today": "Today",
+    "inbox": "Inbox",
+    "timeline": "Timeline",
+    "me": "Me"
+  },
+  "auth": {
+    "login": "Log in",
+    "cardDescription": "Sign in to continue",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "logout": "Log out",
+    "continueWith": "Or continue with",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithApple": "Continue with Apple",
+    "continueWithGitHub": "Continue with GitHub",
+    "comingSoon": "Coming soon",
+    "invalidCredentials": "Invalid email or password",
+    "forgotPassword": "Forgot your password?",
+    "noAccount": "Don't have an account?",
+    "signUp": "Sign up",
+    "signUpTitle": "Create an account",
+    "signUpDescription": "Enter your email to get started",
+    "signUpSubmit": "Create account",
+    "hasAccount": "Already have an account?",
+    "signIn": "Sign in",
+    "emailExists": "An account with this email already exists",
+    "termsNotice": "By continuing, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>."
+  },
+  "workspace": {
+    "switcher": "Workspace",
+    "addWorkspace": "Add workspace"
+  },
+  "pages": {
+    "today": {
+      "title": "Today",
+      "placeholder": "This section is coming in Slice 1."
+    },
+    "inbox": {
+      "title": "Inbox",
+      "placeholder": "This section is coming in Slice 2."
+    },
+    "timeline": {
+      "title": "Timeline",
+      "placeholder": "This section is coming in Slice 1."
+    },
+    "me": {
+      "title": "Me",
+      "placeholder": "Profile and settings — coming soon."
+    }
+  }
+}

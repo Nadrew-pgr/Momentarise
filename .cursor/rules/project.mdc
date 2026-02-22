@@ -1,0 +1,62 @@
+---
+description: Conventions globales du projet Momentarise — à lire en premier
+globs:
+alwaysApply: true
+---
+
+# Momentarise — Conventions projet
+
+## Source de vérité
+
+La spec technique est la **source unique de vérité** :
+`project/specs/Spécifications Techniques Phase 1.md`
+
+Avant toute implémentation, lire la slice concernée dans la spec.
+Après implémentation, cocher les `- [ ]` en `- [x]` dans la DoD.
+
+## Structure monorepo
+
+```
+Momentarise/
+├── apps/api/         # Backend FastAPI (Python, uv)
+├── apps/web/         # Frontend Next.js (npm)
+├── apps/mobile/      # Frontend Expo (npm)
+├── project/          # Specs, notes, idées
+│   ├── specs/        # Spécifications techniques (SSoT)
+│   ├── distilled/    # Ledger d'idées trié
+│   ├── inbox_raw/    # Conversations brutes
+│   └── notes.md      # Notes d'intention produit
+└── docker-compose.yml
+```
+
+## Package managers
+
+- `apps/api/` : **uv** (Python)
+- `apps/web/` : **npm** (Node.js)
+- `apps/mobile/` : **npm** (Node.js)
+
+## Conventions communes
+
+- **IDs** : UUID v4 partout
+- **Timestamps** : UTC, `DateTime(timezone=True)` en DB
+- **Soft delete** : `deleted_at` nullable sur toutes les entités principales
+- **i18n** : aucune string en dur. Toujours passer par les fichiers de traduction (fr.json, en.json)
+- **Validation** : Pydantic (backend) + Zod (frontend)
+- **State management** : TanStack Query (server state) + Zustand (client state)
+
+**ATTENTION — Tailwind CSS : versions différentes web vs mobile**
+- `apps/web/` utilise **Tailwind CSS v4** avec variables CSS OKLCH dans `globals.css`
+- `apps/mobile/` utilise **Tailwind CSS v3** (3.4.x) avec hex dans `tailwind.config.js` (contrainte NativeWind v4)
+- Ce sont deux systèmes de theming différents. Ne PAS tenter d'uniformiser ou de mettre à jour le mobile vers Tailwind v4.
+
+## Spec-Driven Development (SDD)
+
+1. Lire la spec → identifier la slice en cours
+2. Suivre le guide d'implémentation étape par étape
+3. Cocher chaque item DoD quand il est validé
+4. Ne JAMAIS implémenter quelque chose qui est dans "Out of scope"
+
+## Ordre des slices
+
+Slice 0 → Slice 1 → Slice 2 → Slice 3 → Slice 4
+Chaque slice dépend de la précédente. Ne pas sauter.
