@@ -1,0 +1,8 @@
+{
+  "name": "momentarise",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

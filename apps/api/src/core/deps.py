@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.security import decode_access_token
 from src.models.user import User
-from src.models.workspace import WorkspaceMember
+from src.models.workspace import Workspace, WorkspaceMember
 
 bearer_scheme = HTTPBearer()
 
@@ -40,9 +40,11 @@ async def get_current_workspace(
     """Return the active WorkspaceMember for the current user (oldest membership)."""
     result = await db.execute(
         select(WorkspaceMember)
+        .join(Workspace, WorkspaceMember.workspace_id == Workspace.id)
         .where(
             WorkspaceMember.user_id == current_user.id,
             WorkspaceMember.deleted_at.is_(None),
+            Workspace.deleted_at.is_(None),
         )
         .order_by(WorkspaceMember.created_at.asc())
     )

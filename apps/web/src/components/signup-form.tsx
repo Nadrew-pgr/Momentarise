@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { loginSchema } from "@/schemas/auth";
+import { signupSchema } from "@momentarise/shared";
 
 export function SignupForm({
   className,
@@ -33,7 +33,7 @@ export function SignupForm({
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    const parsed = loginSchema.safeParse({ email, password });
+    const parsed = signupSchema.safeParse({ email, password });
     if (!parsed.success) {
       setError(t("auth.invalidCredentials"));
       return;

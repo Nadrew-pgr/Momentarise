@@ -18,6 +18,8 @@ class Workspace(BaseMixin, Base):
 
     owner: Mapped["User"] = relationship(back_populates="owned_workspaces")  # noqa: F821
     members: Mapped[list["WorkspaceMember"]] = relationship(back_populates="workspace")
+    items: Mapped[list["Item"]] = relationship(back_populates="workspace")  # noqa: F821
+    events: Mapped[list["Event"]] = relationship(back_populates="workspace")  # noqa: F821
 
 
 class WorkspaceMember(BaseMixin, Base):

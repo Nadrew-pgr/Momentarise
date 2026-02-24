@@ -98,6 +98,12 @@ export function useCreate<Resource>() {
 }
 ```
 
+## Contrats partagés TS
+
+- Pour les schémas transverses (`auth`, `today`, `timeline`, `events`), importer depuis `@momentarise/shared`.
+- Éviter de recréer des schémas Zod locaux équivalents dans `apps/web/src/schemas/*`.
+- Si un schéma manque dans `@momentarise/shared`, l'ajouter au package partagé puis l'utiliser côté web.
+
 ## Comment ajouter une page
 
 1. Créer `src/app/(dashboard)/<route>/page.tsx`

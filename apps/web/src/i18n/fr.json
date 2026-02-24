@@ -39,7 +39,13 @@
   "pages": {
     "today": {
       "title": "Aujourd'hui",
-      "placeholder": "Cette section arrive dans la Slice 1."
+      "placeholder": "Cette section arrive dans la Slice 1.",
+      "priorities": "Priorités",
+      "emptyPriorities": "Aucune priorité pour aujourd'hui.",
+      "nextEvent": "Prochain événement",
+      "emptyNextEvent": "Aucun événement prévu.",
+      "nextAction": "Prochaine action",
+      "emptyNextAction": "Aucune action planifiée."
     },
     "inbox": {
       "title": "Boîte de réception",
@@ -47,7 +53,10 @@
     },
     "timeline": {
       "title": "Timeline",
-      "placeholder": "Cette section arrive dans la Slice 1."
+      "placeholder": "Cette section arrive dans la Slice 1.",
+      "emptyDay": "Aucun événement ce jour.",
+      "start": "Démarrer",
+      "stop": "Arrêter"
     },
     "me": {
       "title": "Moi",

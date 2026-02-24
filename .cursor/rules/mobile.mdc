@@ -121,6 +121,12 @@ export function eventsToCalendarFormat(events: EventOut[]) {
 }
 ```
 
+## Contrats partagés TS
+
+- Pour les schémas transverses (`auth`, `today`, `timeline`, `events`), importer depuis `@momentarise/shared`.
+- Éviter de recréer des schémas Zod locaux équivalents dans `apps/mobile/schemas/*`.
+- Si un schéma manque dans `@momentarise/shared`, l'ajouter au package partagé puis l'utiliser côté mobile.
+
 ## Design tokens
 
 Les couleurs sont définies en **hex dans `tailwind.config.js`** (pas dans `global.css`).

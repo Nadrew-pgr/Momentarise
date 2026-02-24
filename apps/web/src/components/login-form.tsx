@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { loginSchema } from "@/schemas/auth";
+import { loginSchema } from "@momentarise/shared";
 
 export function LoginForm({
   className,

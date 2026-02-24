@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { loginSchema } from "@/schemas/auth";
+import { loginSchema } from "@momentarise/shared";
 import { login } from "@/lib/auth";
 import { useAuthStore } from "@/lib/store";
 import { GoogleIcon, AppleIcon, GitHubIcon } from "@/components/icons/BrandIcons";

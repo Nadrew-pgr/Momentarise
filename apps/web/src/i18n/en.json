@@ -39,7 +39,13 @@
   "pages": {
     "today": {
       "title": "Today",
-      "placeholder": "This section is coming in Slice 1."
+      "placeholder": "This section is coming in Slice 1.",
+      "priorities": "Priorities",
+      "emptyPriorities": "No priorities for today.",
+      "nextEvent": "Next event",
+      "emptyNextEvent": "No event scheduled.",
+      "nextAction": "Next action",
+      "emptyNextAction": "No action planned."
     },
     "inbox": {
       "title": "Inbox",
@@ -47,7 +53,10 @@
     },
     "timeline": {
       "title": "Timeline",
-      "placeholder": "This section is coming in Slice 1."
+      "placeholder": "This section is coming in Slice 1.",
+      "emptyDay": "No events this day.",
+      "start": "Start",
+      "stop": "Stop"
     },
     "me": {
       "title": "Me",

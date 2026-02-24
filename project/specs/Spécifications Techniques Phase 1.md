@@ -249,13 +249,13 @@ En tant qu’utilisateur, je consulte un digest “Today” (macro) et une Timel
 
 ### DoD (Checklist d’acceptation)
 
-- [ ] **DB** : tables `items` (minimal) et `events` créées ; migrations appliquées.
-- [ ] **API** : `GET /api/v1/today` retourne un digest valide (même si vide).
-- [ ] **API** : `GET /api/v1/timeline` retourne la liste des Events sur une journée.
-- [ ] **API** : start/stop tracking met à jour `actual_time_acc` de manière idempotente.
-- [ ] **Mobile** : Today tab + Timeline tab affichent des états vides propres (i18n).
-- [ ] **Mobile** : le chrono UI reste fluide (tick local) même si le réseau est lent.
-- [ ] **Web** : pages Today/Timeline intégrées au cockpit ; requêtes via `/api/*` (BFF).
+- [x] **DB** : tables `items` (minimal) et `events` créées ; migrations appliquées.
+- [x] **API** : `GET /api/v1/today` retourne un digest valide (même si vide).
+- [x] **API** : `GET /api/v1/timeline` retourne la liste des Events sur une journée.
+- [x] **API** : start/stop tracking met à jour `actual_time_acc` de manière idempotente.
+- [x] **Mobile** : Today tab + Timeline tab affichent des états vides propres (i18n).
+- [x] **Mobile** : le chrono UI reste fluide (tick local) même si le réseau est lent.
+- [x] **Web** : pages Today/Timeline intégrées au cockpit ; requêtes via `/api/*` (BFF).
 
 ### Out of scope
 
@@ -360,6 +360,31 @@ En tant qu’utilisateur, je consulte un digest “Today” (macro) et une Timel
 - Enregistrer les routeurs dans `src/main.py` : `app.include_router(today.router, prefix="/api/v1")`, idem pour timeline et events.
 - Toutes les routes utilisent `Depends(get_current_workspace)` pour filtrer par `workspace_id`.
 
+#### Étape 4.5 : Stabilisation contrats & hardening (gate avant Web/Mobile)
+
+- Cette étape est un **gate NO-GO** : ne pas démarrer l'étape 5 tant que les points ci-dessous ne sont pas validés.
+- **Workspace dependency** :
+  - `get_current_workspace` doit ignorer les memberships pointant vers des workspaces soft-delete (`workspace.deleted_at IS NULL`).
+- **Timeline date** :
+  - `GET /api/v1/timeline?date=...` retourne **422** si `date` n'est pas au format `YYYY-MM-DD` (pas de fallback silencieux).
+- **Tracking contract** :
+  - le champ API de stop reste `actual_time_acc` (contrat public Slice 1),
+  - le stockage DB reste `actual_time_acc_seconds`,
+  - mapping explicite et documenté entre les deux.
+- **Migration hygiene** :
+  - defaults DB explicites sur `events.actual_time_acc_seconds` (= 0) et `events.is_tracking` (= false),
+  - contraintes/checks (`actual_time_acc_seconds >= 0`, `estimated_time_seconds >= 0`),
+  - index ciblés (`items(workspace_id, priority_order)`, `events(workspace_id, start_at)`, `events(workspace_id, is_tracking)`),
+  - via migration dédiée et lisible (pas de mega-migration).
+- **Contrats partagés TS** :
+  - package `@momentarise/shared` présent et exportant `auth/today/timeline/events`,
+  - web + mobile importent les schemas communs depuis ce package,
+  - pas de duplication locale résiduelle des schemas transverses (`auth`, puis Slice 1 `today/timeline/events`).
+- **Validation minimale** :
+  - API compile,
+  - web lint/typecheck sans erreur bloquante,
+  - mobile typecheck sans erreur bloquante.
+
 #### Étape 5 : Web — BFF Routes
 
 - Créer `apps/web/src/app/api/today/route.ts` → proxy `/api/v1/today` (suivre pattern de `api/auth/me/route.ts` avec `proxyWithAuth`).
@@ -382,7 +407,7 @@ En tant qu’utilisateur, je consulte un digest “Today” (macro) et une Timel
 #### Étape 8 : Mobile — Adapter Pattern
 
 - Créer `apps/mobile/lib/adapters/calendarAdapter.ts` : fonction `eventsToCalendarFormat(events)` qui convertit les events API en format `react-native-calendars`.
-- Installer : `npm install react-native-calendars` dans `apps/mobile/`.
+- Installer : `npx expo install react-native-calendars` dans `apps/mobile/`.
 
 #### Étape 9 : Mobile — Pages Today + Timeline
 

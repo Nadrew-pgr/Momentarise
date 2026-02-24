@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { loginSchema } from "@/schemas/auth";
+import { signupSchema } from "@momentarise/shared";
 import { signup } from "@/lib/auth";
 import { useAuthStore } from "@/lib/store";
 
@@ -26,7 +26,7 @@ export default function SignupScreen() {
 
   async function handleSubmit() {
     setError(null);
-    const parsed = loginSchema.safeParse({ email, password });
+    const parsed = signupSchema.safeParse({ email, password });
     if (!parsed.success) {
       setError(t("auth.invalidCredentials"));
       return;

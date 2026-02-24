@@ -111,6 +111,7 @@ async def get_current_workspace(
 ```
 
 Retourne le `WorkspaceMember` le plus ancien du user. 404 si aucun workspace.
+`get_current_workspace` doit aussi ignorer les workspaces soft-delete (`Workspace.deleted_at IS NULL`).
 
 Pattern de query dans les routes :
 
@@ -137,6 +138,17 @@ async def list_items(
 - Modèles : `PascalCase` singulier (`Item`, `Event`)
 - Tables : `snake_case` pluriel (`items`, `events`)
 - Schemas : `<Resource>Out`, `Create<Resource>Request`, `Update<Resource>Request`
+
+## Contrats API Slice 1 (Today/Timeline/Tracking)
+
+- `GET /timeline?date=` : si `date` invalide, répondre 422 (pas de fallback silencieux).
+- `POST /events/{id}/stop` : le contrat API public expose `actual_time_acc`.
+- Le champ DB reste `actual_time_acc_seconds` : assumer et documenter le mapping API ↔ DB.
+
+## Migrations Slice 1
+
+- Favoriser des migrations ciblées et lisibles (petits deltas successifs).
+- Mettre les contraintes/défauts/index au niveau DB (pas uniquement ORM) pour les champs critiques.
 
 ## Auth
 
