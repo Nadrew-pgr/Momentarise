@@ -50,7 +50,20 @@
     },
     "inbox": {
       "title": "Inbox",
-      "placeholder": "This section is coming in Slice 2."
+      "placeholder": "This section is coming in Slice 2.",
+      "add": "Add capture",
+      "addPlaceholder": "Enter raw text…",
+      "process": "Process to item",
+      "processTitle": "Item title",
+      "processSubmit": "Create item",
+      "emptyList": "No captures. Add raw content to get started.",
+      "cancel": "Cancel"
+    },
+    "item": {
+      "details": "Details",
+      "blocks": "Content",
+      "title": "Title",
+      "noItemSelected": "Select a capture to process or an item."
     },
     "timeline": {
       "title": "Timeline",

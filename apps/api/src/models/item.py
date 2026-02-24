@@ -1,7 +1,9 @@
 import uuid
 
 from sqlalchemy import ForeignKey, Integer, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, BaseMixin
@@ -15,6 +17,9 @@ class Item(BaseMixin, Base):
     )
     title: Mapped[str] = mapped_column(Text, nullable=False)
     priority_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    blocks: Mapped[list] = mapped_column(
+        MutableList.as_mutable(JSONB), default=list, nullable=False
+    )
 
     workspace: Mapped["Workspace"] = relationship(back_populates="items")  # noqa: F821
     events: Mapped[list["Event"]] = relationship(  # noqa: F821

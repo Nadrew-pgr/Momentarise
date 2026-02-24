@@ -429,12 +429,12 @@ En tant qu’utilisateur, je capture du brut dans l’Inbox (sas), puis je le tr
 
 ### DoD (Checklist d’acceptation)
 
-- [ ] **DB** : table `inbox_captures` créée ; migration `items.blocks` ajoutée.
-- [ ] **API** : création et listing Inbox (`POST/GET /api/v1/inbox`).
-- [ ] **API** : transformation `POST /api/v1/inbox/{id}/process` crée un Item et soft-delete la capture.
-- [ ] **API** : `PATCH /api/v1/items/{id}` met à jour `blocks` (JSONB) et persiste correctement.
-- [ ] **Mobile** : Inbox tab liste + détail item en Bottom Sheet (3 onglets : Détails, Blocs, Coach placeholder).
-- [ ] **Web** : inbox list en colonne 2 ; item detail en colonne 3 ; mutations en optimistic UI via TanStack Query.
+- [x] **DB** : table `inbox_captures` créée ; migration `items.blocks` ajoutée.
+- [x] **API** : création et listing Inbox (`POST/GET /api/v1/inbox`).
+- [x] **API** : transformation `POST /api/v1/inbox/{id}/process` crée un Item et soft-delete la capture.
+- [x] **API** : `PATCH /api/v1/items/{id}` met à jour `blocks` (JSONB) et persiste correctement.
+- [x] **Mobile** : Inbox tab liste + détail item en Bottom Sheet (3 onglets : Détails, Blocs, Coach placeholder).
+- [x] **Web** : inbox list en colonne 2 ; item detail en colonne 3 ; mutations en optimistic UI via TanStack Query.
 
 ### Out of scope
 

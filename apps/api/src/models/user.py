@@ -16,6 +16,7 @@ class User(BaseMixin, Base):
     identities: Mapped[list["UserIdentity"]] = relationship(back_populates="user", lazy="selectin")
     owned_workspaces: Mapped[list["Workspace"]] = relationship(back_populates="owner")  # noqa: F821
     memberships: Mapped[list["WorkspaceMember"]] = relationship(back_populates="user")  # noqa: F821
+    inbox_captures: Mapped[list["InboxCapture"]] = relationship(back_populates="user")  # noqa: F821
 
 
 class UserIdentity(BaseMixin, Base):

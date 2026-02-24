@@ -50,7 +50,20 @@
     },
     "inbox": {
       "title": "Boîte de réception",
-      "placeholder": "Cette section arrive dans la Slice 2."
+      "placeholder": "Cette section arrive dans la Slice 2.",
+      "add": "Ajouter une capture",
+      "addPlaceholder": "Saisir du texte brut…",
+      "process": "Transformer en élément",
+      "processTitle": "Titre de l'élément",
+      "processSubmit": "Créer l'élément",
+      "emptyList": "Aucune capture. Ajoutez du brut pour commencer.",
+      "cancel": "Annuler"
+    },
+    "item": {
+      "details": "Détails",
+      "blocks": "Contenu",
+      "title": "Titre",
+      "noItemSelected": "Sélectionnez une capture à transformer ou un élément."
     },
     "timeline": {
       "title": "Timeline",

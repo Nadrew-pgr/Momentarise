@@ -8,6 +8,7 @@ import { queryClient } from "@/lib/query-client";
 import { useAuthStore } from "@/lib/store";
 import { getToken } from "@/lib/auth";
 import { BottomSheetCreate } from "@/components/BottomSheetCreate";
+import { ItemDetailSheet } from "@/components/ItemDetailSheet";
 import "@/i18n/config";
 import "../global.css";
 
@@ -54,6 +55,7 @@ export default function RootLayout() {
           <AuthGate>
             <Slot />
             <BottomSheetCreate />
+            <ItemDetailSheet />
           </AuthGate>
         </QueryClientProvider>
       </SafeAreaProvider>

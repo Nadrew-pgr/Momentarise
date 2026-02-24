@@ -25,3 +25,15 @@ export const useCreateSheet = create<CreateSheetState>((set) => ({
   open: () => set({ isOpen: true }),
   close: () => set({ isOpen: false }),
 }));
+
+interface ItemDetailSheetState {
+  itemId: string | null;
+  open: (itemId: string) => void;
+  close: () => void;
+}
+
+export const useItemDetailSheet = create<ItemDetailSheetState>((set) => ({
+  itemId: null,
+  open: (itemId) => set({ itemId }),
+  close: () => set({ itemId: null }),
+}));
