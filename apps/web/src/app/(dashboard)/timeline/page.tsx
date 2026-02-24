@@ -40,6 +40,9 @@ export default function TimelinePage() {
         <p className="text-muted-foreground max-w-sm">
           {t("pages.timeline.emptyDay")}
         </p>
+        <p className="text-muted-foreground max-w-sm text-sm">
+          {t("pages.timeline.emptyHint")}
+        </p>
       </div>
     );
   }

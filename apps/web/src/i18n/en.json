@@ -45,7 +45,8 @@
       "nextEvent": "Next event",
       "emptyNextEvent": "No event scheduled.",
       "nextAction": "Next action",
-      "emptyNextAction": "No action planned."
+      "emptyNextAction": "No action planned.",
+      "emptyHint": "Add items from Inbox to fill this view."
     },
     "inbox": {
       "title": "Inbox",
@@ -56,7 +57,8 @@
       "placeholder": "This section is coming in Slice 1.",
       "emptyDay": "No events this day.",
       "start": "Start",
-      "stop": "Stop"
+      "stop": "Stop",
+      "emptyHint": "Add events from Inbox to see them here."
     },
     "me": {
       "title": "Me",

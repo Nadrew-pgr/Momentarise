@@ -1,13 +1,16 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchWithAuth } from "@/lib/bff-client";
 
 export function useTracking() {
   const queryClient = useQueryClient();
 
   const startMutation = useMutation({
     mutationFn: async (eventId: string) => {
-      const res = await fetch(`/api/events/${eventId}/start`, { method: "POST" });
+      const res = await fetchWithAuth(`/api/events/${eventId}/start`, {
+        method: "POST",
+      });
       if (!res.ok) throw new Error("Failed to start tracking");
       return res.json();
     },
@@ -19,7 +22,9 @@ export function useTracking() {
 
   const stopMutation = useMutation({
     mutationFn: async (eventId: string) => {
-      const res = await fetch(`/api/events/${eventId}/stop`, { method: "POST" });
+      const res = await fetchWithAuth(`/api/events/${eventId}/stop`, {
+        method: "POST",
+      });
       if (!res.ok) throw new Error("Failed to stop tracking");
       return res.json();
     },

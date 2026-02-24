@@ -27,10 +27,17 @@ export default function TodayPage() {
   }
 
   const { priorities, next_event, next_action } = data;
+  const isFullyEmpty =
+    priorities.length === 0 && !next_event && !next_action;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <h1 className="text-2xl font-semibold">{t("pages.today.title")}</h1>
+      {isFullyEmpty && (
+        <p className="text-muted-foreground text-sm">
+          {t("pages.today.emptyHint")}
+        </p>
+      )}
 
       <Card>
         <CardHeader className="text-base font-medium">
