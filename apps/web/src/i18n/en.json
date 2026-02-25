@@ -57,12 +57,18 @@
       "processTitle": "Item title",
       "processSubmit": "Create item",
       "emptyList": "No captures. Add raw content to get started.",
+      "recentItems": "Recent items",
+      "emptyItems": "No recent items.",
       "cancel": "Cancel"
     },
     "item": {
       "details": "Details",
       "blocks": "Content",
       "title": "Title",
+      "backToInbox": "Back to Inbox",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "saveError": "Save error",
       "noItemSelected": "Select a capture to process or an item."
     },
     "timeline": {

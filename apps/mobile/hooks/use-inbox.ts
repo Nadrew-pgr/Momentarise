@@ -57,6 +57,7 @@ export function useProcessCapture() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inbox"] });
       queryClient.invalidateQueries({ queryKey: ["item"] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
     },
   });
 }

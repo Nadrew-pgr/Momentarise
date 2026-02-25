@@ -433,8 +433,8 @@ En tant qu’utilisateur, je capture du brut dans l’Inbox (sas), puis je le tr
 - [x] **API** : création et listing Inbox (`POST/GET /api/v1/inbox`).
 - [x] **API** : transformation `POST /api/v1/inbox/{id}/process` crée un Item et soft-delete la capture.
 - [x] **API** : `PATCH /api/v1/items/{id}` met à jour `blocks` (JSONB) et persiste correctement.
-- [x] **Mobile** : Inbox tab liste + détail item en Bottom Sheet (3 onglets : Détails, Blocs, Coach placeholder).
-- [x] **Web** : inbox list en colonne 2 ; item detail en colonne 3 ; mutations en optimistic UI via TanStack Query.
+- [x] **Mobile** : Inbox tab liste + détail item en page plein écran (3 onglets : Détails, Blocs, Coach placeholder).
+- [x] **Web** : Inbox liste les captures + items récents ; détail Item sur route dédiée `/inbox/items/[id]` en plein espace ; mutations en optimistic UI via TanStack Query.
 
 ### Out of scope
 
@@ -455,6 +455,8 @@ En tant qu’utilisateur, je capture du brut dans l’Inbox (sas), puis je le tr
   - Body `{ "title": string }`
   - L'utilisateur saisit le titre manuellement avant de confirmer le processing.
   - 200 `{ "item_id": uuid }`
+- `GET /items`
+  - 200 `{ "items": [ { "id": uuid, "title": string, "updated_at": datetime } ] }`
 - `GET /items/{item_id}`
   - 200 `{ "id": uuid, "title": string, "blocks": [] }`
 - `PATCH /items/{item_id}`
@@ -466,6 +468,7 @@ En tant qu’utilisateur, je capture du brut dans l’Inbox (sas), puis je le tr
 - `GET /api/inbox` → proxy `/api/v1/inbox`
 - `POST /api/inbox` → proxy `/api/v1/inbox`
 - `POST /api/inbox/{id}/process` → proxy `/api/v1/inbox/{id}/process`
+- `GET /api/items` → proxy `/api/v1/items`
 - `GET/PATCH /api/items/{id}` → proxy `/api/v1/items/{id}`
 
 ### DB Contract
@@ -504,13 +507,12 @@ class ProseMirrorNode(BaseModel):
 #### Mobile
 
 - `/(tabs)/inbox`
-- Détail Item : Bottom Sheet modal partagé (3 onglets : Détails / Blocs / Coach placeholder)
+- Détail Item : `/items/[id]` (page dédiée plein écran, 3 onglets : Détails / Blocs / Coach placeholder)
 
 #### Web
 
-- `/inbox` (cockpit)
-  - Colonne 2 : liste Inbox / Items
-  - Colonne 3 : détail Item
+- `/inbox` : liste Inbox (captures + items récents) avec état vide si aucun item sélectionné.
+- `/inbox/items/[id]` : détail Item sur page dédiée plein espace (BlockNote + autosave débouncé).
 
 
 ### Décisions verrouillées (Slice 2)
@@ -534,7 +536,7 @@ class ProseMirrorNode(BaseModel):
 - Créer `apps/api/src/schemas/inbox.py` : `InboxCaptureOut`, `CreateCaptureRequest`, `ProcessCaptureResponse`.
 - Créer `apps/api/src/schemas/item.py` : `ItemOut`, `UpdateItemRequest`.
 - Créer `apps/api/src/api/v1/inbox.py` : `GET /inbox`, `POST /inbox`, `POST /inbox/{id}/process`.
-- Créer `apps/api/src/api/v1/items.py` : `GET /items/{id}`, `PATCH /items/{id}`.
+- Créer `apps/api/src/api/v1/items.py` : `GET /items`, `GET /items/{id}`, `PATCH /items/{id}`.
 - Toutes les routes filtrent par `workspace_id` via `get_current_workspace`.
 
 #### Étape 3 : Web — BFF + Hooks
@@ -545,15 +547,23 @@ class ProseMirrorNode(BaseModel):
 #### Étape 4 : Web — Éditeur BlockNote
 
 - Installer : `npm install @blocknote/core @blocknote/react @blocknote/mantine` dans `apps/web/`.
-- Modifier `apps/web/src/app/(dashboard)/inbox/page.tsx` : cockpit 3 colonnes (liste inbox en col 2, détail item en col 3).
+- Modifier `apps/web/src/app/(dashboard)/inbox/page.tsx` : liste Inbox (captures + items récents) sans éditeur embarqué.
+- Créer `apps/web/src/app/(dashboard)/inbox/items/[id]/page.tsx` : détail item en page dédiée plein espace avec autosave débouncé.
 - Créer `apps/web/src/components/block-editor.tsx` : wrapper BlockNote qui lit/écrit le JSON `blocks`.
 
 #### Étape 5 : Mobile — Éditeur TenTap
 
 - Installer : `npm install @10play/tentap-editor react-native-webview` dans `apps/mobile/`.
 - Modifier `apps/mobile/app/(tabs)/inbox.tsx` : liste des captures.
-- Créer `apps/mobile/components/ItemDetailSheet.tsx` : Bottom Sheet modal avec 3 onglets (Détails / Blocs / Coach placeholder).
+- Créer `apps/mobile/app/items/[id].tsx` : page plein écran avec 3 onglets (Détails / Blocs / Coach placeholder).
 - Créer `apps/mobile/components/BlockEditor.tsx` : wrapper TenTap pour éditer les blocks.
+
+#### Validation manuelle (corrections Slice 2)
+
+- `GET /api/v1/items` retourne uniquement les items du workspace courant, triés par `updated_at DESC`.
+- Web : `POST /api/inbox/{id}/process` redirige vers `/inbox/items/{item_id}`.
+- Mobile : `process` ouvre `/items/{id}` ; retour vers Inbox sans état cassé.
+- Web/Mobile : édition continue n’entraîne plus une alternance systématique `PATCH` puis `GET` à chaque frappe.
 
 ---
 

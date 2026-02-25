@@ -17,7 +17,9 @@ class InboxCapture(BaseMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     raw_content: Mapped[str] = mapped_column(Text, nullable=False)
-    source: Mapped[str | None] = mapped_column(Text, nullable=True, default="manual")
+    source: Mapped[str | None] = mapped_column(
+        Text, nullable=True, default="manual", server_default="manual"
+    )
 
     workspace: Mapped["Workspace"] = relationship(back_populates="inbox_captures")  # noqa: F821
     user: Mapped["User"] = relationship(back_populates="inbox_captures")  # noqa: F821

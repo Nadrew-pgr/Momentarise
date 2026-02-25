@@ -8,7 +8,6 @@ import { queryClient } from "@/lib/query-client";
 import { useAuthStore } from "@/lib/store";
 import { getToken } from "@/lib/auth";
 import { BottomSheetCreate } from "@/components/BottomSheetCreate";
-import { ItemDetailSheet } from "@/components/ItemDetailSheet";
 import "@/i18n/config";
 import "../global.css";
 
@@ -28,10 +27,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoading) return;
-    const inAuthGroup = segments[0] === "(tabs)";
-    if (isAuthenticated && !inAuthGroup) {
+    const inProtectedGroup = segments[0] === "(tabs)" || segments[0] === "items";
+    if (isAuthenticated && !inProtectedGroup) {
       router.replace("/(tabs)/today");
-    } else if (!isAuthenticated && inAuthGroup) {
+    } else if (!isAuthenticated && inProtectedGroup) {
       router.replace("/login");
     }
   }, [isAuthenticated, isLoading, segments, router]);
@@ -55,7 +54,6 @@ export default function RootLayout() {
           <AuthGate>
             <Slot />
             <BottomSheetCreate />
-            <ItemDetailSheet />
           </AuthGate>
         </QueryClientProvider>
       </SafeAreaProvider>

@@ -124,3 +124,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+.blocknote-shell {
+  height: 100%;
+  min-height: 0;
+  overflow: visible;
+}
+
+.blocknote-shell .bn-container,
+.blocknote-shell .bn-editor {
+  height: 100%;
+  min-height: 100%;
+  overflow: visible;
+}
+
+.blocknote-shell .bn-suggestion-menu,
+.blocknote-shell [role="listbox"] {
+  z-index: 80;
+}

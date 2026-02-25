@@ -1,9 +1,25 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ItemOut, UpdateItemRequest } from "@momentarise/shared";
-import { itemOutSchema } from "@momentarise/shared";
+import type {
+  ItemListResponse,
+  ItemOut,
+  UpdateItemRequest,
+} from "@momentarise/shared";
+import { itemListResponseSchema, itemOutSchema } from "@momentarise/shared";
 import { fetchWithAuth } from "@/lib/bff-client";
+
+export function useItems() {
+  return useQuery<ItemListResponse>({
+    queryKey: ["items"],
+    queryFn: async () => {
+      const res = await fetchWithAuth("/api/items");
+      if (!res.ok) throw new Error("Failed to fetch items");
+      const data = await res.json();
+      return itemListResponseSchema.parse(data) as ItemListResponse;
+    },
+  });
+}
 
 export function useItem(itemId: string | null) {
   return useQuery<ItemOut | null>({
@@ -52,9 +68,9 @@ export function useUpdateItem(itemId: string | null) {
         queryClient.setQueryData(["item", itemId], context.previous);
       }
     },
-    onSettled: () => {
+    onSuccess: (updatedItem) => {
       if (itemId) {
-        queryClient.invalidateQueries({ queryKey: ["item", itemId] });
+        queryClient.setQueryData(["item", itemId], updatedItem);
       }
     },
   });

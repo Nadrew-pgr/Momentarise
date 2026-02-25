@@ -57,12 +57,18 @@
       "processTitle": "Titre de l'élément",
       "processSubmit": "Créer l'élément",
       "emptyList": "Aucune capture. Ajoutez du brut pour commencer.",
+      "recentItems": "Éléments récents",
+      "emptyItems": "Aucun élément récent.",
       "cancel": "Annuler"
     },
     "item": {
       "details": "Détails",
       "blocks": "Contenu",
       "title": "Titre",
+      "backToInbox": "Retour Inbox",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "saveError": "Erreur d'enregistrement",
       "noItemSelected": "Sélectionnez une capture à transformer ou un élément."
     },
     "timeline": {

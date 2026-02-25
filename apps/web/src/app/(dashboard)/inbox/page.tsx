@@ -1,31 +1,31 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
+import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { Inbox as InboxIcon, Plus } from "lucide-react";
-import { useInbox, useCreateCapture, useProcessCapture } from "@/hooks/use-inbox";
-import { useItem, useUpdateItem } from "@/hooks/use-item";
-import { BlockEditor } from "@/components/block-editor";
+import { useCreateCapture, useInbox, useProcessCapture } from "@/hooks/use-inbox";
+import { useItems } from "@/hooks/use-item";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Block } from "@blocknote/core";
 
 export default function InboxPage() {
   const { t } = useTranslation();
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const router = useRouter();
   const [newCaptureText, setNewCaptureText] = useState("");
   const [processingCaptureId, setProcessingCaptureId] = useState<string | null>(null);
   const [processingTitle, setProcessingTitle] = useState("");
 
   const { data: inboxData, isLoading: inboxLoading } = useInbox();
+  const { data: itemsData, isLoading: itemsLoading } = useItems();
   const createCapture = useCreateCapture();
   const processCapture = useProcessCapture();
-  const { data: itemData, isLoading: itemLoading } = useItem(selectedItemId);
-  const updateItem = useUpdateItem(selectedItemId);
 
   const captures = inboxData?.captures ?? [];
+  const items = itemsData?.items ?? [];
 
   const handleAddCapture = useCallback(() => {
     const text = newCaptureText.trim();
@@ -36,7 +36,7 @@ export default function InboxPage() {
         onSuccess: () => setNewCaptureText(""),
       }
     );
-  }, [newCaptureText, createCapture]);
+  }, [createCapture, newCaptureText]);
 
   const handleStartProcess = useCallback((captureId: string) => {
     setProcessingCaptureId(captureId);
@@ -49,29 +49,44 @@ export default function InboxPage() {
       { captureId: processingCaptureId, title: processingTitle.trim() },
       {
         onSuccess: (res) => {
-          setSelectedItemId(res.item_id);
           setProcessingCaptureId(null);
           setProcessingTitle("");
+          router.push(`/inbox/items/${res.item_id}`);
         },
       }
     );
-  }, [processingCaptureId, processingTitle, processCapture]);
+  }, [processCapture, processingCaptureId, processingTitle, router]);
 
-  const handleBlocksChange = useCallback(
-    (blocks: Block[]) => {
-      if (!selectedItemId) return;
-      updateItem.mutate({ blocks: blocks as unknown as Record<string, unknown>[] });
-    },
-    [selectedItemId, updateItem]
-  );
+  let recentItemsContent: ReactNode;
+  if (itemsLoading) {
+    recentItemsContent = <p className="text-muted-foreground text-sm">{t("pages.inbox.placeholder")}</p>;
+  } else if (items.length === 0) {
+    recentItemsContent = <p className="text-muted-foreground text-sm">{t("pages.inbox.emptyItems")}</p>;
+  } else {
+    recentItemsContent = (
+      <div className="flex flex-col gap-2">
+        {items.map((item) => (
+          <Button
+            key={item.id}
+            variant="outline"
+            className="h-auto justify-between px-3 py-2"
+            onClick={() => router.push(`/inbox/items/${item.id}`)}
+          >
+            <span className="truncate text-left text-sm">{item.title}</span>
+            <span className="text-muted-foreground ml-4 text-xs">
+              {new Date(item.updated_at).toLocaleString()}
+            </span>
+          </Button>
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full flex-1 gap-6">
-      {/* Column 2: Inbox list */}
+    <div className="flex h-full min-h-0 flex-1 gap-6">
       <aside className="flex w-80 shrink-0 flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{t("pages.inbox.title")}</h2>
-        </div>
+        <h2 className="text-lg font-semibold">{t("pages.inbox.title")}</h2>
+
         <div className="flex gap-2">
           <Input
             placeholder={t("pages.inbox.addPlaceholder")}
@@ -90,94 +105,78 @@ export default function InboxPage() {
             <Plus className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex flex-1 flex-col gap-2 overflow-auto">
-          {inboxLoading ? (
-            <p className="text-muted-foreground text-sm">{t("pages.inbox.placeholder")}</p>
-          ) : captures.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("pages.inbox.emptyList")}</p>
-          ) : (
-            captures.map((c) => (
-              <Card key={c.id} className="overflow-hidden">
-                <CardContent className="p-3">
-                  <p className="line-clamp-2 text-sm">{c.raw_content}</p>
-                  {processingCaptureId === c.id ? (
-                    <div className="mt-2 flex flex-col gap-2">
-                      <Label htmlFor={`title-${c.id}`} className="text-xs">
-                        {t("pages.inbox.processTitle")}
-                      </Label>
-                      <Input
-                        id={`title-${c.id}`}
-                        value={processingTitle}
-                        onChange={(e) => setProcessingTitle(e.target.value)}
-                        placeholder={t("pages.item.title")}
-                        className="h-8 text-sm"
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={handleSubmitProcess}
-                          disabled={!processingTitle.trim() || processCapture.isPending}
-                        >
-                          {t("pages.inbox.processSubmit")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setProcessingCaptureId(null);
-                            setProcessingTitle("");
-                          }}
-                        >
-                          {t("pages.inbox.cancel")}
-                        </Button>
+
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto pr-1">
+          <div className="flex flex-col gap-2">
+            {inboxLoading ? (
+              <p className="text-muted-foreground text-sm">{t("pages.inbox.placeholder")}</p>
+            ) : captures.length === 0 ? (
+              <p className="text-muted-foreground text-sm">{t("pages.inbox.emptyList")}</p>
+            ) : (
+              captures.map((capture) => (
+                <Card key={capture.id} className="overflow-hidden">
+                  <CardContent className="p-3">
+                    <p className="line-clamp-2 text-sm">{capture.raw_content}</p>
+                    {processingCaptureId === capture.id ? (
+                      <div className="mt-2 flex flex-col gap-2">
+                        <Label htmlFor={`title-${capture.id}`} className="text-xs">
+                          {t("pages.inbox.processTitle")}
+                        </Label>
+                        <Input
+                          id={`title-${capture.id}`}
+                          value={processingTitle}
+                          onChange={(e) => setProcessingTitle(e.target.value)}
+                          placeholder={t("pages.item.title")}
+                          className="h-8 text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={handleSubmitProcess}
+                            disabled={!processingTitle.trim() || processCapture.isPending}
+                          >
+                            {t("pages.inbox.processSubmit")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setProcessingCaptureId(null);
+                              setProcessingTitle("");
+                            }}
+                          >
+                            {t("pages.inbox.cancel")}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 h-8 text-xs"
-                      onClick={() => handleStartProcess(c.id)}
-                    >
-                      {t("pages.inbox.process")}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 h-8 text-xs"
+                        onClick={() => handleStartProcess(capture.id)}
+                      >
+                        {t("pages.inbox.process")}
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          <div className="border-t pt-4">
+            <h3 className="mb-2 text-sm font-semibold">{t("pages.inbox.recentItems")}</h3>
+            {recentItemsContent}
+          </div>
         </div>
       </aside>
 
-      {/* Column 3: Item detail */}
-      <main className="min-w-0 flex-1">
-        {!selectedItemId ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 py-12 text-center">
-            <InboxIcon className="text-muted-foreground h-12 w-12" />
-            <p className="text-muted-foreground max-w-sm">{t("pages.item.noItemSelected")}</p>
-          </div>
-        ) : itemLoading || !itemData ? (
-          <p className="text-muted-foreground py-8 text-sm">{t("pages.inbox.placeholder")}</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <h3 className="text-base font-medium">{itemData.title}</h3>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="min-h-[200px] rounded-md border border-input bg-background">
-                  <BlockEditor
-                    key={selectedItemId}
-                    editorKey={selectedItemId}
-                    value={itemData.blocks}
-                    onChange={handleBlocksChange}
-                    editable={!updateItem.isPending}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+      <main className="flex min-w-0 flex-1 items-center justify-center rounded-lg border border-dashed border-border px-8 py-10 text-center">
+        <div className="flex max-w-md flex-col items-center gap-3">
+          <InboxIcon className="text-muted-foreground h-10 w-10" />
+          <p className="text-muted-foreground text-sm">{t("pages.item.noItemSelected")}</p>
+        </div>
       </main>
     </div>
   );

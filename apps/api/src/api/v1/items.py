@@ -8,9 +8,31 @@ from src.core.database import get_db
 from src.core.deps import get_current_workspace
 from src.models.item import Item
 from src.models.workspace import WorkspaceMember
-from src.schemas.item import ItemOut, UpdateItemRequest
+from src.schemas.item import (
+    ItemListItemOut,
+    ItemListResponse,
+    ItemOut,
+    UpdateItemRequest,
+)
 
 router = APIRouter(prefix="/items", tags=["items"])
+
+
+@router.get("", response_model=ItemListResponse)
+async def list_items(
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> ItemListResponse:
+    result = await db.execute(
+        select(Item)
+        .where(
+            Item.workspace_id == workspace.workspace_id,
+            Item.deleted_at.is_(None),
+        )
+        .order_by(Item.updated_at.desc())
+    )
+    items = list(result.scalars().all())
+    return ItemListResponse(items=[ItemListItemOut.model_validate(item) for item in items])
 
 
 @router.get("/{item_id}", response_model=ItemOut)
@@ -56,7 +78,7 @@ async def update_item(
             detail="Item not found",
         )
     if body.blocks is not None:
-        item.blocks = body.blocks
+        item.blocks = [block.model_dump(exclude_none=True) for block in body.blocks]
     if body.title is not None:
         item.title = body.title
     await db.commit()

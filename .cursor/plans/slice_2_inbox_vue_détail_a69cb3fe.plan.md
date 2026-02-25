@@ -1,6 +1,6 @@
 ---
 name: Slice 2 Inbox Vue Détail
-overview: "Implémentation de la Slice 2 (Inbox & Vue Détail) en Spec-Driven Development : modèle InboxCapture et extension Item (blocks JSONB), API inbox/items, BFF + hooks web avec BlockNote, mobile avec TenTap et Bottom Sheet détail item à 3 onglets."
+overview: "Implémentation de la Slice 2 (Inbox & Vue Détail) en Spec-Driven Development : modèle InboxCapture et extension Item (blocks JSONB), API inbox/items, BFF + hooks web avec BlockNote, mobile avec TenTap et page détail item plein écran à 3 onglets."
 todos: []
 isProject: false
 ---
@@ -9,7 +9,7 @@ isProject: false
 
 ## Contexte
 
-- **Source de vérité** : [project/specs/Spécifications Techniques Phase 1.md](project/specs/Spécifications Techniques Phase 1.md) — Slice 2 (lignes 334–458).
+- **Source de vérité** : [project/specs/Spécifications Techniques Phase 1.md](project/specs/Spécifications Techniques Phase 1.md) — section Slice 2.
 - **Conventions** : [.cursor/rules/project.mdc](.cursor/rules/project.mdc), [backend.mdc](.cursor/rules/backend.mdc), [web.mdc](.cursor/rules/web.mdc), [mobile.mdc](.cursor/rules/mobile.mdc).
 - **Hors scope** : IA (parsing/génération), attachments/fichiers/OCR, marketplace templates.
 
@@ -22,9 +22,9 @@ isProject: false
   - [apps/api/src/models/**init**.py](apps/api/src/models/__init__.py) — y ajouter `InboxCapture`.
   - [apps/api/src/main.py](apps/api/src/main.py) — enregistrement des routeurs.
   - [apps/web/src/lib/bff.ts](apps/web/src/lib/bff.ts) — `proxyWithAuth` pour BFF (pour POST/PATCH avec body : passer `body: JSON.stringify(await request.json())` dans `init`).
-  - [apps/web/src/app/(dashboard)/inbox/page.tsx](apps/web/src/app/(dashboard)/inbox/page.tsx) — page actuelle à remplacer par le cockpit 2 colonnes.
+  - [apps/web/src/app/(dashboard)/inbox/page.tsx](apps/web/src/app/(dashboard)/inbox/page.tsx) — page liste Inbox (captures + items récents) sans éditeur embarqué.
   - [apps/mobile/app/(tabs)/inbox.tsx](apps/mobile/app/(tabs)/inbox.tsx) — écran actuel à enrichir (liste + détail).
-  - [apps/mobile/components/BottomSheetCreate.tsx](apps/mobile/components/BottomSheetCreate.tsx) — pattern Bottom Sheet à réutiliser pour `ItemDetailSheet`.
+  - [apps/mobile/app/items/[id].tsx](apps/mobile/app/items/[id].tsx) — page cible pour le détail item plein écran.
 
 ---
 
@@ -70,6 +70,7 @@ isProject: false
   - `POST /inbox` → body `CreateCaptureRequest`, 201 `{ "id": uuid }`, enregistrer `user_id` depuis `get_current_user` + `workspace_id` depuis `get_current_workspace`.
   - `POST /inbox/{capture_id}/process` → body `{ "title": string }`, créer un `Item` avec ce `title` et `blocks=[]`, soft-delete la capture (`deleted_at = now()`), 200 `{ "item_id": uuid }`. Vérifier que la capture appartient au workspace.
 - **Créer** `apps/api/src/api/v1/items.py` :
+  - `GET /items` → 200 `ItemListResponse` trié `updated_at DESC`, filtré par `workspace_id` et `deleted_at.is_(None)`.
   - `GET /items/{item_id}` → 200 `ItemOut`, filtré par `workspace_id` et `deleted_at.is_(None)` (sinon 404).
   - `PATCH /items/{item_id}` → body `UpdateItemRequest`, mettre à jour `blocks` (et éventuellement `title` si dans le contrat), 200 `ItemOut`.
 - Toutes les routes utilisent `Depends(get_current_workspace)` et, pour inbox create/process, `get_current_user` pour `user_id`.
@@ -99,6 +100,8 @@ isProject: false
 - **Créer** `apps/web/src/app/api/items/[id]/route.ts` :
   - `GET` → proxy `GET /api/v1/items/{id}`.
   - `PATCH` → body `{ blocks }` (et optionnellement title) → proxy `PATCH /api/v1/items/{id}`.
+- **Créer** `apps/web/src/app/api/items/route.ts` :
+  - `GET` → proxy `GET /api/v1/items`.
 
 **Hooks :**
 
@@ -107,12 +110,13 @@ isProject: false
   - `useCreateCapture()` : `useMutation` POST /api/inbox, `onSuccess` → `invalidateQueries(["inbox"])`.
   - `useProcessCapture()` : `useMutation` POST /api/inbox/{id}/process, invalider `["inbox"]` et `["items"]` (ou query key item si ouverte).
 - **Créer** `apps/web/src/hooks/use-item.ts` :
+  - `useItems()` : `useQuery` avec `queryKey: ["items"]`, `queryFn: GET /api/items`.
   - `useItem(id: string | null)` : `useQuery` quand `id` non null, `queryKey: ["item", id]`, `queryFn: GET /api/items/{id}`.
-  - `useUpdateItem(id)` : `useMutation` PATCH /api/items/{id} avec **optimistic update** (TanStack Query : `onMutate` avec `setQueryData`, `onError` rollback, `onSettled` invalidate).
+  - `useUpdateItem(id)` : `useMutation` PATCH /api/items/{id} avec **optimistic update** (TanStack Query : `onMutate` + rollback + `onSuccess` qui met à jour le cache, sans invalidate systématique).
 
 Référence hooks : [apps/web/src/hooks/use-today.ts](apps/web/src/hooks/use-today.ts), [apps/web/src/hooks/use-timeline.ts](apps/web/src/hooks/use-timeline.ts).
 
-**DoD spec** : partie « **Web** : inbox list en colonne 2 ; item detail en colonne 3 ; mutations en optimistic UI » (complétée après étape 4).
+**DoD spec** : partie « **Web** : Inbox liste captures + items récents ; détail Item sur `/inbox/items/[id]` ; mutations en optimistic UI » (complétée après étape 4).
 
 ---
 
@@ -124,34 +128,34 @@ Référence hooks : [apps/web/src/hooks/use-today.ts](apps/web/src/hooks/use-tod
   - Utiliser l’API BlockNote pour initialiser le document à partir de `value` et écrire les changements en JSON (BlockNote peut exporter/importer un format compatible ProseMirror).
   - Documenter ou vérifier la compatibilité BlockNote ↔ ProseMirror JSON (spec : « format ProseMirror natif »).
 - **Modifier** [apps/web/src/app/(dashboard)/inbox/page.tsx](apps/web/src/app/(dashboard)/inbox/page.tsx) :
-  - Layout **cockpit 2 colonnes dans le contenu** : colonne gauche = liste (Inbox captures + liens vers items récents ou liste d’items), colonne droite = détail de l’item sélectionné avec BlockNote.
-  - Afficher la liste des captures (GET /api/inbox), bouton « Ajouter » (POST capture), sur une capture « Process » → saisie du titre → POST process → nouvel item créé, sélectionnable.
-  - Quand un item est sélectionné : GET /api/items/{id}, afficher titre + BlockEditor pour `blocks`, sauvegarde via PATCH avec optimistic update (useUpdateItem).
+  - Page `/inbox` : liste captures + items récents + état vide.
+  - Afficher la liste des captures (GET /api/inbox), bouton « Ajouter » (POST capture), sur une capture « Process » → saisie du titre → POST process → redirection vers `/inbox/items/{id}`.
+- **Créer** `apps/web/src/app/(dashboard)/inbox/items/[id]/page.tsx` :
+  - Détail item plein écran (pas de `Card`), BlockNote occupant toute la zone de contenu.
+  - Autosave débouncé (700 ms) + état `saving/saved/error`.
 - **i18n** : ajouter les clés nécessaires dans [apps/web/src/i18n/fr.json](apps/web/src/i18n/fr.json) et [apps/web/src/i18n/en.json](apps/web/src/i18n/en.json) (inbox.add, inbox.process, item.details, item.blocks, etc.).
 
-**DoD spec** : cocher « **Web** : inbox list en colonne 2 ; item detail en colonne 3 ; mutations en optimistic UI via TanStack Query. »
+**DoD spec** : cocher « **Web** : Inbox liste captures + items récents ; détail Item sur `/inbox/items/[id]` ; mutations en optimistic UI via TanStack Query. »
 
 ---
 
-## Étape 5 : Mobile — Éditeur TenTap + Bottom Sheet détail
+## Étape 5 : Mobile — Éditeur TenTap + page détail plein écran
 
 - **Installer** : `cd apps/mobile && npx expo install @10play/tentap-editor react-native-webview` (si erreurs de peer deps : `npm install --legacy-peer-deps` pour les paquets non-Expo).
-- **Store** : dans [apps/mobile/lib/store.ts](apps/mobile/lib/store.ts) (ou fichier dédié), ajouter un store type `useItemDetailSheet` : `itemId: string | null`, `open(itemId)`, `close()`.
-- **Créer** `apps/mobile/components/ItemDetailSheet.tsx` :
-  - Bottom Sheet avec 3 onglets : **Détails** (titre, métadonnées), **Blocs** (éditeur TenTap), **Coach** (placeholder texte i18n).
-  - Utiliser `@gorhom/bottom-sheet` (déjà utilisé dans BottomSheetCreate), avec onglets (tabs) en haut (ex. boutons ou segment control).
-  - Rendu dans `app/_layout.tsx` au même niveau que `BottomSheetCreate` (ou conditionnellement quand `itemId` non null).
+- **Créer** `apps/mobile/app/items/[id].tsx` :
+  - Page dédiée plein écran avec 3 onglets : **Détails**, **Blocs**, **Coach**.
+  - Header avec retour Inbox + état `saving/saved/error`.
 - **Créer** `apps/mobile/components/BlockEditor.tsx` :
   - Wrapper TenTap qui reçoit `value` (blocks JSON) et `onChange(blocks)`.
   - TenTap / Tiptap produit du JSON compatible ProseMirror ; synchroniser avec le state et l’API PATCH items/{id}.
 - **Modifier** [apps/mobile/app/(tabs)/inbox.tsx](apps/mobile/app/(tabs)/inbox.tsx) :
   - Liste des captures (useInbox équivalent : appel direct FastAPI avec token depuis SecureStore).
   - Créer hooks `use-inbox.ts` et `use-item.ts` dans `apps/mobile/hooks/` (même logique que web mais fetch vers `EXPO_PUBLIC_API_URL` + Bearer).
-  - Tap sur une capture → flow « Process » (saisie titre → POST process) ou affichage détail.
-  - Tap sur un item (ou après process) → ouvrir `ItemDetailSheet` avec cet `item_id`.
+  - Tap sur une capture → flow « Process » (saisie titre → POST process).
+  - Tap sur un item (ou après process) → `router.push("/items/{id}")`.
 - **i18n mobile** : [apps/mobile/i18n/fr.json](apps/mobile/i18n/fr.json) et [apps/mobile/i18n/en.json](apps/mobile/i18n/en.json) — clés pour inbox, item detail, onglets Détails/Blocs/Coach placeholder.
 
-**DoD spec** : cocher « **Mobile** : Inbox tab liste + détail item en Bottom Sheet (3 onglets : Détails, Blocs, Coach placeholder). »
+**DoD spec** : cocher « **Mobile** : Inbox tab liste + détail item en page plein écran (3 onglets : Détails, Blocs, Coach placeholder). »
 
 ---
 
@@ -163,13 +167,13 @@ flowchart LR
   B --> C[Shared inbox/item]
   C --> D[Etape 3 Web BFF Hooks]
   D --> E[Etape 4 Web BlockNote]
-  B --> F[Etape 5 Mobile TenTap Sheet]
+  B --> F[Etape 5 Mobile TenTap Page]
   C --> F
 ```
 
 
 
-- Après **chaque** étape : cocher les items DoD correspondants dans [project/specs/Spécifications Techniques Phase 1.md](project/specs/Spécifications Techniques Phase 1.md) (`- [ ]` → `- [x]`), puis lancer le linter / typecheck (web : `npm run lint`, mobile : idem ou tsc).
+- Après **chaque** étape : cocher les items DoD correspondants dans [project/specs/Spécifications Techniques Phase 1.md](project/specs/Spécifications Techniques Phase 1.md) (`- [ ]` → `- [x]`), puis lancer le linter / typecheck (web : `npm run lint`, mobile : `npx tsc --noEmit`).
 - **Ne pas** implémenter ce qui est dans « Out of scope » Slice 2 (IA, attachments, marketplace).
 
 ---
@@ -180,4 +184,3 @@ flowchart LR
 - **BFF** : pour les routes POST/PATCH avec body, toujours faire `const body = await request.json(); return proxyWithAuth(..., { method: "POST", body: JSON.stringify(body) });`.
 - **Mobile** : utiliser `npx expo install` pour `@10play/tentap-editor` et `react-native-webview` ; en cas d’échec npm, `npm install --legacy-peer-deps`.
 - **Port** : ne tuer que le port du projet (ex. 3000 pour web, 8081 pour Expo) si besoin, jamais tous les processus Next/Expo.
-

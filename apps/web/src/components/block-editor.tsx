@@ -2,9 +2,8 @@
 
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
-import "@blocknote/core/fonts/inter.css";
-import "@blocknote/mantine/style.css";
 import type { Block } from "@blocknote/core";
+import { cn } from "@/lib/utils";
 
 export interface BlockEditorProps {
   /** BlockNote/ProseMirror-compatible blocks (from API or empty array) */
@@ -14,6 +13,7 @@ export interface BlockEditorProps {
   editable?: boolean;
   /** Key to reset editor when item changes (e.g. itemId) */
   editorKey?: string;
+  className?: string;
 }
 
 /**
@@ -26,6 +26,7 @@ export function BlockEditor({
   placeholder,
   editable = true,
   editorKey,
+  className,
 }: BlockEditorProps) {
   const initialContent = Array.isArray(value) && value.length > 0 ? (value as Block[]) : undefined;
   const editor = useCreateBlockNote(
@@ -34,15 +35,18 @@ export function BlockEditor({
   );
 
   return (
-    <BlockNoteView
-      editor={editor}
-      theme="light"
-      editable={editable}
-      onChange={() => {
-        const doc = editor.document;
-        if (doc) onChange(doc);
-      }}
-      data-placeholder={placeholder}
-    />
+    <div className={cn("blocknote-shell h-full min-h-0 overflow-visible", className)}>
+      <BlockNoteView
+        editor={editor}
+        theme="light"
+        editable={editable}
+        onChange={() => {
+          const doc = editor.document;
+          if (doc) onChange(doc);
+        }}
+        data-placeholder={placeholder}
+        className="h-full min-h-0 overflow-visible"
+      />
+    </div>
   );
 }

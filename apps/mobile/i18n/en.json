@@ -1,1 +1,105 @@
-{"common":{"appName":"Momentarise"},"nav":{"today":"Today","inbox":"Inbox","create":"Create","timeline":"Timeline","me":"Me"},"auth":{"login":"Log in","loginDescription":"Log in to continue","email":"Email","password":"Password","submit":"Log in","logout":"Log out","invalidCredentials":"Invalid email or password","forgotPassword":"Forgot password?","noAccount":"No account?","signUp":"Sign up","signUpTitle":"Create an account","signUpDescription":"Enter your email to get started","signUpSubmit":"Create my account","hasAccount":"Already have an account?","signIn":"Log in","emailExists":"An account with this email already exists","continueWithGoogle":"Continue with Google","continueWithApple":"Continue with Apple","continueWithGitHub":"Continue with GitHub","comingSoon":"Coming soon","continueWith":"Or continue with"},"create":{"title":"Create","placeholder":"Capture is coming in Slice 2."},"pages":{"today":{"title":"Today","placeholder":"This section is coming in Slice 1.","priorities":"Priorities","emptyPriorities":"No priorities for today.","nextEvent":"Next event","emptyNextEvent":"No event scheduled.","nextAction":"Next action","emptyNextAction":"No action planned."},"inbox":{"title":"Inbox","placeholder":"This section is coming in Slice 2.","add":"Add capture","addPlaceholder":"Enter raw text…","process":"Process to item","processTitle":"Item title","processSubmit":"Create item","emptyList":"No captures.","cancel":"Cancel"},"item":{"details":"Details","blocks":"Content","coach":"Coach","coachPlaceholder":"Coach is coming in a future version.","title":"Title","noItemSelected":"Select a capture to process or an item."},"timeline":{"title":"Timeline","placeholder":"This section is coming in Slice 1.","emptyDay":"No events this day.","start":"Start","stop":"Stop"},"me":{"title":"Me","placeholder":"Profile and settings — coming soon."}}}
+{
+  "common": {
+    "appName": "Momentarise"
+  },
+  "nav": {
+    "today": "Today",
+    "inbox": "Inbox",
+    "create": "Create",
+    "timeline": "Timeline",
+    "me": "Me"
+  },
+  "auth": {
+    "login": "Log in",
+    "loginDescription": "Log in to continue",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Log in",
+    "logout": "Log out",
+    "invalidCredentials": "Invalid email or password",
+    "forgotPassword": "Forgot password?",
+    "noAccount": "No account?",
+    "signUp": "Sign up",
+    "signUpTitle": "Create an account",
+    "signUpDescription": "Enter your email to get started",
+    "signUpSubmit": "Create my account",
+    "hasAccount": "Already have an account?",
+    "signIn": "Log in",
+    "emailExists": "An account with this email already exists",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithApple": "Continue with Apple",
+    "continueWithGitHub": "Continue with GitHub",
+    "comingSoon": "Coming soon",
+    "continueWith": "Or continue with"
+  },
+  "create": {
+    "title": "Create",
+    "placeholder": "Quick capture: add raw content and send it to Inbox.",
+    "options": {
+      "note": {
+        "title": "Note",
+        "subtitle": "Available now"
+      },
+      "photo": {
+        "title": "Photo",
+        "subtitle": "Coming soon"
+      },
+      "voice": {
+        "title": "Voice",
+        "subtitle": "Coming soon"
+      },
+      "link": {
+        "title": "Link",
+        "subtitle": "Coming soon"
+      }
+    }
+  },
+  "pages": {
+    "today": {
+      "title": "Today",
+      "placeholder": "This section is coming in Slice 1.",
+      "priorities": "Priorities",
+      "emptyPriorities": "No priorities for today.",
+      "nextEvent": "Next event",
+      "emptyNextEvent": "No event scheduled.",
+      "nextAction": "Next action",
+      "emptyNextAction": "No action planned."
+    },
+    "inbox": {
+      "title": "Inbox",
+      "placeholder": "This section is coming in Slice 2.",
+      "add": "Add capture",
+      "addPlaceholder": "Enter raw text…",
+      "process": "Process to item",
+      "processTitle": "Item title",
+      "processSubmit": "Create item",
+      "emptyList": "No captures.",
+      "recentItems": "Recent items",
+      "emptyItems": "No recent items.",
+      "cancel": "Cancel"
+    },
+    "item": {
+      "details": "Details",
+      "blocks": "Content",
+      "coach": "Coach",
+      "coachPlaceholder": "Coach is coming in a future version.",
+      "title": "Title",
+      "backToInbox": "Back to Inbox",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "saveError": "Save error",
+      "noItemSelected": "Select a capture to process or an item."
+    },
+    "timeline": {
+      "title": "Timeline",
+      "placeholder": "This section is coming in Slice 1.",
+      "emptyDay": "No events this day.",
+      "start": "Start",
+      "stop": "Stop"
+    },
+    "me": {
+      "title": "Me",
+      "placeholder": "Profile and settings — coming soon."
+    }
+  }
+}

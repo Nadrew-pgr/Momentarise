@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -20,11 +21,23 @@ ProseMirrorNode.model_rebuild()
 class ItemOut(BaseModel):
     id: uuid.UUID
     title: str
-    blocks: list[dict[str, Any]]  # ProseMirror JSON; validated as list of dicts in API
+    blocks: list[ProseMirrorNode]
 
     model_config = {"from_attributes": True}
 
 
 class UpdateItemRequest(BaseModel):
-    blocks: list[dict[str, Any]] | None = None
+    blocks: list[ProseMirrorNode] | None = None
     title: str | None = None
+
+
+class ItemListItemOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ItemListResponse(BaseModel):
+    items: list[ItemListItemOut]
