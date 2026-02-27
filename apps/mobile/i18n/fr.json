@@ -1,6 +1,7 @@
 {
   "common": {
-    "appName": "Momentarise"
+    "appName": "Momentarise",
+    "retry": "Réessayer"
   },
   "nav": {
     "today": "Aujourd'hui",
@@ -34,23 +35,29 @@
   },
   "create": {
     "title": "Créer",
+    "defaultNoteTitle": "Nouvelle note",
+    "error": "Action en échec. Vérifie le réseau/API puis réessaie.",
     "placeholder": "Capture rapide : ajoute du brut puis envoie-le dans Inbox.",
     "options": {
       "note": {
         "title": "Note",
-        "subtitle": "Disponible maintenant"
+        "subtitle": "Créer un item direct"
       },
       "photo": {
         "title": "Photo",
-        "subtitle": "Bientôt disponible"
+        "subtitle": "Capture brute (placeholder)"
       },
       "voice": {
         "title": "Audio",
-        "subtitle": "Bientôt disponible"
+        "subtitle": "Capture brute (placeholder)"
       },
       "link": {
         "title": "Lien",
-        "subtitle": "Bientôt disponible"
+        "subtitle": "Capture brute (placeholder)"
+      },
+      "sync": {
+        "title": "Sync",
+        "subtitle": "Ouvrir la page Sync"
       }
     }
   },
@@ -73,7 +80,10 @@
       "process": "Transformer en élément",
       "processTitle": "Titre de l'élément",
       "processSubmit": "Créer l'élément",
+      "preview": "Prévisualiser",
+      "apply": "Appliquer",
       "emptyList": "Aucune capture.",
+      "emptyCapture": "Capture sans contenu texte.",
       "recentItems": "Éléments récents",
       "emptyItems": "Aucun élément récent.",
       "cancel": "Annuler"
@@ -88,14 +98,24 @@
       "saving": "Enregistrement…",
       "saved": "Enregistré",
       "saveError": "Erreur d'enregistrement",
+      "delete": "Supprimer",
+      "deleted": "Élément supprimé.",
+      "undoDelete": "Annuler",
+      "linkedTo": "Lié à",
+      "emptyLinks": "Aucun lien pour cet élément.",
       "noItemSelected": "Sélectionnez une capture à transformer ou un élément."
     },
     "timeline": {
       "title": "Timeline",
       "placeholder": "Cette section arrive dans la Slice 1.",
       "emptyDay": "Aucun événement ce jour.",
+      "emptyHint": "Ajoutez des événements depuis Inbox pour les voir ici.",
       "start": "Démarrer",
       "stop": "Arrêter"
+    },
+    "sync": {
+      "title": "Sync",
+      "placeholder": "Page Sync prête pour les prochaines itérations (chat, preview/apply, outils IA)."
     },
     "me": {
       "title": "Moi",

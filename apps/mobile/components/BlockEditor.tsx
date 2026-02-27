@@ -56,9 +56,11 @@ export function BlockEditor({
   }, [editor]);
 
   return (
-    <View style={{ flex: 1, minHeight: 160 }}>
-      <RichText editor={editor} style={{ flex: 1, minHeight: 120 }} />
-      <Toolbar editor={editor} />
+    <View style={{ flex: 1, minHeight: 220 }}>
+      <RichText editor={editor} style={{ flex: 1, minHeight: 180 }} />
+      <View style={{ borderTopWidth: 1, borderTopColor: "#e4e4e7", paddingTop: 8 }}>
+        <Toolbar editor={editor} />
+      </View>
     </View>
   );
 }

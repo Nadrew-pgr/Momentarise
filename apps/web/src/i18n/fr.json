@@ -1,10 +1,12 @@
 {
   "common": {
-    "appName": "Momentarise"
+    "appName": "Momentarise",
+    "retry": "Réessayer"
   },
   "nav": {
     "today": "Aujourd'hui",
     "inbox": "Boîte de réception",
+    "sync": "Sync",
     "timeline": "Timeline",
     "me": "Moi"
   },
@@ -52,11 +54,15 @@
       "title": "Boîte de réception",
       "placeholder": "Cette section arrive dans la Slice 2.",
       "add": "Ajouter une capture",
+      "createNote": "Créer une note",
       "addPlaceholder": "Saisir du texte brut…",
       "process": "Transformer en élément",
       "processTitle": "Titre de l'élément",
       "processSubmit": "Créer l'élément",
+      "preview": "Prévisualiser",
+      "apply": "Appliquer",
       "emptyList": "Aucune capture. Ajoutez du brut pour commencer.",
+      "emptyCapture": "Capture sans contenu texte.",
       "recentItems": "Éléments récents",
       "emptyItems": "Aucun élément récent.",
       "cancel": "Annuler"
@@ -69,7 +75,16 @@
       "saving": "Enregistrement…",
       "saved": "Enregistré",
       "saveError": "Erreur d'enregistrement",
+      "delete": "Supprimer",
+      "deleted": "Élément supprimé.",
+      "undoDelete": "Annuler",
+      "linkedTo": "Lié à",
+      "emptyLinks": "Aucun lien pour cet élément.",
       "noItemSelected": "Sélectionnez une capture à transformer ou un élément."
+    },
+    "sync": {
+      "title": "Sync",
+      "placeholder": "Page Sync prête pour les prochaines itérations (chat, preview/apply, outils IA)."
     },
     "timeline": {
       "title": "Timeline",

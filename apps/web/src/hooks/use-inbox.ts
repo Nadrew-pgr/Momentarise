@@ -2,11 +2,17 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  ApplyCaptureRequest,
+  ApplyCaptureResponse,
+  CapturePreviewResponse,
   CreateCaptureRequest,
   InboxListResponse,
   ProcessCaptureResponse,
 } from "@momentarise/shared";
 import {
+  applyCaptureResponseSchema,
+  capturePreviewResponseSchema,
+  createCaptureRequestSchema,
   inboxListResponseSchema,
   processCaptureResponseSchema,
 } from "@momentarise/shared";
@@ -28,16 +34,56 @@ export function useCreateCapture() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: CreateCaptureRequest) => {
+      const body = createCaptureRequestSchema.parse(payload);
       const res = await fetchWithAuth("/api/inbox", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Failed to create capture");
       return res.json() as Promise<{ id: string }>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    },
+  });
+}
+
+export function usePreviewCapture() {
+  return useMutation({
+    mutationFn: async ({ captureId }: { captureId: string }) => {
+      const res = await fetchWithAuth(`/api/inbox/${captureId}/preview`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to preview capture");
+      const data = await res.json();
+      return capturePreviewResponseSchema.parse(data) as CapturePreviewResponse;
+    },
+  });
+}
+
+export function useApplyCapture() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      captureId,
+      payload,
+    }: {
+      captureId: string;
+      payload?: ApplyCaptureRequest;
+    }) => {
+      const res = await fetchWithAuth(`/api/inbox/${captureId}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload ?? {}),
+      });
+      if (!res.ok) throw new Error("Failed to apply capture");
+      const data = await res.json();
+      return applyCaptureResponseSchema.parse(data) as ApplyCaptureResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
     },
   });
 }
@@ -60,8 +106,8 @@ export function useProcessCapture() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inbox"] });
-      queryClient.invalidateQueries({ queryKey: ["item"] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["item"] });
     },
   });
 }

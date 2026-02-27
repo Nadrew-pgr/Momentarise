@@ -3,6 +3,7 @@ import {
   Text,
   ScrollView,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
@@ -10,13 +11,20 @@ import { useToday } from "@/hooks/use-today";
 
 export default function TodayScreen() {
   const { t } = useTranslation();
-  const { data, isLoading, error } = useToday();
+  const { data, isLoading, error, refetch, isFetching } = useToday();
 
   if (error) {
     return (
       <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-destructive">{error.message}</Text>
+          <Pressable
+            onPress={() => refetch()}
+            disabled={isFetching}
+            className="mt-3 rounded border border-input px-3 py-2"
+          >
+            <Text className="text-foreground">{t("common.retry")}</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );

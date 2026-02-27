@@ -61,6 +61,7 @@ async def get_timeline(
             actual_time_acc_seconds=e.actual_time_acc_seconds,
             is_tracking=e.is_tracking,
             tracking_started_at=e.tracking_started_at,
+            updated_at=e.updated_at,
         )
         for e in events
     ]

@@ -16,12 +16,18 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 interface CreateSheetState {
   isOpen: boolean;
+  openNonce: number;
   open: () => void;
   close: () => void;
 }
 
 export const useCreateSheet = create<CreateSheetState>((set) => ({
   isOpen: false,
-  open: () => set({ isOpen: true }),
+  openNonce: 0,
+  open: () =>
+    set((state) => ({
+      isOpen: true,
+      openNonce: state.openNonce + 1,
+    })),
   close: () => set({ isOpen: false }),
 }));

@@ -21,6 +21,8 @@ class Workspace(BaseMixin, Base):
     items: Mapped[list["Item"]] = relationship(back_populates="workspace")  # noqa: F821
     events: Mapped[list["Event"]] = relationship(back_populates="workspace")  # noqa: F821
     inbox_captures: Mapped[list["InboxCapture"]] = relationship(back_populates="workspace")  # noqa: F821
+    entity_links: Mapped[list["EntityLink"]] = relationship(back_populates="workspace")  # noqa: F821
+    ai_changes: Mapped[list["AIChange"]] = relationship(back_populates="workspace")  # noqa: F821
 
 
 class WorkspaceMember(BaseMixin, Base):

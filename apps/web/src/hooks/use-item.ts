@@ -2,11 +2,23 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  CreateEntityLinkRequest,
+  ItemActionResponse,
+  ItemCreateRequest,
+  ItemLinksResponse,
   ItemListResponse,
   ItemOut,
   UpdateItemRequest,
 } from "@momentarise/shared";
-import { itemListResponseSchema, itemOutSchema } from "@momentarise/shared";
+import {
+  createEntityLinkRequestSchema,
+  entityLinkSchema,
+  itemActionResponseSchema,
+  itemCreateRequestSchema,
+  itemLinksResponseSchema,
+  itemListResponseSchema,
+  itemOutSchema,
+} from "@momentarise/shared";
 import { fetchWithAuth } from "@/lib/bff-client";
 
 export function useItems() {
@@ -35,6 +47,28 @@ export function useItem(itemId: string | null) {
   });
 }
 
+export function useCreateItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: ItemCreateRequest) => {
+      const body = itemCreateRequestSchema.parse(payload);
+      const res = await fetchWithAuth("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Failed to create item");
+      const data = await res.json();
+      return itemOutSchema.parse(data) as ItemOut;
+    },
+    onSuccess: (item) => {
+      queryClient.setQueryData(["item", item.id], item);
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    },
+  });
+}
+
 export function useUpdateItem(itemId: string | null) {
   const queryClient = useQueryClient();
 
@@ -54,11 +88,18 @@ export function useUpdateItem(itemId: string | null) {
       if (!itemId) return undefined;
       await queryClient.cancelQueries({ queryKey: ["item", itemId] });
       const previous = queryClient.getQueryData<ItemOut>(["item", itemId]);
-      if (previous && payload.blocks !== undefined) {
+      if (previous) {
+        const optimisticBlocks =
+          payload.blocks !== undefined
+            ? (payload.blocks as unknown as ItemOut["blocks"])
+            : undefined;
         queryClient.setQueryData<ItemOut>(["item", itemId], {
           ...previous,
-          blocks: payload.blocks,
+          ...(optimisticBlocks !== undefined && { blocks: optimisticBlocks }),
           ...(payload.title !== undefined && { title: payload.title }),
+          ...(payload.kind !== undefined && { kind: payload.kind }),
+          ...(payload.status !== undefined && { status: payload.status }),
+          ...(payload.metadata !== undefined && { metadata: payload.metadata }),
         });
       }
       return { previous };
@@ -72,6 +113,81 @@ export function useUpdateItem(itemId: string | null) {
       if (itemId) {
         queryClient.setQueryData(["item", itemId], updatedItem);
       }
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+    },
+  });
+}
+
+export function useDeleteItem(itemId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!itemId) throw new Error("No item id");
+      const res = await fetchWithAuth(`/api/items/${itemId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete item");
+      const data = await res.json();
+      return itemActionResponseSchema.parse(data) as ItemActionResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    },
+  });
+}
+
+export function useRestoreItem(itemId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!itemId) throw new Error("No item id");
+      const res = await fetchWithAuth(`/api/items/${itemId}/restore`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to restore item");
+      const data = await res.json();
+      return itemActionResponseSchema.parse(data) as ItemActionResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["item", itemId] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    },
+  });
+}
+
+export function useItemLinks(itemId: string | null) {
+  return useQuery<ItemLinksResponse>({
+    queryKey: ["item-links", itemId],
+    enabled: !!itemId,
+    queryFn: async () => {
+      if (!itemId) return { links: [] };
+      const res = await fetchWithAuth(`/api/items/${itemId}/links`);
+      if (!res.ok) throw new Error("Failed to fetch links");
+      const data = await res.json();
+      return itemLinksResponseSchema.parse(data) as ItemLinksResponse;
+    },
+  });
+}
+
+export function useCreateItemLink(itemId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: CreateEntityLinkRequest) => {
+      if (!itemId) throw new Error("No item id");
+      const body = createEntityLinkRequestSchema.parse(payload);
+      const res = await fetchWithAuth(`/api/items/${itemId}/links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Failed to create link");
+      const data = await res.json();
+      return entityLinkSchema.parse(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["item-links", itemId] });
     },
   });
 }

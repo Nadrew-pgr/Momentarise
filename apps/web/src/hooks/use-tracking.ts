@@ -17,6 +17,7 @@ export function useTracking() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["today"] });
       queryClient.invalidateQueries({ queryKey: ["timeline"] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
     },
   });
 
@@ -31,6 +32,7 @@ export function useTracking() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["today"] });
       queryClient.invalidateQueries({ queryKey: ["timeline"] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
     },
   });
 

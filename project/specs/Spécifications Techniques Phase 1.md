@@ -567,90 +567,87 @@ class ProseMirrorNode(BaseModel):
 
 ---
 
-## Slice 3 — Journaling & Capture (omnicanal)
+## Slice 3 — Capture Hub, Linking Graph, Sync-ready
 
 ### User Story
 
-En tant qu’utilisateur, je peux capturer depuis l’extérieur (web extension / share / deep link) vers l’Inbox et je peux logger une humeur simple (1–5).
+En tant qu’utilisateur, je capture rapidement (`+`) puis je choisis explicitement quoi faire: créer un item direct, prévisualiser une transformation, appliquer, annuler.  
+Tous les objets (captures, items, events/moments) sont liés via un graphe de liens explicites.
 
 ### DoD (Checklist d’acceptation)
 
-- [ ] **API** : endpoint capture externe insère dans `inbox_captures`.
-- [ ] **Mobile** : Deep Link `lifeos://share?text=...` ouvre l’app et crée une capture.
-- [ ] **DB** : table `habit_logs` créée ; mood score validé.
-- [ ] **Web** : widget “mood” présent (Me ou Sidebar), i18n compliant.
+- [x] **DB** : `items` étendu (`kind`, `status`, `metadata`, `source_capture_id`).
+- [x] **DB** : `inbox_captures` étendu (`capture_type`, `status`, `metadata`).
+- [x] **DB** : tables `entity_links` et `ai_changes` créées.
+- [x] **API** : `POST /api/v1/items` (création directe) disponible.
+- [x] **API** : `DELETE /api/v1/items/{id}` + `POST /api/v1/items/{id}/restore` disponibles.
+- [x] **API** : `GET/POST /api/v1/items/{id}/links` disponibles.
+- [x] **API** : `POST /api/v1/inbox/{id}/preview` + `POST /api/v1/inbox/{id}/apply` disponibles.
+- [x] **Web** : route `/sync` ajoutée (stub prêt pour itérations IA).
+- [x] **Mobile** : `+` reste un Bottom Sheet de capture (pas de navigation forcée).
+- [x] **Mobile** : timeline visible même sans événements (grille + empty overlay).
 
 ### Out of scope
 
-- Share Extension native complète (iOS/Android) si elle impose trop de natif en Phase 1 (peut être “prep-only”).
-- Habit tracker complexe.
+- Agent autonome complet.
+- RAG vectoriel complet (reporté Slice 4).
+- Intégrations natives Voice/Photo complètes (les options existent, pipeline minimal placeholder en place).
 
 ### API Contract
 
 #### FastAPI (`/api/v1`)
 
-- `POST /capture/external`
-  - Body `{ "raw_content": string, "source": "deeplink" | "extension" | "share" }`
-  - 201 `{ "capture_id": uuid }`
-- `POST /habits/log`
-  - Body `{ "date": "YYYY-MM-DD", "mood_score": 1..5 | null }`
-  - 200 `{ "ok": true }`
-
-#### Next.js BFF (Route Handlers `/api`)
-
-- Web : `POST /api/capture/external` → proxy `/api/v1/capture/external`
-- Web : `POST /api/habits/log` → proxy `/api/v1/habits/log`
-
-### DB Contract
-
-#### `habit_logs`
-
-- `id` UUID PK
-- `workspace_id` UUID FK → `workspaces.id`
-- `user_id` UUID FK → `users.id`
-- `date` DATE non-null
-- `mood_score` INTEGER nullable (1..5)
-- Contrainte unique : `(user_id, date)`
-- `created_at`, `updated_at`, `deleted_at`
+- `POST /items` → crée un item direct (`title`, `kind`, `status`, `metadata`, `source_capture_id`, `blocks`).
+- `PATCH /items/{id}` → update item.
+- `DELETE /items/{id}` → soft delete item.
+- `POST /items/{id}/restore` → restore item soft-deleted.
+- `GET /items/{id}/links` → retourne les liens entrants/sortants de l’item.
+- `POST /items/{id}/links` → crée un lien explicite depuis l’item.
+- `POST /inbox/{id}/preview` → suggère `title/kind` (heuristique phase 1).
+- `POST /inbox/{id}/apply` → crée item depuis capture + soft delete capture.
+- `POST /inbox/{id}/process` → transformation manuelle (legacy conservé).
 
 ### UI Routes
 
 #### Mobile
 
-- Deep link handler (pas forcément une route visible)
-- Mood log accessible via `/(tabs)/me` (ou widget)
+- `+` : Bottom Sheet capture hub (`Note`, `Voice`, `Photo`, `Link`, `Sync`).
+- `/items/[id]` : détail item plein écran (Détails / Blocs / Coach placeholder).
+- `/sync` : stub.
 
 #### Web
 
-- Widget mood dans `/me` (ou Sidebar cockpit)
-
+- `/inbox` : captures + items récents + actions `preview/apply/process`.
+- `/inbox/items/[id]` : détail plein espace + suppression + undo + panel links.
+- `/sync` : stub.
 
 ### Décisions verrouillées (Slice 3)
 
-- **Deep link scheme** : `lifeos://share?text=...` (configuré dans `app.json` Expo).
-- **Mood widget** : composant simple (5 étoiles/émojis) dans la page `/me`, pas un onglet séparé.
-- **Share Extension native** : prep-only en Phase 1 (deep link uniquement).
+- `process` n’est plus obligatoire pour utiliser un item.
+- `+` est un hub de capture uniquement.
+- Toute mutation IA future suit `preview -> apply -> undo`.
+- Vocabulaire canonique: `InboxCapture`, `Item`, `Event/Moment`, `Block`, `EntityLink`.
 
 ### Guide d'implémentation
 
-#### Étape 1 : Backend — Endpoints
+#### Étape 1 : Backend
 
-- Créer `apps/api/src/api/v1/capture.py` : `POST /capture/external` → insère dans `inbox_captures` avec champ `source`.
-- Créer `apps/api/src/models/habit_log.py` : table `habit_logs`.
-- Créer `apps/api/src/schemas/habit.py` + `apps/api/src/api/v1/habits.py` : `POST /habits/log`.
-- Migration : `uv run alembic revision --autogenerate -m "add_habit_logs"`
+- Migration Slice 3 v2 (`f4b6c9d3e2a1`).
+- Extension modèles `Item` et `InboxCapture`.
+- Ajout modèles `EntityLink` et `AIChange`.
+- Routes `items` et `inbox` mises à jour avec nouveaux endpoints.
 
-#### Étape 2 : Web — BFF + Widget Mood
+#### Étape 2 : Shared contracts
 
-- Route Handler BFF : `api/capture/external/route.ts`, `api/habits/log/route.ts`.
-- Modifier `apps/web/src/app/(dashboard)/me/page.tsx` : ajouter widget mood (5 boutons 1-5, appel `POST /api/habits/log`).
-- Hook : `use-mood.ts` avec `useMutation`.
+- Ajouter enums/types partagés: `CaptureType`, `ItemKind`, `LifecycleStatus`, `LinkRelationType`.
+- Ajouter schémas `ItemCreateRequest`, `ItemActionResponse`, `EntityLink`, `Preview/Apply`.
+- Ajouter support `block_id` dans le contrat blocks.
 
-#### Étape 3 : Mobile — Deep Link Handler
+#### Étape 3 : Web + Mobile
 
-- Configurer le scheme dans `apps/mobile/app.json` : `"scheme": "lifeos"`.
-- Créer un handler dans `apps/mobile/app/_layout.tsx` : écouter `Linking.addEventListener` → si URL `lifeos://share?text=...` → appeler `POST /api/v1/capture/external`.
-- Ajouter widget mood dans `apps/mobile/app/(tabs)/me.tsx`.
+- Web: BFF routes manquantes (`restore`, `links`, `preview`, `apply`) + `/sync`.
+- Mobile: `BottomSheetCreate` en hub de capture, timeline non vide visuellement, retour item fiable vers Inbox.
+- Web/Mobile: suppression item + undo court terme + affichage des liens.
 
 ---
 

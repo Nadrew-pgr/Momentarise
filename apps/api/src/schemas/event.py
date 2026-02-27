@@ -1,7 +1,34 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from src.schemas.timeline import EventOut
+
+
+class EventCreateRequest(BaseModel):
+    title: str = Field(min_length=1)
+    start_at: datetime
+    end_at: datetime
+    estimated_time_seconds: int | None = Field(default=None, ge=0)
+    item_id: uuid.UUID | None = None
+
+
+class EventUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1)
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    estimated_time_seconds: int | None = Field(default=None, ge=0)
+    last_known_updated_at: datetime | None = None
+
+
+class EventsRangeResponse(BaseModel):
+    events: list[EventOut]
+
+
+class EventDeleteResponse(BaseModel):
+    id: uuid.UUID
+    deleted: bool
 
 
 class StartTrackingResponse(BaseModel):

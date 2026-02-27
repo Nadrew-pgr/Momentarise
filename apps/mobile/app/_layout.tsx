@@ -27,7 +27,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoading) return;
-    const inProtectedGroup = segments[0] === "(tabs)" || segments[0] === "items";
+    const inProtectedGroup =
+      segments[0] === "(tabs)" || segments[0] === "items" || segments[0] === "sync";
     if (isAuthenticated && !inProtectedGroup) {
       router.replace("/(tabs)/today");
     } else if (!isAuthenticated && inProtectedGroup) {

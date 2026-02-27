@@ -13,7 +13,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { useCreateCapture, useInbox, useProcessCapture } from "@/hooks/use-inbox";
+import {
+  useApplyCapture,
+  useCreateCapture,
+  useInbox,
+  usePreviewCapture,
+  useProcessCapture,
+} from "@/hooks/use-inbox";
 import { useItems } from "@/hooks/use-item";
 
 export default function InboxScreen() {
@@ -27,6 +33,11 @@ export default function InboxScreen() {
   const { data: itemsData, isLoading: itemsLoading } = useItems();
   const createCapture = useCreateCapture();
   const processCapture = useProcessCapture();
+  const previewCapture = usePreviewCapture();
+  const applyCapture = useApplyCapture();
+  const [previewByCaptureId, setPreviewByCaptureId] = useState<
+    Record<string, { suggested_title: string; suggested_kind: string; reason: string }>
+  >({});
 
   const captures = inboxData?.captures ?? [];
   const items = itemsData?.items ?? [];
@@ -35,7 +46,13 @@ export default function InboxScreen() {
     const text = newCaptureText.trim();
     if (!text) return;
     createCapture.mutate(
-      { raw_content: text },
+      {
+        raw_content: text,
+        capture_type: "text",
+        status: "captured",
+        source: "manual",
+        metadata: { source: "mobile_inbox_text" },
+      },
       { onSuccess: () => setNewCaptureText("") }
     );
   }, [createCapture, newCaptureText]);
@@ -58,6 +75,47 @@ export default function InboxScreen() {
       }
     );
   }, [processCapture, processingCaptureId, processingTitle, router]);
+
+  const handlePreview = useCallback(
+    (captureId: string) => {
+      previewCapture.mutate(
+        { captureId },
+        {
+          onSuccess: (preview) => {
+            setPreviewByCaptureId((prev) => ({
+              ...prev,
+              [captureId]: {
+                suggested_title: preview.suggested_title,
+                suggested_kind: preview.suggested_kind,
+                reason: preview.reason,
+              },
+            }));
+          },
+        }
+      );
+    },
+    [previewCapture]
+  );
+
+  const handleApply = useCallback(
+    (captureId: string) => {
+      const preview = previewByCaptureId[captureId];
+      applyCapture.mutate(
+        {
+          captureId,
+          payload: preview
+            ? { title: preview.suggested_title, kind: preview.suggested_kind as never }
+            : undefined,
+        },
+        {
+          onSuccess: (res) => {
+            router.push(`/items/${res.item_id}`);
+          },
+        }
+      );
+    },
+    [applyCapture, previewByCaptureId, router]
+  );
 
   const listFooter = useMemo(() => {
     return (
@@ -143,9 +201,24 @@ export default function InboxScreen() {
               ListFooterComponent={listFooter}
               renderItem={({ item: capture }) => (
                 <View className="mb-3 rounded-lg border border-border bg-card p-3">
+                  <View className="mb-1 flex-row items-center justify-between">
+                    <Text className="text-xs uppercase text-muted-foreground">{capture.capture_type}</Text>
+                    <Text className="text-xs text-muted-foreground">{capture.status}</Text>
+                  </View>
                   <Text className="text-sm text-foreground" numberOfLines={3}>
-                    {capture.raw_content}
+                    {capture.raw_content || t("pages.inbox.emptyCapture")}
                   </Text>
+                  {previewByCaptureId[capture.id] ? (
+                    <View className="mt-2 rounded border border-border bg-background p-2">
+                      <Text className="text-xs font-medium text-foreground">
+                        {previewByCaptureId[capture.id].suggested_title} (
+                        {previewByCaptureId[capture.id].suggested_kind})
+                      </Text>
+                      <Text className="text-xs text-muted-foreground">
+                        {previewByCaptureId[capture.id].reason}
+                      </Text>
+                    </View>
+                  ) : null}
                   {processingCaptureId === capture.id ? (
                     <View className="mt-2 gap-2">
                       <TextInput
@@ -177,14 +250,32 @@ export default function InboxScreen() {
                       </View>
                     </View>
                   ) : (
-                    <Pressable
-                      onPress={() => handleStartProcess(capture.id)}
-                      className="mt-2"
-                    >
-                      <Text className="text-sm font-medium text-primary">
-                        {t("pages.inbox.process")}
-                      </Text>
-                    </Pressable>
+                    <View className="mt-2 flex-row flex-wrap gap-2">
+                      <Pressable
+                        onPress={() => handlePreview(capture.id)}
+                        className="rounded border border-input px-2.5 py-1.5"
+                      >
+                        <Text className="text-xs font-medium text-foreground">
+                          {t("pages.inbox.preview")}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleApply(capture.id)}
+                        className="rounded bg-primary px-2.5 py-1.5"
+                      >
+                        <Text className="text-xs font-medium text-primary-foreground">
+                          {t("pages.inbox.apply")}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleStartProcess(capture.id)}
+                        className="rounded border border-input px-2.5 py-1.5"
+                      >
+                        <Text className="text-xs font-medium text-foreground">
+                          {t("pages.inbox.process")}
+                        </Text>
+                      </Pressable>
+                    </View>
                   )}
                 </View>
               )}

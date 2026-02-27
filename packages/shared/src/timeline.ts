@@ -10,6 +10,7 @@ export const eventOutSchema = z.object({
   actual_time_acc_seconds: z.number().int(),
   is_tracking: z.boolean(),
   tracking_started_at: z.string().datetime().nullable(),
+  updated_at: z.string().datetime(),
 });
 
 export const timelineResponseSchema = z.object({
@@ -17,5 +18,34 @@ export const timelineResponseSchema = z.object({
   events: z.array(eventOutSchema),
 });
 
+export const eventCreateRequestSchema = z.object({
+  title: z.string().min(1),
+  start_at: z.string().datetime(),
+  end_at: z.string().datetime(),
+  estimated_time_seconds: z.number().int().min(0).optional(),
+  item_id: z.string().uuid().optional().nullable(),
+});
+
+export const eventUpdateRequestSchema = z.object({
+  title: z.string().min(1).optional(),
+  start_at: z.string().datetime().optional(),
+  end_at: z.string().datetime().optional(),
+  estimated_time_seconds: z.number().int().min(0).optional(),
+  last_known_updated_at: z.string().datetime().optional(),
+});
+
+export const eventsRangeResponseSchema = z.object({
+  events: z.array(eventOutSchema),
+});
+
+export const eventDeleteResponseSchema = z.object({
+  id: z.string().uuid(),
+  deleted: z.boolean(),
+});
+
 export type EventOut = z.infer<typeof eventOutSchema>;
 export type TimelineResponse = z.infer<typeof timelineResponseSchema>;
+export type EventCreateRequest = z.input<typeof eventCreateRequestSchema>;
+export type EventUpdateRequest = z.input<typeof eventUpdateRequestSchema>;
+export type EventsRangeResponse = z.infer<typeof eventsRangeResponseSchema>;
+export type EventDeleteResponse = z.infer<typeof eventDeleteResponseSchema>;

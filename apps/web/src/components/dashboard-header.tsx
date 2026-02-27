@@ -17,6 +17,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 const pathToLabelKey: Record<string, string> = {
   today: "nav.today",
   inbox: "nav.inbox",
+  sync: "nav.sync",
   timeline: "nav.timeline",
   me: "nav.me",
 };

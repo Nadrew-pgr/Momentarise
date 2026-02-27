@@ -14,6 +14,7 @@ class EventOut(BaseModel):
     actual_time_acc_seconds: int
     is_tracking: bool
     tracking_started_at: datetime | None
+    updated_at: datetime
 
     model_config = {"from_attributes": True}
 

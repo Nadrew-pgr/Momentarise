@@ -135,3 +135,27 @@ Momentarise/
 | Lancer le web | `apps/web/` | `npm run dev` |
 | Installer deps Mobile | `apps/mobile/` | `npm install` |
 | Lancer le mobile | `apps/mobile/` | `npx expo start` |
+
+## Dépannage rapide
+
+### Erreur SQLAlchemy `sqlalche.me/e/20/f405` (colonne inexistante)
+
+Symptôme courant:
+- `column items.kind does not exist`
+- `column inbox_captures.capture_type does not exist`
+
+Cause:
+- les modèles Python sont plus avancés que le schéma de la base locale.
+
+Correctif:
+
+```bash
+cd apps/api
+uv run alembic upgrade head
+```
+
+Puis redémarrer l'API:
+
+```bash
+uv run uvicorn src.main:app --reload --port 8000
+```

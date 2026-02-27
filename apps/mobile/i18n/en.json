@@ -1,6 +1,7 @@
 {
   "common": {
-    "appName": "Momentarise"
+    "appName": "Momentarise",
+    "retry": "Retry"
   },
   "nav": {
     "today": "Today",
@@ -34,23 +35,29 @@
   },
   "create": {
     "title": "Create",
+    "defaultNoteTitle": "New note",
+    "error": "Action failed. Check network/API and retry.",
     "placeholder": "Quick capture: add raw content and send it to Inbox.",
     "options": {
       "note": {
         "title": "Note",
-        "subtitle": "Available now"
+        "subtitle": "Create a direct item"
       },
       "photo": {
         "title": "Photo",
-        "subtitle": "Coming soon"
+        "subtitle": "Raw capture (placeholder)"
       },
       "voice": {
         "title": "Voice",
-        "subtitle": "Coming soon"
+        "subtitle": "Raw capture (placeholder)"
       },
       "link": {
         "title": "Link",
-        "subtitle": "Coming soon"
+        "subtitle": "Raw capture (placeholder)"
+      },
+      "sync": {
+        "title": "Sync",
+        "subtitle": "Open Sync page"
       }
     }
   },
@@ -73,7 +80,10 @@
       "process": "Process to item",
       "processTitle": "Item title",
       "processSubmit": "Create item",
+      "preview": "Preview",
+      "apply": "Apply",
       "emptyList": "No captures.",
+      "emptyCapture": "Capture without text content.",
       "recentItems": "Recent items",
       "emptyItems": "No recent items.",
       "cancel": "Cancel"
@@ -88,14 +98,24 @@
       "saving": "Saving…",
       "saved": "Saved",
       "saveError": "Save error",
+      "delete": "Delete",
+      "deleted": "Item deleted.",
+      "undoDelete": "Undo",
+      "linkedTo": "Linked to",
+      "emptyLinks": "No links for this item.",
       "noItemSelected": "Select a capture to process or an item."
     },
     "timeline": {
       "title": "Timeline",
       "placeholder": "This section is coming in Slice 1.",
       "emptyDay": "No events this day.",
+      "emptyHint": "Add events from Inbox to see them here.",
       "start": "Start",
       "stop": "Stop"
+    },
+    "sync": {
+      "title": "Sync",
+      "placeholder": "Sync page ready for next iterations (chat, preview/apply, AI tools)."
     },
     "me": {
       "title": "Me",

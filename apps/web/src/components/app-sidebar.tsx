@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
+  Bot,
   Calendar,
   ChevronsUpDown,
   Inbox,
@@ -39,6 +40,7 @@ import { useMe } from "@/hooks/use-me";
 const navItems = [
   { href: "/today", icon: LayoutDashboard, labelKey: "nav.today" },
   { href: "/inbox", icon: Inbox, labelKey: "nav.inbox" },
+  { href: "/sync", icon: Bot, labelKey: "nav.sync" },
   { href: "/timeline", icon: Calendar, labelKey: "nav.timeline" },
   { href: "/me", icon: User, labelKey: "nav.me" },
 ] as const;

@@ -1,29 +1,36 @@
-import { useCallback, useMemo, useRef, useEffect } from "react";
+import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { FileText, Camera, Mic, Link2 } from "lucide-react-native";
+import { Bot, Camera, FileText, Link2, Mic } from "lucide-react-native";
+import type { CaptureType } from "@momentarise/shared";
+import { useCreateCapture } from "@/hooks/use-inbox";
+import { useCreateItem } from "@/hooks/use-item";
 import { useCreateSheet } from "@/lib/store";
 
 function CaptureOption({
   label,
   subtitle,
-  disabled,
   icon,
   onPress,
+  translucent,
+  disabled,
 }: {
   label: string;
   subtitle: string;
-  disabled?: boolean;
   icon: React.ReactNode;
   onPress?: () => void;
+  translucent?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      className={`rounded-xl border px-3 py-3 ${disabled ? "border-border/50 bg-card/40 opacity-60" : "border-border bg-card"}`}
+      className={`rounded-xl border px-3 py-3 ${
+        translucent ? "border-border/60 bg-card/60" : "border-border bg-card"
+      } ${disabled ? "opacity-60" : ""}`}
     >
       <View className="flex-row items-center gap-3">
         <View className="h-9 w-9 items-center justify-center rounded-lg bg-background">
@@ -41,17 +48,22 @@ function CaptureOption({
 export function BottomSheetCreate() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { isOpen, close } = useCreateSheet();
+  const { isOpen, openNonce, close } = useCreateSheet();
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["48%"], []);
+  const snapPoints = useMemo(() => ["50%"], []);
+  const createCapture = useCreateCapture();
+  const createItem = useCreateItem();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const isBusy = createCapture.isPending || createItem.isPending;
 
   useEffect(() => {
     if (isOpen) {
+      setActionError(null);
       bottomSheetRef.current?.snapToIndex(0);
     } else {
       bottomSheetRef.current?.close();
     }
-  }, [isOpen]);
+  }, [isOpen, openNonce]);
 
   const handleSheetChanges = useCallback(
     (index: number) => {
@@ -61,8 +73,59 @@ export function BottomSheetCreate() {
   );
 
   const openNoteCapture = useCallback(() => {
+    setActionError(null);
+    createItem.mutate(
+      {
+        title: t("create.defaultNoteTitle"),
+        kind: "note",
+        status: "draft",
+        metadata: { source: "mobile_plus", channel: "note" },
+        blocks: [],
+      },
+      {
+        onSuccess: (item) => {
+          close();
+          router.push(`/items/${item.id}`);
+        },
+        onError: (error) => {
+          setActionError(
+            error instanceof Error ? error.message : t("create.error")
+          );
+        },
+      }
+    );
+  }, [close, createItem, router, t]);
+
+  const openCapture = useCallback(
+    (captureType: CaptureType) => {
+      setActionError(null);
+      createCapture.mutate(
+        {
+          raw_content: "",
+          source: "manual",
+          capture_type: captureType,
+          status: "captured",
+          metadata: { source: "mobile_plus", channel: captureType },
+        },
+        {
+          onSuccess: () => {
+            close();
+            router.push("/inbox");
+          },
+          onError: (error) => {
+            setActionError(
+              error instanceof Error ? error.message : t("create.error")
+            );
+          },
+        }
+      );
+    },
+    [close, createCapture, router, t]
+  );
+
+  const openSync = useCallback(() => {
     close();
-    router.push("/(tabs)/create");
+    router.push("/sync");
   }, [close, router]);
 
   return (
@@ -81,7 +144,15 @@ export function BottomSheetCreate() {
           <Pressable onPress={close} className="rounded border border-input px-2 py-1">
             <Text className="text-xs text-muted-foreground">{t("pages.inbox.cancel")}</Text>
           </Pressable>
+          {isBusy ? (
+            <Text className="text-xs text-muted-foreground">{t("create.working")}</Text>
+          ) : null}
         </View>
+        {actionError ? (
+          <View className="mb-3 rounded-lg border border-destructive bg-destructive/10 px-3 py-2">
+            <Text className="text-xs text-destructive">{actionError}</Text>
+          </View>
+        ) : null}
 
         <View className="gap-2">
           <CaptureOption
@@ -89,28 +160,42 @@ export function BottomSheetCreate() {
             subtitle={t("create.options.note.subtitle")}
             icon={<FileText size={18} color="#171717" />}
             onPress={openNoteCapture}
-          />
-          <CaptureOption
-            label={t("create.options.photo.title")}
-            subtitle={t("create.options.photo.subtitle")}
-            icon={<Camera size={18} color="#71717a" />}
-            disabled
+            disabled={isBusy}
           />
           <CaptureOption
             label={t("create.options.voice.title")}
             subtitle={t("create.options.voice.subtitle")}
-            icon={<Mic size={18} color="#71717a" />}
-            disabled
+            icon={<Mic size={18} color="#171717" />}
+            onPress={() => openCapture("voice")}
+            translucent
+            disabled={isBusy}
+          />
+          <CaptureOption
+            label={t("create.options.photo.title")}
+            subtitle={t("create.options.photo.subtitle")}
+            icon={<Camera size={18} color="#171717" />}
+            onPress={() => openCapture("photo")}
+            translucent
+            disabled={isBusy}
           />
           <CaptureOption
             label={t("create.options.link.title")}
             subtitle={t("create.options.link.subtitle")}
-            icon={<Link2 size={18} color="#71717a" />}
-            disabled
+            icon={<Link2 size={18} color="#171717" />}
+            onPress={() => openCapture("link")}
+            translucent
+            disabled={isBusy}
+          />
+          <CaptureOption
+            label={t("create.options.sync.title")}
+            subtitle={t("create.options.sync.subtitle")}
+            icon={<Bot size={18} color="#171717" />}
+            onPress={openSync}
+            translucent
+            disabled={isBusy}
           />
         </View>
       </BottomSheetView>
     </BottomSheet>
   );
 }
-

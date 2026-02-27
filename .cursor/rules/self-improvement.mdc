@@ -1,0 +1,71 @@
+---
+description: Journal d'apprentissage (erreurs/learnings/demandes) dans .learnings/
+alwaysApply: true
+---
+
+# Self‑Improvement (journal .learnings/)
+
+## Objectif
+
+- Après un incident non trivial (commande qui échoue, stacktrace, correction d’hypothèse), écrire une entrée courte et exploitable dans `.learnings/` pour éviter la récidive.
+
+## Quand écrire quoi
+
+- **Erreur / crash / commande non‑zéro** → `.learnings/ERRORS.md`
+- **Correction / apprentissage / meilleur pattern** → `.learnings/LEARNINGS.md`
+- **Besoin d’une capacité manquante** → `.learnings/FEATURE_REQUESTS.md`
+
+## Règles
+
+- **Créer `.learnings/` si absent** et créer les 3 fichiers si besoin (avec un titre + sections).
+- **Ne jamais logguer de secrets** (tokens, mots de passe, URLs privées avec creds).
+- **Inclure** : commande, message d’erreur (extrait pertinent), cause probable, fix suggéré, fichiers concernés.
+- **Déduplication** : si le sujet revient, ajouter “See Also” et incrémenter la récurrence plutôt que créer 10 entrées identiques.
+
+## Mini‑templates (à copier/coller)
+
+### ERREUR
+
+```markdown
+## [ERR-YYYYMMDD-XXX] <contexte>
+**Logged**: <ISO-8601>
+**Priority**: high
+**Status**: pending
+**Area**: backend|frontend|infra|tests|docs|config
+
+### Summary
+<une ligne>
+
+### Error
+```
+<extrait>
+```
+
+### Context
+- Command: `<...>`
+- Related Files: <...>
+
+### Suggested Fix
+<action concrète>
+---
+```
+
+### LEARNING
+
+```markdown
+## [LRN-YYYYMMDD-XXX] <category>
+**Logged**: <ISO-8601>
+**Priority**: medium
+**Status**: pending
+**Area**: backend|frontend|infra|tests|docs|config
+
+### Summary
+<une ligne>
+
+### Details
+<ce qui était faux / ce qui est vrai>
+
+### Suggested Action
+<action concrète>
+---
+```

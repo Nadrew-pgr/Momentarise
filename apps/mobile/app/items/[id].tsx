@@ -12,7 +12,13 @@ import { useTranslation } from "react-i18next";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { ProseMirrorNode } from "@momentarise/shared";
 import { BlockEditor } from "@/components/BlockEditor";
-import { useItem, useUpdateItem } from "@/hooks/use-item";
+import {
+  useDeleteItem,
+  useItem,
+  useItemLinks,
+  useRestoreItem,
+  useUpdateItem,
+} from "@/hooks/use-item";
 
 type TabKey = "details" | "blocks" | "coach";
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -24,17 +30,26 @@ export default function ItemDetailPage() {
   const itemId = typeof params.id === "string" ? params.id : null;
 
   const { data: item, isLoading } = useItem(itemId);
+  const { data: linksData } = useItemLinks(itemId);
   const updateItem = useUpdateItem(itemId);
+  const deleteItem = useDeleteItem(itemId);
+  const restoreItem = useRestoreItem(itemId);
 
   const [activeTab, setActiveTab] = useState<TabKey>("blocks");
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [showUndoDelete, setShowUndoDelete] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
+      }
+      if (deleteTimerRef.current) {
+        clearTimeout(deleteTimerRef.current);
+        deleteTimerRef.current = null;
       }
     };
   }, []);
@@ -68,6 +83,42 @@ export default function ItemDetailPage() {
     [itemId, updateItem]
   );
 
+  const handleBackToInbox = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    }
+    setTimeout(() => {
+      router.replace("/inbox");
+    }, 0);
+  }, [router]);
+
+  const handleDelete = useCallback(() => {
+    deleteItem.mutate(undefined, {
+      onSuccess: () => {
+        setShowUndoDelete(true);
+        if (deleteTimerRef.current) {
+          clearTimeout(deleteTimerRef.current);
+        }
+        deleteTimerRef.current = setTimeout(() => {
+          setShowUndoDelete(false);
+          router.replace("/inbox");
+        }, 7000);
+      },
+    });
+  }, [deleteItem, router]);
+
+  const handleUndoDelete = useCallback(() => {
+    restoreItem.mutate(undefined, {
+      onSuccess: () => {
+        setShowUndoDelete(false);
+        if (deleteTimerRef.current) {
+          clearTimeout(deleteTimerRef.current);
+          deleteTimerRef.current = null;
+        }
+      },
+    });
+  }, [restoreItem]);
+
   if (!itemId) {
     return (
       <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
@@ -95,13 +146,35 @@ export default function ItemDetailPage() {
         <View className="flex-1">
           <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
             <Pressable
-              onPress={() => router.replace("/(tabs)/inbox")}
+              onPress={handleBackToInbox}
               className="rounded border border-input px-3 py-1.5"
             >
               <Text className="text-sm text-foreground">{t("pages.item.backToInbox")}</Text>
             </Pressable>
-            {saveLabel ? <Text className="text-xs text-muted-foreground">{saveLabel}</Text> : null}
+            <View className="flex-row items-center gap-2">
+              {saveLabel ? <Text className="text-xs text-muted-foreground">{saveLabel}</Text> : null}
+              <Pressable
+                onPress={handleDelete}
+                className="rounded border border-destructive px-3 py-1.5"
+                disabled={deleteItem.isPending}
+              >
+                <Text className="text-sm text-destructive">{t("pages.item.delete")}</Text>
+              </Pressable>
+            </View>
           </View>
+
+          {showUndoDelete ? (
+            <View className="flex-row items-center justify-between border-b border-border bg-muted/40 px-4 py-2">
+              <Text className="text-sm text-foreground">{t("pages.item.deleted")}</Text>
+              <Pressable
+                onPress={handleUndoDelete}
+                className="rounded border border-input px-3 py-1.5"
+                disabled={restoreItem.isPending}
+              >
+                <Text className="text-sm text-foreground">{t("pages.item.undoDelete")}</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           <View className="flex-row border-b border-border">
             {([
@@ -129,12 +202,26 @@ export default function ItemDetailPage() {
             <ScrollView className="flex-1 px-4 py-4" keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
               <Text className="text-base font-semibold text-foreground">{item.title}</Text>
               <Text className="mt-1 text-xs text-muted-foreground">ID: {item.id}</Text>
+              <View className="mt-4 gap-2">
+                <Text className="text-sm font-semibold text-foreground">{t("pages.item.linkedTo")}</Text>
+                {linksData == null || linksData.links.length === 0 ? (
+                  <Text className="text-xs text-muted-foreground">{t("pages.item.emptyLinks")}</Text>
+                ) : (
+                  linksData.links.map((link) => (
+                    <View key={link.id} className="rounded border border-border bg-card px-3 py-2">
+                      <Text className="text-xs font-medium text-foreground">
+                        {link.relation_type} {link.to_entity_type}:{link.to_entity_id}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
             </ScrollView>
           ) : null}
 
           {activeTab === "blocks" ? (
-            <View className="flex-1 min-h-0 px-4 py-4">
-              <View className="flex-1 rounded-lg border border-input bg-background">
+            <View className="flex-1 min-h-0 px-2 py-2">
+              <View className="flex-1 bg-background">
                 <BlockEditor value={item.blocks} onChange={scheduleSave} editable />
               </View>
             </View>

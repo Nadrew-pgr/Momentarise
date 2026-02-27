@@ -1,10 +1,12 @@
 {
   "common": {
-    "appName": "Momentarise"
+    "appName": "Momentarise",
+    "retry": "Retry"
   },
   "nav": {
     "today": "Today",
     "inbox": "Inbox",
+    "sync": "Sync",
     "timeline": "Timeline",
     "me": "Me"
   },
@@ -52,11 +54,15 @@
       "title": "Inbox",
       "placeholder": "This section is coming in Slice 2.",
       "add": "Add capture",
+      "createNote": "Create note",
       "addPlaceholder": "Enter raw text…",
       "process": "Process to item",
       "processTitle": "Item title",
       "processSubmit": "Create item",
+      "preview": "Preview",
+      "apply": "Apply",
       "emptyList": "No captures. Add raw content to get started.",
+      "emptyCapture": "Capture without text content.",
       "recentItems": "Recent items",
       "emptyItems": "No recent items.",
       "cancel": "Cancel"
@@ -69,7 +75,16 @@
       "saving": "Saving…",
       "saved": "Saved",
       "saveError": "Save error",
+      "delete": "Delete",
+      "deleted": "Item deleted.",
+      "undoDelete": "Undo",
+      "linkedTo": "Linked to",
+      "emptyLinks": "No links for this item.",
       "noItemSelected": "Select a capture to process or an item."
+    },
+    "sync": {
+      "title": "Sync",
+      "placeholder": "Sync page ready for next iterations (chat, preview/apply, AI tools)."
     },
     "timeline": {
       "title": "Timeline",

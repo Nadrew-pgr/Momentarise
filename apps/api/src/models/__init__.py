@@ -1,4 +1,6 @@
+from src.models.ai_change import AIChange
 from src.models.base import Base, BaseMixin
+from src.models.entity_link import EntityLink
 from src.models.enums import WorkspaceRole
 from src.models.event import Event
 from src.models.inbox_capture import InboxCapture
@@ -17,4 +19,6 @@ __all__ = [
     "Item",
     "Event",
     "InboxCapture",
+    "EntityLink",
+    "AIChange",
 ]

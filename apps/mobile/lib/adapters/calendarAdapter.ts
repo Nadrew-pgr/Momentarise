@@ -16,9 +16,21 @@ export type EventsByDate = Record<string, CalendarEvent[]>;
 
 function toCalendarTime(iso: string): string {
   const d = new Date(iso);
-  const date = d.toISOString().slice(0, 10);
-  const time = d.toISOString().slice(11, 19).replace("T", " ");
+  const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+  const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(
+    2,
+    "0"
+  )}:${String(d.getSeconds()).padStart(2, "0")}`;
   return `${date} ${time}`;
+}
+
+function toLocalDateKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 }
 
 /**
@@ -28,9 +40,9 @@ function toCalendarTime(iso: string): string {
 export function eventsToCalendarFormat(
   response: TimelineResponse
 ): EventsByDate {
-  const byDate: EventsByDate = {};
+  const byDate: EventsByDate = { [response.date]: [] };
   for (const ev of response.events) {
-    const dateKey = response.date;
+    const dateKey = toLocalDateKey(ev.start_at);
     if (!byDate[dateKey]) byDate[dateKey] = [];
     byDate[dateKey].push({
       id: ev.id,
