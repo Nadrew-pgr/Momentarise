@@ -141,7 +141,11 @@ export function BottomSheetCreate() {
       <BottomSheetView className="flex-1 px-4 pb-4 pt-2">
         <View className="mb-3 flex-row items-center justify-between">
           <Text className="text-lg font-bold text-foreground">{t("create.title")}</Text>
-          <Pressable onPress={close} className="rounded border border-input px-2 py-1">
+          <Pressable
+            onPress={close}
+            disabled={isBusy}
+            className="rounded border border-input px-2 py-1"
+          >
             <Text className="text-xs text-muted-foreground">{t("pages.inbox.cancel")}</Text>
           </Pressable>
           {isBusy ? (

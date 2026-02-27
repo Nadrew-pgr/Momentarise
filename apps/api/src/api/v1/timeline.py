@@ -42,7 +42,7 @@ async def get_timeline(
         .where(
             Event.workspace_id == ws_id,
             Event.deleted_at.is_(None),
-            Event.start_at >= start_of_day,
+            Event.end_at >= start_of_day,
             Event.start_at <= end_of_day,
         )
         .options(selectinload(Event.item))

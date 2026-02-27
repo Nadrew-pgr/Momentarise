@@ -37,6 +37,7 @@
     "title": "Create",
     "defaultNoteTitle": "New note",
     "error": "Action failed. Check network/API and retry.",
+    "working": "Action in progress...",
     "placeholder": "Quick capture: add raw content and send it to Inbox.",
     "options": {
       "note": {

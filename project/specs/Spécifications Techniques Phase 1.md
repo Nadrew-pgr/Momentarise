@@ -583,9 +583,12 @@ Tous les objets (captures, items, events/moments) sont liés via un graphe de li
 - [x] **API** : `DELETE /api/v1/items/{id}` + `POST /api/v1/items/{id}/restore` disponibles.
 - [x] **API** : `GET/POST /api/v1/items/{id}/links` disponibles.
 - [x] **API** : `POST /api/v1/inbox/{id}/preview` + `POST /api/v1/inbox/{id}/apply` disponibles.
+- [x] **API** : `GET/POST /api/v1/events` + `PATCH/DELETE /api/v1/events/{id}` disponibles.
 - [x] **Web** : route `/sync` ajoutée (stub prêt pour itérations IA).
+- [x] **Web** : timeline migrée vers calendrier Coss branché sur API (BFF only).
 - [x] **Mobile** : `+` reste un Bottom Sheet de capture (pas de navigation forcée).
 - [x] **Mobile** : timeline visible même sans événements (grille + empty overlay).
+- [x] **Qualité** : lint React 19 vert sans contournement des règles hooks/refs.
 
 ### Out of scope
 
@@ -606,6 +609,10 @@ Tous les objets (captures, items, events/moments) sont liés via un graphe de li
 - `POST /inbox/{id}/preview` → suggère `title/kind` (heuristique phase 1).
 - `POST /inbox/{id}/apply` → crée item depuis capture + soft delete capture.
 - `POST /inbox/{id}/process` → transformation manuelle (legacy conservé).
+- `GET /events?from=YYYY-MM-DD&to=YYYY-MM-DD` → liste events du range (workspace + soft-delete filter).
+- `POST /events` → crée un event (et crée item minimal si `item_id` absent).
+- `PATCH /events/{id}` → update event + `item.title` (avec garde `last_known_updated_at`).
+- `DELETE /events/{id}` → soft delete event.
 
 ### UI Routes
 
@@ -620,6 +627,7 @@ Tous les objets (captures, items, events/moments) sont liés via un graphe de li
 - `/inbox` : captures + items récents + actions `preview/apply/process`.
 - `/inbox/items/[id]` : détail plein espace + suppression + undo + panel links.
 - `/sync` : stub.
+- `/timeline` : calendrier interactif (Coss) connecté aux routes BFF `/api/events`.
 
 ### Décisions verrouillées (Slice 3)
 
@@ -646,8 +654,18 @@ Tous les objets (captures, items, events/moments) sont liés via un graphe de li
 #### Étape 3 : Web + Mobile
 
 - Web: BFF routes manquantes (`restore`, `links`, `preview`, `apply`) + `/sync`.
+- Web: BFF events complets (`GET/POST /api/events`, `PATCH/DELETE /api/events/[id]`) + intégration Coss sur `/timeline`.
 - Mobile: `BottomSheetCreate` en hub de capture, timeline non vide visuellement, retour item fiable vers Inbox.
 - Web/Mobile: suppression item + undo court terme + affichage des liens.
+
+#### Étape 4 : Hardening timeline
+
+- Migration DB events:
+  - check `end_at > start_at`
+  - index `(workspace_id, start_at, deleted_at)`
+  - index `(workspace_id, item_id, deleted_at)`
+- Web: adapter EventOut -> CalendarEvent et brancher CRUD complet.
+- Mobile: conserver grille visible même API down; erreur réseau non bloquante.
 
 ---
 

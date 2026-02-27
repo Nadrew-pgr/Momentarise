@@ -106,7 +106,7 @@ async def list_events(
         .where(
             Event.workspace_id == workspace.workspace_id,
             Event.deleted_at.is_(None),
-            Event.start_at >= range_start,
+            Event.end_at >= range_start,
             Event.start_at <= range_end,
         )
         .options(selectinload(Event.item))

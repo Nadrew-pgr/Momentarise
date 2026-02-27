@@ -159,3 +159,27 @@ Puis redémarrer l'API:
 ```bash
 uv run uvicorn src.main:app --reload --port 8000
 ```
+
+### Timeline visible mais données absentes (web/mobile)
+
+Symptôme courant:
+- La grille calendrier s'affiche, mais un message réseau apparaît.
+- Les requêtes `/api/today`, `/api/inbox` ou `/api/items` retournent `500`.
+
+Checklist:
+
+```bash
+# 1) Vérifier que l'API tourne
+curl http://localhost:8000/api/v1/health
+
+# 2) Vérifier le schéma DB (migrations à jour)
+cd apps/api
+uv run alembic upgrade head
+
+# 3) Mobile: vérifier l'URL API (IP locale, pas localhost)
+cat apps/mobile/.env
+```
+
+Rappel mobile:
+- `EXPO_PUBLIC_API_URL` doit pointer vers une IP joignable depuis le téléphone (ex: `http://192.168.x.x:8000`).
+- Si l'API est down, la timeline reste visible mais les données ne se chargent pas.

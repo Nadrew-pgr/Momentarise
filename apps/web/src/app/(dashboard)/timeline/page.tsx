@@ -1,20 +1,17 @@
 "use client";
 
-import { differenceInSeconds, format } from "date-fns";
+import { differenceInSeconds } from "date-fns";
 import { toast } from "sonner";
 import { useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
 import { EventCalendar } from "@/components/event-calendar";
 import type { CalendarEvent } from "@/components/event-calendar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   useCreateEvent,
   useDeleteEvent,
   useEventsRange,
   useUpdateEvent,
 } from "@/hooks/use-events";
-import { useTracking } from "@/hooks/use-tracking";
 
 function toLocalYYYYMMDD(date: Date): string {
   const y = date.getFullYear();
@@ -28,7 +25,6 @@ function toEstimatedSeconds(start: Date, end: Date): number {
 }
 
 export default function TimelinePage() {
-  const { t } = useTranslation();
   const today = new Date();
   const todayKey = toLocalYYYYMMDD(today);
   const [visibleRange, setVisibleRange] = useState<{ from: string; to: string }>({
@@ -46,9 +42,8 @@ export default function TimelinePage() {
   const createEvent = useCreateEvent();
   const updateEvent = useUpdateEvent();
   const deleteEvent = useDeleteEvent();
-  const { startTracking, stopTracking, isStarting, isStopping } = useTracking();
 
-  const events = data?.events ?? [];
+  const events = useMemo(() => data?.events ?? [], [data?.events]);
   const eventById = useMemo(() => {
     return new Map(events.map((event) => [event.id, event]));
   }, [events]);
@@ -63,10 +58,6 @@ export default function TimelinePage() {
       title: event.title,
     }));
   }, [events]);
-
-  const todaysEvents = useMemo(() => {
-    return events.filter((event) => toLocalYYYYMMDD(new Date(event.start_at)) === todayKey);
-  }, [events, todayKey]);
 
   const handleRangeChange = ({ from, to }: { from: Date; to: Date }) => {
     const nextRange = {
@@ -118,16 +109,9 @@ export default function TimelinePage() {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{t("pages.timeline.title")}</h1>
-        <p className="text-muted-foreground text-sm">
-          {visibleRange.from} → {visibleRange.to}
-        </p>
-      </div>
-
+    <div className="flex h-full w-full flex-1 flex-col">
       {error ? (
-        <div className="bg-destructive/10 border-destructive rounded-md border px-3 py-2">
+        <div className="bg-destructive/10 border-destructive m-4 rounded-md border px-3 py-2">
           <p className="text-destructive text-sm">{error.message}</p>
           <Button
             className="mt-2"
@@ -138,75 +122,19 @@ export default function TimelinePage() {
               void refetchEvents();
             }}
           >
-            {t("common.retry")}
+            Retry
           </Button>
         </div>
       ) : null}
 
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          <EventCalendar
-            events={calendarEvents}
-            onVisibleRangeChange={handleRangeChange}
-            onEventAdd={handleCreateEvent}
-            onEventUpdate={handleUpdateEvent}
-            onEventDelete={handleDeleteEvent}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="space-y-2 py-4">
-          <h2 className="font-semibold">
-            {t("pages.timeline.title")} — {todayKey}
-          </h2>
-          {isLoading ? <p className="text-muted-foreground text-sm">Loading…</p> : null}
-          {todaysEvents.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("pages.timeline.emptyDay")}</p>
-          ) : null}
-          {todaysEvents.map((event) => (
-            <div
-              key={event.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
-            >
-              <div className="min-w-0 flex-1">
-                <span className="text-muted-foreground mr-2 text-sm">
-                  {format(new Date(event.start_at), "HH:mm")}
-                </span>
-                <span className="font-medium">{event.title}</span>
-              </div>
-              {event.is_tracking ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={isStopping}
-                  onClick={() =>
-                    void stopTracking(event.id).catch((err) => {
-                      toast.error(err instanceof Error ? err.message : "Failed to stop tracking");
-                    })
-                  }
-                >
-                  {t("pages.timeline.stop")}
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  disabled={isStarting}
-                  onClick={() =>
-                    void startTracking(event.id).catch((err) => {
-                      toast.error(
-                        err instanceof Error ? err.message : "Failed to start tracking"
-                      );
-                    })
-                  }
-                >
-                  {t("pages.timeline.start")}
-                </Button>
-              )}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      {isLoading ? <p className="px-4 text-sm text-muted-foreground">Loading...</p> : null}
+      <EventCalendar
+        events={calendarEvents}
+        onVisibleRangeChange={handleRangeChange}
+        onEventAdd={handleCreateEvent}
+        onEventUpdate={handleUpdateEvent}
+        onEventDelete={handleDeleteEvent}
+      />
     </div>
   );
 }

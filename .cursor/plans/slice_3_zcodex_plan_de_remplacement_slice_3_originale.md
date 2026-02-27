@@ -125,16 +125,25 @@ Le mood logging est déplacé hors Slice 3 (backlog bien-être, plus tard).
 ## Statut d’implémentation (en cours)
 - [x] Backend: modèles `items`/`inbox_captures` étendus + tables `entity_links` / `ai_changes`.
 - [x] Backend: endpoints `POST /items`, `DELETE /items/{id}`, `POST /items/{id}/restore`, `GET/POST /items/{id}/links`, `POST /inbox/{id}/preview`, `POST /inbox/{id}/apply`.
+- [x] Backend: endpoints timeline scalables `GET/POST /events` + `PATCH/DELETE /events/{id}` + garde multi-device (`last_known_updated_at`).
+- [x] Backend: migration DB de durcissement events (`c6d5f7a1b2c3`) appliquée.
 - [x] Shared: enums/schemas capture-kind-status-links + `block_id` dans les blocks.
+- [x] Shared: contrats events (`EventCreateRequest`, `EventUpdateRequest`, `EventsRangeResponse`) + `EventOut.updated_at`.
 - [x] Web: BFF routes nouvelles + `/sync` stub + inbox/actions preview/apply + item delete/undo + panel links.
+- [x] Web: BFF `GET/POST /api/events` et `PATCH/DELETE /api/events/[id]` ajoutés.
+- [x] Web: timeline migrée vers calendrier Coss avec persistance API (CRUD) + section tracking start/stop.
+- [x] Web: refactor React 19 des composants Coss sans contournement lint.
 - [x] Mobile: `+` hub capture (note direct item + captures typées) + `/sync` stub.
-- [x] Mobile: timeline visible même vide + correction timezone adapter.
+- [x] Mobile: timeline visible même vide + erreur réseau non bloquante + empty state unique.
+- [x] Mobile: `+` renforcé (réouverture stable, reset erreur, actions désactivées pendant mutation).
 - [x] QA complète et ajustements finaux lint/typecheck/py_compile.
 
 ### Validation exécutée
 1. `python3 -m py_compile apps/api/src/api/v1/items.py apps/api/src/api/v1/inbox.py apps/api/src/schemas/item.py apps/api/src/schemas/inbox.py apps/api/src/models/item.py apps/api/src/models/inbox_capture.py apps/api/src/models/entity_link.py apps/api/src/models/ai_change.py`
-2. `cd apps/web && npm run lint`
-3. `cd apps/mobile && npx tsc --noEmit`
+2. `cd apps/api && uv run python -m py_compile src/api/v1/events.py src/schemas/event.py src/api/v1/timeline.py`
+3. `cd apps/api && uv run alembic upgrade head`
+4. `cd apps/web && npm run lint -- --max-warnings=0`
+5. `cd apps/mobile && npx tsc --noEmit`
 
 ### Points non couverts par cette slice (à ne pas confondre avec des régressions)
 1. Intégration visuelle complète de `project/inbox_raw/AI_Chat_interface` dans `/sync` (la route `/sync` est un stub).

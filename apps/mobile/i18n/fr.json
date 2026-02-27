@@ -37,6 +37,7 @@
     "title": "Créer",
     "defaultNoteTitle": "Nouvelle note",
     "error": "Action en échec. Vérifie le réseau/API puis réessaie.",
+    "working": "Action en cours...",
     "placeholder": "Capture rapide : ajoute du brut puis envoie-le dans Inbox.",
     "options": {
       "note": {

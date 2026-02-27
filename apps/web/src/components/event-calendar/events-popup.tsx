@@ -2,7 +2,7 @@
 
 import { format, isSameDay } from "date-fns";
 import { XIcon } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { EventItem } from "./event-item";
 import type { CalendarEvent } from "./types";
@@ -23,7 +23,6 @@ export function EventsPopup({
   onEventSelect,
 }: EventsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
-  const [adjustedPosition, setAdjustedPosition] = useState(position);
 
   // Handle click outside to close popup
   useEffect(() => {
@@ -61,24 +60,16 @@ export function EventsPopup({
     onClose();
   };
 
-  useLayoutEffect(() => {
-    const node = popupRef.current;
-    if (!node) {
-      setAdjustedPosition(position);
-      return;
-    }
-    const positionCopy = { ...position };
-    const rect = node.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    if (positionCopy.left + rect.width > viewportWidth) {
-      positionCopy.left = Math.max(0, viewportWidth - rect.width);
-    }
-    if (positionCopy.top + rect.height > viewportHeight) {
-      positionCopy.top = Math.max(0, viewportHeight - rect.height);
-    }
-    setAdjustedPosition(positionCopy);
+  const adjustedPosition = useMemo(() => {
+    if (typeof window === "undefined") return position;
+    const popupWidth = 320; // w-80
+    const popupMaxHeight = 384; // max-h-96
+    const maxLeft = Math.max(0, window.innerWidth - popupWidth);
+    const maxTop = Math.max(0, window.innerHeight - popupMaxHeight);
+    return {
+      left: Math.min(Math.max(0, position.left), maxLeft),
+      top: Math.min(Math.max(0, position.top), maxTop),
+    };
   }, [position]);
 
   return (
