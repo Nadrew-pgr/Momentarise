@@ -21,11 +21,11 @@ Momentarise/
 ├── apps/api/         # Backend FastAPI (Python, uv)
 ├── apps/web/         # Frontend Next.js (npm)
 ├── apps/mobile/      # Frontend Expo (npm)
-├── project/          # Specs, notes, idées
+├── project/          # Specs, idées, docs
 │   ├── specs/        # Spécifications techniques (SSoT)
 │   ├── distilled/    # Ledger d'idées trié
 │   ├── inbox_raw/    # Conversations brutes
-│   └── notes.md      # Notes d'intention produit
+│   └── docs/         # Documentation opérationnelle
 └── docker-compose.yml
 ```
 
@@ -34,6 +34,10 @@ Momentarise/
 - `apps/api/` : **uv** (Python)
 - `apps/web/` : **npm** (Node.js)
 - `apps/mobile/` : **npm** (Node.js)
+
+## Theme ready
+
+Tout le code UI (web et mobile) doit rester **theme ready** : utiliser uniquement des tokens de thème (couleurs sémantiques : background, foreground, card, muted-foreground, primary, destructive, etc.) et ne jamais hardcoder de couleurs (hex, rgb) pour les fonds ou textes principaux. Les écrans ne doivent pas forcer un thème (ex. fond noir en dur sur une page). Ainsi, un futur sélecteur de thème (light / dark / system + palettes) pourra s’appliquer sans refonte.
 
 ## Conventions communes
 

@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+export const eventColorSchema = z.enum([
+  "sky",
+  "amber",
+  "violet",
+  "rose",
+  "emerald",
+  "orange",
+]);
+
 export const eventOutSchema = z.object({
   id: z.string().uuid(),
   item_id: z.string().uuid(),
@@ -9,6 +18,7 @@ export const eventOutSchema = z.object({
   estimated_time_seconds: z.number().int(),
   actual_time_acc_seconds: z.number().int(),
   is_tracking: z.boolean(),
+  color: eventColorSchema,
   tracking_started_at: z.string().datetime().nullable(),
   updated_at: z.string().datetime(),
 });
@@ -24,6 +34,7 @@ export const eventCreateRequestSchema = z.object({
   end_at: z.string().datetime(),
   estimated_time_seconds: z.number().int().min(0).optional(),
   item_id: z.string().uuid().optional().nullable(),
+  color: eventColorSchema.optional(),
 });
 
 export const eventUpdateRequestSchema = z.object({
@@ -32,6 +43,7 @@ export const eventUpdateRequestSchema = z.object({
   end_at: z.string().datetime().optional(),
   estimated_time_seconds: z.number().int().min(0).optional(),
   last_known_updated_at: z.string().datetime().optional(),
+  color: eventColorSchema.optional(),
 });
 
 export const eventsRangeResponseSchema = z.object({
@@ -49,3 +61,4 @@ export type EventCreateRequest = z.input<typeof eventCreateRequestSchema>;
 export type EventUpdateRequest = z.input<typeof eventUpdateRequestSchema>;
 export type EventsRangeResponse = z.infer<typeof eventsRangeResponseSchema>;
 export type EventDeleteResponse = z.infer<typeof eventDeleteResponseSchema>;
+export type EventColor = z.infer<typeof eventColorSchema>;

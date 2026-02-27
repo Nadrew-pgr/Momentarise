@@ -3,14 +3,11 @@
 import { endOfWeek, isSameDay, isWithinInterval, startOfWeek } from "date-fns";
 import { useEffect, useState } from "react";
 
-import {
-  EndHour,
-  StartHour,
-} from "@/components/event-calendar/constants";
-
 export function useCurrentTimeIndicator(
   currentDate: Date,
   view: "day" | "week",
+  startHour: number,
+  endHour: number,
 ) {
   const [currentTimePosition, setCurrentTimePosition] = useState<number>(0);
   const [currentTimeVisible, setCurrentTimeVisible] = useState<boolean>(false);
@@ -20,9 +17,9 @@ export function useCurrentTimeIndicator(
       const now = new Date();
       const hours = now.getHours();
       const minutes = now.getMinutes();
-      const totalMinutes = (hours - StartHour) * 60 + minutes;
+      const totalMinutes = (hours - startHour) * 60 + minutes;
       const dayStartMinutes = 0; // 12am
-      const dayEndMinutes = (EndHour - StartHour) * 60; // 12am next day
+      const dayEndMinutes = (endHour - startHour) * 60;
 
       // Calculate position as percentage of day
       const position =
@@ -54,7 +51,7 @@ export function useCurrentTimeIndicator(
     const interval = setInterval(calculateTimePosition, 60000);
 
     return () => clearInterval(interval);
-  }, [currentDate, view]);
+  }, [currentDate, endHour, startHour, view]);
 
   return { currentTimePosition, currentTimeVisible };
 }

@@ -22,6 +22,9 @@ class Event(BaseMixin, Base):
     estimated_time_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     actual_time_acc_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_tracking: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    color: Mapped[str] = mapped_column(
+        nullable=False, default="sky", server_default="sky"
+    )
     tracking_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

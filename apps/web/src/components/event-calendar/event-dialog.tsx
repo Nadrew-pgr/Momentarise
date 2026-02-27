@@ -41,6 +41,8 @@ interface EventDialogProps {
   onClose: () => void;
   onSave: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
+  onToggleTracking?: (eventId: string) => void;
+  isTrackingActionPending?: boolean;
 }
 
 export function EventDialog({
@@ -49,6 +51,8 @@ export function EventDialog({
   onClose,
   onSave,
   onDelete,
+  onToggleTracking,
+  isTrackingActionPending = false,
 }: EventDialogProps) {
   const formatTimeForInput = useCallback((date: Date) => {
     const hours = date.getHours().toString().padStart(2, "0");
@@ -402,16 +406,27 @@ export function EventDialog({
           </fieldset>
         </div>
         <DialogFooter className="flex-row sm:justify-between">
-          {event?.id && (
-            <Button
-              aria-label="Delete event"
-              onClick={handleDelete}
-              size="icon"
-              variant="outline"
-            >
-              <RiDeleteBinLine aria-hidden="true" size={16} />
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {event?.id && onToggleTracking && (
+              <Button
+                onClick={() => onToggleTracking(event.id)}
+                variant="outline"
+                disabled={isTrackingActionPending}
+              >
+                {event.isTracking ? "Stop" : "Start"}
+              </Button>
+            )}
+            {event?.id && (
+              <Button
+                aria-label="Delete event"
+                onClick={handleDelete}
+                size="icon"
+                variant="outline"
+              >
+                <RiDeleteBinLine aria-hidden="true" size={16} />
+              </Button>
+            )}
+          </div>
           <div className="flex flex-1 justify-end gap-2">
             <Button onClick={onClose} variant="outline">
               Cancel

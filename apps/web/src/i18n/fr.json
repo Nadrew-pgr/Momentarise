@@ -1,13 +1,17 @@
 {
   "common": {
     "appName": "Momentarise",
-    "retry": "Réessayer"
+    "retry": "Réessayer",
+    "today": "Aujourd'hui",
+    "cancel": "Annuler",
+    "save": "Enregistrer"
   },
   "nav": {
     "today": "Aujourd'hui",
     "inbox": "Boîte de réception",
     "sync": "Sync",
     "timeline": "Timeline",
+    "calendar": "Calendrier",
     "me": "Moi"
   },
   "auth": {
@@ -93,6 +97,23 @@
       "start": "Démarrer",
       "stop": "Arrêter",
       "emptyHint": "Ajoutez des événements depuis l'Inbox pour les voir ici."
+    },
+    "calendar": {
+      "title": "Calendrier",
+      "engineBadgeCoss": "Moteur Coss",
+      "engineBadgeFull": "Moteur FullCalendar",
+      "month": "Mois",
+      "week": "Semaine",
+      "day": "Jour",
+      "displayHours": "Heures",
+      "displayHoursStart": "Début",
+      "displayHoursEnd": "Fin",
+      "create": "Créer un événement",
+      "edit": "Modifier l'événement",
+      "start": "Début",
+      "end": "Fin",
+      "save": "Enregistrer",
+      "titlePlaceholder": "Événement sans titre"
     },
     "me": {
       "title": "Moi",

@@ -60,6 +60,7 @@ async def get_timeline(
             estimated_time_seconds=e.estimated_time_seconds,
             actual_time_acc_seconds=e.actual_time_acc_seconds,
             is_tracking=e.is_tracking,
+            color=e.color,
             tracking_started_at=e.tracking_started_at,
             updated_at=e.updated_at,
         )

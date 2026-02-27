@@ -1,7 +1,9 @@
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import Enum, ForeignKey, Text, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, BaseMixin
@@ -37,6 +39,12 @@ class WorkspaceMember(BaseMixin, Base):
     )
     role: Mapped[WorkspaceRole] = mapped_column(
         Enum(WorkspaceRole, name="workspace_role"), nullable=False
+    )
+    preferences: Mapped[dict] = mapped_column(
+        MutableDict.as_mutable(JSONB),
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
     )
 
     workspace: Mapped["Workspace"] = relationship(back_populates="members")

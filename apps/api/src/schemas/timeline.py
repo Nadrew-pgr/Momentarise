@@ -13,6 +13,7 @@ class EventOut(BaseModel):
     estimated_time_seconds: int
     actual_time_acc_seconds: int
     is_tracking: bool
+    color: str
     tracking_started_at: datetime | None
     updated_at: datetime
 

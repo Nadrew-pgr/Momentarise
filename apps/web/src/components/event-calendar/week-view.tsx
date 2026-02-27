@@ -19,7 +19,7 @@ import {
 import type React from "react";
 import { useMemo } from "react";
 
-import { EndHour, StartHour, WeekCellsHeight } from "./constants";
+import { WeekCellsHeight } from "./constants";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
@@ -33,6 +33,8 @@ interface WeekViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
+  startHour: number;
+  endHour: number;
 }
 
 interface PositionedEvent {
@@ -49,6 +51,8 @@ export function WeekView({
   events,
   onEventSelect,
   onEventCreate,
+  startHour,
+  endHour,
 }: WeekViewProps) {
   const days = useMemo(() => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
@@ -64,10 +68,10 @@ export function WeekView({
   const hours = useMemo(() => {
     const dayStart = startOfDay(currentDate);
     return eachHourOfInterval({
-      end: addHours(dayStart, EndHour - 1),
-      start: addHours(dayStart, StartHour),
+      end: addHours(dayStart, endHour - 1),
+      start: addHours(dayStart, startHour),
     });
-  }, [currentDate]);
+  }, [currentDate, endHour, startHour]);
 
   // Get all-day events and multi-day events for the week
   const allDayEvents = useMemo(() => {
@@ -127,6 +131,10 @@ export function WeekView({
       // Calculate positions for each event
       const positionedEvents: PositionedEvent[] = [];
       const dayStart = startOfDay(day);
+      const visibleStart = new Date(dayStart);
+      visibleStart.setHours(startHour, 0, 0, 0);
+      const visibleEnd = new Date(dayStart);
+      visibleEnd.setHours(endHour, 0, 0, 0);
 
       // Track columns for overlapping events
       const columns: { event: CalendarEvent; end: Date }[][] = [];
@@ -136,21 +144,28 @@ export function WeekView({
         const eventEnd = new Date(event.end);
 
         // Adjust start and end times if they're outside this day
-        const adjustedStart = isSameDay(day, eventStart)
-          ? eventStart
-          : dayStart;
-        const adjustedEnd = isSameDay(day, eventEnd)
-          ? eventEnd
-          : addHours(dayStart, 24);
+        const adjustedStart = new Date(
+          Math.max(
+            (isSameDay(day, eventStart) ? eventStart : dayStart).getTime(),
+            visibleStart.getTime(),
+          ),
+        );
+        const adjustedEnd = new Date(
+          Math.min(
+            (isSameDay(day, eventEnd) ? eventEnd : addHours(dayStart, 24)).getTime(),
+            visibleEnd.getTime(),
+          ),
+        );
+        if (adjustedEnd <= adjustedStart) continue;
 
         // Calculate top position and height
-        const startHour =
+        const eventStartHour =
           getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
-        const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
+        const eventEndHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
 
         // Adjust the top calculation to account for the new start time
-        const top = (startHour - StartHour) * WeekCellsHeight;
-        const height = (endHour - startHour) * WeekCellsHeight;
+        const top = (eventStartHour - startHour) * WeekCellsHeight;
+        const height = (eventEndHour - eventStartHour) * WeekCellsHeight;
 
         // Find a column for this event
         let columnIndex = 0;
@@ -203,7 +218,7 @@ export function WeekView({
     });
 
     return result;
-  }, [days, events]);
+  }, [days, endHour, events, startHour]);
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -214,6 +229,8 @@ export function WeekView({
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
     currentDate,
     "week",
+    startHour,
+    endHour,
   );
 
   return (
@@ -308,8 +325,13 @@ export function WeekView({
               className="relative min-h-[var(--week-cells-height)] border-border/70 border-b last:border-b-0"
               key={hour.toString()}
             >
-              {index > 0 && (
-                <span className="-top-3 absolute left-0 flex h-6 w-16 max-w-full items-center justify-end bg-background pe-2 text-[10px] text-muted-foreground/70 sm:pe-4 sm:text-xs">
+              {index >= 0 && (
+                <span
+                  className={cn(
+                    "absolute left-0 flex h-6 w-16 max-w-full items-center justify-end bg-background pe-2 text-[10px] text-muted-foreground/70 sm:pe-4 sm:text-xs",
+                    index === 0 ? "top-0" : "-top-3",
+                  )}
+                >
                   {format(hour, "h a")}
                 </span>
               )}

@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import {
   Bot,
   Calendar,
+  CalendarDays,
   ChevronsUpDown,
   Inbox,
   LayoutDashboard,
@@ -42,6 +43,7 @@ const navItems = [
   { href: "/inbox", icon: Inbox, labelKey: "nav.inbox" },
   { href: "/sync", icon: Bot, labelKey: "nav.sync" },
   { href: "/timeline", icon: Calendar, labelKey: "nav.timeline" },
+  { href: "/calendar", icon: CalendarDays, labelKey: "nav.calendar" },
   { href: "/me", icon: User, labelKey: "nav.me" },
 ] as const;
 

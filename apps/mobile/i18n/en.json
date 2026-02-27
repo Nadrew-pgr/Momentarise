@@ -1,7 +1,9 @@
 {
   "common": {
     "appName": "Momentarise",
-    "retry": "Retry"
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save"
   },
   "nav": {
     "today": "Today",
@@ -111,6 +113,10 @@
       "placeholder": "This section is coming in Slice 1.",
       "emptyDay": "No events this day.",
       "emptyHint": "Add events from Inbox to see them here.",
+      "displayHours": "Hours",
+      "displayHoursHint": "Adjust the visible time window.",
+      "startHour": "Start hour",
+      "endHour": "End hour",
       "start": "Start",
       "stop": "Stop"
     },

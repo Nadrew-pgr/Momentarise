@@ -91,9 +91,9 @@ Momentarise/
 ├── docker-compose.yml          # PostgreSQL (dev)
 ├── project/                    # Specs, idées, docs produit
 │   ├── specs/                  # Spécifications techniques (SSoT)
-│   ├── distilled/              # Ledger d'idées trié
-│   ├── inbox_raw/              # Conversations brutes
-│   └── notes.md                # Notes d'intention produit
+│   ├── distilled/             # Ledger d'idées trié
+│   ├── inbox_raw/             # Conversations brutes
+│   └── docs/                  # Documentation opérationnelle
 ├── apps/
 │   ├── api/                    # Backend FastAPI
 │   │   ├── .env                # Variables d'environnement

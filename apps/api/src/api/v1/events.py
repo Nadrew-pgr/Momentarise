@@ -34,6 +34,7 @@ def _event_to_out(event: Event) -> EventOut:
         estimated_time_seconds=event.estimated_time_seconds,
         actual_time_acc_seconds=event.actual_time_acc_seconds,
         is_tracking=event.is_tracking,
+        color=event.color,
         tracking_started_at=event.tracking_started_at,
         updated_at=event.updated_at,
     )
@@ -147,6 +148,7 @@ async def create_event(
         item_id=item.id,
         start_at=body.start_at,
         end_at=body.end_at,
+        color=body.color or "sky",
         estimated_time_seconds=_resolve_estimated_time_seconds(
             body.start_at,
             body.end_at,
@@ -193,6 +195,8 @@ async def update_event(
         event.estimated_time_seconds = body.estimated_time_seconds
     if body.title is not None and event.item is not None:
         event.item.title = body.title
+    if body.color is not None:
+        event.color = body.color
 
     await db.commit()
     reloaded = await _get_event(event.id, workspace.workspace_id, db)

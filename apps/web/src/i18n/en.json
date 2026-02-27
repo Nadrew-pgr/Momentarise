@@ -1,13 +1,17 @@
 {
   "common": {
     "appName": "Momentarise",
-    "retry": "Retry"
+    "retry": "Retry",
+    "today": "Today",
+    "cancel": "Cancel",
+    "save": "Save"
   },
   "nav": {
     "today": "Today",
     "inbox": "Inbox",
     "sync": "Sync",
     "timeline": "Timeline",
+    "calendar": "Calendar",
     "me": "Me"
   },
   "auth": {
@@ -93,6 +97,23 @@
       "start": "Start",
       "stop": "Stop",
       "emptyHint": "Add events from Inbox to see them here."
+    },
+    "calendar": {
+      "title": "Calendar",
+      "engineBadgeCoss": "Coss engine",
+      "engineBadgeFull": "FullCalendar engine",
+      "month": "Month",
+      "week": "Week",
+      "day": "Day",
+      "displayHours": "Hours",
+      "displayHoursStart": "Start",
+      "displayHoursEnd": "End",
+      "create": "Create event",
+      "edit": "Edit event",
+      "start": "Start",
+      "end": "End",
+      "save": "Save",
+      "titlePlaceholder": "Untitled event"
     },
     "me": {
       "title": "Me",

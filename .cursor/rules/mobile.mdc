@@ -127,14 +127,15 @@ export function eventsToCalendarFormat(events: EventOut[]) {
 - Éviter de recréer des schémas Zod locaux équivalents dans `apps/mobile/schemas/*`.
 - Si un schéma manque dans `@momentarise/shared`, l'ajouter au package partagé puis l'utiliser côté mobile.
 
-## Design tokens
+## Design tokens / Theme ready
 
 Les couleurs sont définies en **hex dans `tailwind.config.js`** (pas dans `global.css`).
 Le fichier `global.css` contient uniquement les directives Tailwind (`@tailwind base/components/utilities`).
 
 NativeWind utilise les couleurs du `tailwind.config.js` via `className="bg-background text-foreground"`.
 
-Pour changer le thème : modifier les valeurs hex dans `tailwind.config.js`.
+- **Theme ready** : toujours utiliser les tokens (bg-background, text-foreground, bg-card, text-muted-foreground, etc.). Ne jamais hardcoder de couleurs (hex) pour fonds ou textes afin que l’app reste prête pour un futur sélecteur de thème (light/dark/palettes). Voir règle projet « Theme ready ».
+- Pour changer le thème actuel : modifier les valeurs hex dans `tailwind.config.js` (ou plus tard brancher un ThemeProvider).
 
 **ATTENTION** : le web utilise des variables CSS OKLCH dans `globals.css` ; le mobile utilise des hex dans `tailwind.config.js`. Ce sont deux mécanismes différents — ne PAS essayer de les unifier.
 

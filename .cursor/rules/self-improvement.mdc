@@ -1,30 +1,41 @@
 ---
-description: Journal d'apprentissage (erreurs/learnings/demandes) dans .learnings/
+description: Alimenter .learnings/ dès qu'une erreur, une correction ou une idée apparaît
 alwaysApply: true
 ---
 
-# Self‑Improvement (journal .learnings/)
+# Self-Improvement — Alimenter le journal .learnings/
 
 ## Objectif
 
-- Après un incident non trivial (commande qui échoue, stacktrace, correction d’hypothèse), écrire une entrée courte et exploitable dans `.learnings/` pour éviter la récidive.
+- **Dès qu’une erreur, une correction ou une idée apparaît** : écrire une entrée dans `.learnings/` pour éviter la récidive et centraliser les idées (au lieu de feuilles volantes ou notes éparses dans la doc).
 
 ## Quand écrire quoi
 
-- **Erreur / crash / commande non‑zéro** → `.learnings/ERRORS.md`
-- **Correction / apprentissage / meilleur pattern** → `.learnings/LEARNINGS.md`
-- **Besoin d’une capacité manquante** → `.learnings/FEATURE_REQUESTS.md`
+| Événement | Fichier | Action |
+|-----------|---------|--------|
+| Commande échoue, stack trace, exception, timeout | `.learnings/ERRORS.md` | Ajouter une entrée tout de suite après l’incident |
+| Utilisateur te corrige (« non c’est pas ça », « en fait il faut… ») | `.learnings/LEARNINGS.md` | Catégorie `correction` |
+| Connaissance obsolète ou meilleure approche trouvée | `.learnings/LEARNINGS.md` | Catégorie `knowledge_gap` ou `best_practice` |
+| Demande de fonctionnalité / capacité manquante | `.learnings/FEATURE_REQUESTS.md` | Une entrée par idée ou demande |
+| Idée produit ou technique en vrac (à trier plus tard) | `.learnings/IDEAS.md` | Format léger ; peut être promue vers FEATURE_REQUESTS ou LEARNINGS |
+
+## Comportement attendu
+
+1. **Après une erreur** (commande non zéro, exception, crash) : proposer ou écrire une entrée dans `ERRORS.md` avec Summary, Error, Context, Suggested Fix. Ne pas se contenter de corriger sans logger.
+2. **Après une correction de l’utilisateur** : ajouter une entrée dans `LEARNINGS.md` (catégorie `correction`) avec ce qui était faux et ce qui est correct.
+3. **Quand l’utilisateur exprime une idée** (feature, amélioration, « j’aimerais… ») : proposer de la loguer dans `FEATURE_REQUESTS.md` ou `IDEAS.md` plutôt que dans un doc épars ; si l’utilisateur accepte, écrire l’entrée.
+4. **Créer `.learnings/`** et les fichiers (ERRORS, LEARNINGS, FEATURE_REQUESTS, IDEAS) s’ils sont absents.
 
 ## Règles
 
-- **Créer `.learnings/` si absent** et créer les 3 fichiers si besoin (avec un titre + sections).
-- **Ne jamais logguer de secrets** (tokens, mots de passe, URLs privées avec creds).
-- **Inclure** : commande, message d’erreur (extrait pertinent), cause probable, fix suggéré, fichiers concernés.
-- **Déduplication** : si le sujet revient, ajouter “See Also” et incrémenter la récurrence plutôt que créer 10 entrées identiques.
+- Ne jamais loguer de secrets (tokens, mots de passe, URLs avec identifiants).
+- Inclure : commande ou contexte, message d’erreur (extrait), cause probable, fix suggéré, fichiers concernés.
+- Déduplication : si le sujet revient, ajouter « See Also » vers l’entrée existante plutôt que dupliquer.
+- Format détaillé : voir `project/docs/self-improvement.md` (IDs LRN/ERR/FEAT, Priority, Status, Area, métadonnées).
 
-## Mini‑templates (à copier/coller)
+## Mini-templates (à utiliser)
 
-### ERREUR
+### ERREUR → ERRORS.md
 
 ```markdown
 ## [ERR-YYYYMMDD-XXX] <contexte>
@@ -50,7 +61,7 @@ alwaysApply: true
 ---
 ```
 
-### LEARNING
+### LEARNING → LEARNINGS.md
 
 ```markdown
 ## [LRN-YYYYMMDD-XXX] <category>
@@ -69,3 +80,7 @@ alwaysApply: true
 <action concrète>
 ---
 ```
+
+### IDÉE / FEATURE → FEATURE_REQUESTS.md ou IDEAS.md
+
+Pour une idée en vrac (IDEAS.md) : une ligne ou un court paragraphe avec date, puis éventuellement « → à promouvoir en FEAT » quand c’est mûr.

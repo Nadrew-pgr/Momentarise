@@ -1,52 +1,31 @@
 "use client";
 
-import { RiCalendarCheckLine } from "@remixicon/react";
 import {
-  addDays,
-  addMonths,
-  addWeeks,
-  endOfMonth,
-  endOfWeek,
   format,
-  isSameMonth,
-  startOfMonth,
-  startOfWeek,
-  subMonths,
-  subWeeks,
 } from "date-fns";
-import {
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  PlusIcon,
-} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AgendaView } from "./agenda-view";
 import { CalendarDndProvider } from "./calendar-dnd-context";
-import { AgendaDaysToShow, EventGap, EventHeight, WeekCellsHeight } from "./constants";
+import { EventGap, EventHeight, WeekCellsHeight } from "./constants";
 import { DayView } from "./day-view";
-import { EventDialog } from "./event-dialog";
 import { MonthView } from "./month-view";
 import type { CalendarEvent, CalendarView } from "./types";
 import { addHoursToDate } from "./utils";
 import { WeekView } from "./week-view";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { getCalendarViewTitle, getRangeForCalendarView, shiftCalendarDate } from "@/features/calendar/core/view-types";
+import { CalendarEventDialog } from "@/features/calendar/ui/CalendarEventDialog";
+import { CalendarToolbar } from "@/features/calendar/ui/CalendarToolbar";
 
 export interface EventCalendarProps {
   events?: CalendarEvent[];
   onEventAdd?: (event: CalendarEvent) => void | Promise<void>;
   onEventUpdate?: (event: CalendarEvent) => void | Promise<void>;
   onEventDelete?: (eventId: string) => void | Promise<void>;
+  onEventStartTracking?: (eventId: string) => void | Promise<void>;
+  onEventStopTracking?: (eventId: string) => void | Promise<void>;
+  isMutating?: boolean;
   onVisibleRangeChange?: (range: {
     from: Date;
     to: Date;
@@ -55,6 +34,9 @@ export interface EventCalendarProps {
   }) => void;
   className?: string;
   initialView?: CalendarView;
+  startHour?: number;
+  endHour?: number;
+  onDisplayHoursChange?: (startHour: number, endHour: number) => Promise<void>;
 }
 
 export function EventCalendar({
@@ -62,9 +44,15 @@ export function EventCalendar({
   onEventAdd,
   onEventUpdate,
   onEventDelete,
+  onEventStartTracking,
+  onEventStopTracking,
+  isMutating = false,
   onVisibleRangeChange,
   className,
   initialView = "month",
+  startHour = 8,
+  endHour = 24,
+  onDisplayHoursChange,
 }: EventCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<CalendarView>(initialView);
@@ -73,67 +61,12 @@ export function EventCalendar({
     null,
   );
 
-  // Add keyboard shortcuts for view switching
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if user is typing in an input, textarea or contentEditable element
-      // or if the event dialog is open
-      if (
-        isEventDialogOpen ||
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target instanceof HTMLElement && e.target.isContentEditable)
-      ) {
-        return;
-      }
-
-      switch (e.key.toLowerCase()) {
-        case "m":
-          setView("month");
-          break;
-        case "w":
-          setView("week");
-          break;
-        case "d":
-          setView("day");
-          break;
-        case "a":
-          setView("agenda");
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isEventDialogOpen]);
-
   const handlePrevious = () => {
-    if (view === "month") {
-      setCurrentDate(subMonths(currentDate, 1));
-    } else if (view === "week") {
-      setCurrentDate(subWeeks(currentDate, 1));
-    } else if (view === "day") {
-      setCurrentDate(addDays(currentDate, -1));
-    } else if (view === "agenda") {
-      // For agenda view, go back 30 days (a full month)
-      setCurrentDate(addDays(currentDate, -AgendaDaysToShow));
-    }
+    setCurrentDate((prev) => shiftCalendarDate(prev, view, "prev"));
   };
 
   const handleNext = () => {
-    if (view === "month") {
-      setCurrentDate(addMonths(currentDate, 1));
-    } else if (view === "week") {
-      setCurrentDate(addWeeks(currentDate, 1));
-    } else if (view === "day") {
-      setCurrentDate(addDays(currentDate, 1));
-    } else if (view === "agenda") {
-      // For agenda view, go forward 30 days (a full month)
-      setCurrentDate(addDays(currentDate, AgendaDaysToShow));
-    }
+    setCurrentDate((prev) => shiftCalendarDate(prev, view, "next"));
   };
 
   const handleToday = () => {
@@ -217,82 +150,17 @@ export function EventCalendar({
     });
   };
 
-  const viewTitle = useMemo(() => {
-    if (view === "month") {
-      return format(currentDate, "MMMM yyyy");
-    }
-    if (view === "week") {
-      const start = startOfWeek(currentDate, { weekStartsOn: 0 });
-      const end = endOfWeek(currentDate, { weekStartsOn: 0 });
-      if (isSameMonth(start, end)) {
-        return format(start, "MMMM yyyy");
-      }
-      return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`;
-    }
-    if (view === "day") {
-      return (
-        <>
-          <span aria-hidden="true" className="min-[480px]:hidden">
-            {format(currentDate, "MMM d, yyyy")}
-          </span>
-          <span aria-hidden="true" className="max-[479px]:hidden min-md:hidden">
-            {format(currentDate, "MMMM d, yyyy")}
-          </span>
-          <span className="max-md:hidden">
-            {format(currentDate, "EEE MMMM d, yyyy")}
-          </span>
-        </>
-      );
-    }
-    if (view === "agenda") {
-      // Show the month range for agenda view
-      const start = currentDate;
-      const end = addDays(currentDate, AgendaDaysToShow - 1);
-
-      if (isSameMonth(start, end)) {
-        return format(start, "MMMM yyyy");
-      }
-      return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`;
-    }
-    return format(currentDate, "MMMM yyyy");
-  }, [currentDate, view]);
+  const viewTitle = useMemo(
+    () => getCalendarViewTitle(currentDate, view),
+    [currentDate, view]
+  );
 
   useEffect(() => {
     if (!onVisibleRangeChange) return;
-
-    if (view === "month") {
-      onVisibleRangeChange({
-        from: startOfWeek(startOfMonth(currentDate), { weekStartsOn: 0 }),
-        to: endOfWeek(endOfMonth(currentDate), { weekStartsOn: 0 }),
-        view,
-        currentDate,
-      });
-      return;
-    }
-
-    if (view === "week") {
-      onVisibleRangeChange({
-        from: startOfWeek(currentDate, { weekStartsOn: 0 }),
-        to: endOfWeek(currentDate, { weekStartsOn: 0 }),
-        view,
-        currentDate,
-      });
-      return;
-    }
-
-    if (view === "day") {
-      onVisibleRangeChange({
-        from: currentDate,
-        to: currentDate,
-        view,
-        currentDate,
-      });
-      return;
-    }
-
+    const range = getRangeForCalendarView(currentDate, view);
     onVisibleRangeChange({
-      from: currentDate,
-      to: addDays(currentDate, AgendaDaysToShow - 1),
+      from: range.from,
+      to: range.to,
       view,
       currentDate,
     });
@@ -310,98 +178,34 @@ export function EventCalendar({
       }
     >
       <CalendarDndProvider onEventUpdate={handleEventUpdate}>
-        <div
-          className={cn(
-            "flex items-center justify-between p-2 sm:p-4",
-            className,
-          )}
-        >
-          <div className="flex items-center gap-1 sm:gap-4">
-            <Button
-              className="max-[479px]:aspect-square max-[479px]:p-0!"
-              onClick={handleToday}
-              variant="outline"
-            >
-              <RiCalendarCheckLine
-                aria-hidden="true"
-                className="min-[480px]:hidden"
-                size={16}
-              />
-              <span className="max-[479px]:sr-only">Today</span>
-            </Button>
-            <div className="flex items-center sm:gap-2">
-              <Button
-                aria-label="Previous"
-                onClick={handlePrevious}
-                size="icon"
-                variant="ghost"
-              >
-                <ChevronLeftIcon aria-hidden="true" size={16} />
-              </Button>
-              <Button
-                aria-label="Next"
-                onClick={handleNext}
-                size="icon"
-                variant="ghost"
-              >
-                <ChevronRightIcon aria-hidden="true" size={16} />
-              </Button>
-            </div>
-            <h2 className="font-semibold text-sm sm:text-lg md:text-xl">
-              {viewTitle}
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button className="gap-1.5 max-[479px]:h-8" variant="outline">
-                  <span>
-                    <span aria-hidden="true" className="min-[480px]:hidden">
-                      {view.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="max-[479px]:sr-only">
-                      {view.charAt(0).toUpperCase() + view.slice(1)}
-                    </span>
-                  </span>
-                  <ChevronDownIcon
-                    aria-hidden="true"
-                    className="-me-1 opacity-60"
-                    size={16}
-                  />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-32">
-                <DropdownMenuItem onClick={() => setView("month")}>
-                  Month <DropdownMenuShortcut>M</DropdownMenuShortcut>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setView("week")}>
-                  Week <DropdownMenuShortcut>W</DropdownMenuShortcut>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setView("day")}>
-                  Day <DropdownMenuShortcut>D</DropdownMenuShortcut>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setView("agenda")}>
-                  Agenda <DropdownMenuShortcut>A</DropdownMenuShortcut>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              className="max-[479px]:aspect-square max-[479px]:p-0!"
-              onClick={() => {
-                setSelectedEvent(null); // Ensure we're creating a new event
-                setIsEventDialogOpen(true);
-              }}
-              size="sm"
-            >
-              <PlusIcon
-                aria-hidden="true"
-                className="sm:-ms-1 opacity-60"
-                size={16}
-              />
-              <span className="max-sm:sr-only">New event</span>
-            </Button>
-          </div>
-        </div>
+        <CalendarToolbar
+          className={className}
+          view={view}
+          title={viewTitle}
+          onToday={handleToday}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          onViewChange={(nextView) => setView(nextView as CalendarView)}
+          onCreate={() => {
+            const start = new Date(currentDate);
+            start.setHours(startHour, 0, 0, 0);
+            setSelectedEvent({
+              id: "",
+              title: "",
+              start,
+              end: addHoursToDate(start, 1),
+              allDay: false,
+              color: "sky",
+              isTracking: false,
+            });
+            setIsEventDialogOpen(true);
+          }}
+          startHour={startHour}
+          endHour={endHour}
+          onDisplayHoursChange={onDisplayHoursChange}
+          disableActions={isMutating}
+          shortcutsEnabled={!isEventDialogOpen}
+        />
 
         <div className="flex flex-1 flex-col">
           {view === "month" && (
@@ -418,6 +222,8 @@ export function EventCalendar({
               events={events}
               onEventCreate={handleEventCreate}
               onEventSelect={handleEventSelect}
+              startHour={startHour}
+              endHour={endHour}
             />
           )}
           {view === "day" && (
@@ -426,6 +232,8 @@ export function EventCalendar({
               events={events}
               onEventCreate={handleEventCreate}
               onEventSelect={handleEventSelect}
+              startHour={startHour}
+              endHour={endHour}
             />
           )}
           {view === "agenda" && (
@@ -437,7 +245,7 @@ export function EventCalendar({
           )}
         </div>
 
-        <EventDialog
+        <CalendarEventDialog
           key={
             selectedEvent
               ? `${selectedEvent.id || "new"}-${new Date(selectedEvent.start).toISOString()}-${new Date(selectedEvent.end).toISOString()}`
@@ -451,6 +259,42 @@ export function EventCalendar({
           }}
           onDelete={handleEventDelete}
           onSave={handleEventSave}
+          onToggleTracking={
+            onEventStartTracking && onEventStopTracking
+              ? (eventId) => {
+                  const event = events.find((e) => e.id === eventId);
+                  if (!event) return;
+                  if (event.isTracking) {
+                    void Promise.resolve(onEventStopTracking(eventId)).then(() => {
+                      setSelectedEvent((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              isTracking: false,
+                            }
+                          : prev
+                      );
+                    }).catch((error: unknown) => {
+                      toast.error(error instanceof Error ? error.message : "Failed to update tracking");
+                    });
+                  } else {
+                    void Promise.resolve(onEventStartTracking(eventId)).then(() => {
+                      setSelectedEvent((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              isTracking: true,
+                            }
+                          : prev
+                      );
+                    }).catch((error: unknown) => {
+                      toast.error(error instanceof Error ? error.message : "Failed to update tracking");
+                    });
+                  }
+                }
+              : undefined
+          }
+          isTrackingActionPending={isMutating}
         />
       </CalendarDndProvider>
     </div>

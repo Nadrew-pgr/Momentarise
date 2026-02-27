@@ -19,6 +19,7 @@ const pathToLabelKey: Record<string, string> = {
   inbox: "nav.inbox",
   sync: "nav.sync",
   timeline: "nav.timeline",
+  calendar: "nav.calendar",
   me: "nav.me",
 };
 

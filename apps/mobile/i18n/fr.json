@@ -1,7 +1,9 @@
 {
   "common": {
     "appName": "Momentarise",
-    "retry": "Réessayer"
+    "retry": "Réessayer",
+    "cancel": "Annuler",
+    "save": "Enregistrer"
   },
   "nav": {
     "today": "Aujourd'hui",
@@ -111,6 +113,10 @@
       "placeholder": "Cette section arrive dans la Slice 1.",
       "emptyDay": "Aucun événement ce jour.",
       "emptyHint": "Ajoutez des événements depuis Inbox pour les voir ici.",
+      "displayHours": "Heures",
+      "displayHoursHint": "Ajustez la plage horaire visible.",
+      "startHour": "Heure de début",
+      "endHour": "Heure de fin",
       "start": "Démarrer",
       "stop": "Arrêter"
     },

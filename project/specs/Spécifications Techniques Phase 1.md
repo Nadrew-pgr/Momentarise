@@ -667,6 +667,24 @@ Tous les objets (captures, items, events/moments) sont liés via un graphe de li
 - Web: adapter EventOut -> CalendarEvent et brancher CRUD complet.
 - Mobile: conserver grille visible même API down; erreur réseau non bloquante.
 
+#### Addendum — Parité stricte `/timeline` ↔ `/calendar` + préférences persistées
+
+- [x] `events.color` persisté en base (palette fermée: `sky | amber | violet | rose | emerald | orange`).
+- [x] `workspace_members.preferences` persisté en base (`preferences.calendar.start_hour`, `preferences.calendar.end_hour`).
+- [x] Endpoint backend: `GET /api/v1/preferences/calendar`.
+- [x] Endpoint backend: `PATCH /api/v1/preferences/calendar` avec garde conflit `last_known_updated_at` (`409`).
+- [x] `GET /api/v1/events` et `GET /api/v1/timeline` retournent `color`.
+- [x] `POST/PATCH /api/v1/events` acceptent `color`.
+- [x] BFF web: `GET/PATCH /api/preferences/calendar`.
+- [x] `/timeline` (Coss) et `/calendar` (FullCalendar) consomment les mêmes préférences horaires persistées backend.
+- [x] `/timeline` et `/calendar` alignés visuellement via couche `.calendar-parity` (headers, axes horaires, chips event, état passé barré, accent tracking).
+- [x] Mobile timeline lit/écrit les préférences horaires backend et conserve un fallback visuel si API indisponible.
+
+Décisions verrouillées (addendum):
+1. Préférences calendaires portées par `workspace_member` (multi-device, pas local/session).
+2. Valeurs serveur par défaut: `start_hour=8`, `end_hour=24`.
+3. Les différences de moteur (`Coss` vs `FullCalendar`) restent internes; UX utilisateur harmonisée.
+
 ---
 
 ## Slice 4 — Hardening multi-tenant & préparation IA/RAG

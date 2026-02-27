@@ -1,0 +1,23 @@
+# Dependencies and local env
+.venv
+venv
+.env
+.env.*
+
+# Git / IDE
+.git
+.gitignore
+.cursor
+.idea
+.vscode
+*.md
+!README.md
+
+# Python
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+*.egg-info
+dist
+build

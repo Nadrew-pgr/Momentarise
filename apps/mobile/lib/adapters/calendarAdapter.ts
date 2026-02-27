@@ -14,6 +14,18 @@ export interface CalendarEvent {
  */
 export type EventsByDate = Record<string, CalendarEvent[]>;
 
+const EVENT_COLOR_MAP: Record<
+  EventOut["color"],
+  string
+> = {
+  sky: "#38bdf8",
+  amber: "#f59e0b",
+  violet: "#8b5cf6",
+  rose: "#f43f5e",
+  emerald: "#10b981",
+  orange: "#f97316",
+};
+
 function toCalendarTime(iso: string): string {
   const d = new Date(iso);
   const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -49,6 +61,7 @@ export function eventsToCalendarFormat(
       start: toCalendarTime(ev.start_at),
       end: toCalendarTime(ev.end_at),
       title: ev.title,
+      color: EVENT_COLOR_MAP[ev.color],
     });
   }
   return byDate;
@@ -63,5 +76,6 @@ export function eventToCalendarEvent(ev: EventOut): CalendarEvent {
     start: toCalendarTime(ev.start_at),
     end: toCalendarTime(ev.end_at),
     title: ev.title,
+    color: EVENT_COLOR_MAP[ev.color],
   };
 }

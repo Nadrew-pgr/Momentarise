@@ -14,7 +14,7 @@ import {
 import type React from "react";
 import { useMemo } from "react";
 
-import { EndHour, StartHour, WeekCellsHeight } from "./constants";
+import { WeekCellsHeight } from "./constants";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
@@ -28,6 +28,8 @@ interface DayViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
+  startHour: number;
+  endHour: number;
 }
 
 interface PositionedEvent {
@@ -44,14 +46,16 @@ export function DayView({
   events,
   onEventSelect,
   onEventCreate,
+  startHour,
+  endHour,
 }: DayViewProps) {
   const hours = useMemo(() => {
     const dayStart = startOfDay(currentDate);
     return eachHourOfInterval({
-      end: addHours(dayStart, EndHour - 1),
-      start: addHours(dayStart, StartHour),
+      end: addHours(dayStart, endHour - 1),
+      start: addHours(dayStart, startHour),
     });
-  }, [currentDate]);
+  }, [currentDate, endHour, startHour]);
 
   const dayEvents = useMemo(() => {
     return events
@@ -89,6 +93,10 @@ export function DayView({
   const positionedEvents = useMemo(() => {
     const result: PositionedEvent[] = [];
     const dayStart = startOfDay(currentDate);
+    const visibleStart = new Date(dayStart);
+    visibleStart.setHours(startHour, 0, 0, 0);
+    const visibleEnd = new Date(dayStart);
+    visibleEnd.setHours(endHour, 0, 0, 0);
 
     // Sort events by start time and duration
     const sortedEvents = [...timeEvents].sort((a, b) => {
@@ -115,20 +123,27 @@ export function DayView({
       const eventEnd = new Date(event.end);
 
       // Adjust start and end times if they're outside this day
-      const adjustedStart = isSameDay(currentDate, eventStart)
-        ? eventStart
-        : dayStart;
-      const adjustedEnd = isSameDay(currentDate, eventEnd)
-        ? eventEnd
-        : addHours(dayStart, 24);
+      const adjustedStart = new Date(
+        Math.max(
+          (isSameDay(currentDate, eventStart) ? eventStart : dayStart).getTime(),
+          visibleStart.getTime(),
+        ),
+      );
+      const adjustedEnd = new Date(
+        Math.min(
+          (isSameDay(currentDate, eventEnd) ? eventEnd : addHours(dayStart, 24)).getTime(),
+          visibleEnd.getTime(),
+        ),
+      );
+      if (adjustedEnd <= adjustedStart) continue;
 
       // Calculate top position and height
-      const startHour =
+      const eventStartHour =
         getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
-      const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
+      const eventEndHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
 
-      const top = (startHour - StartHour) * WeekCellsHeight;
-      const height = (endHour - startHour) * WeekCellsHeight;
+      const top = (eventStartHour - startHour) * WeekCellsHeight;
+      const height = (eventEndHour - eventStartHour) * WeekCellsHeight;
 
       // Find a column for this event
       let columnIndex = 0;
@@ -175,7 +190,7 @@ export function DayView({
     }
 
     return result;
-  }, [currentDate, timeEvents]);
+  }, [currentDate, endHour, startHour, timeEvents]);
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -186,6 +201,8 @@ export function DayView({
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
     currentDate,
     "day",
+    startHour,
+    endHour,
   );
 
   return (
@@ -231,8 +248,13 @@ export function DayView({
               className="relative h-[var(--week-cells-height)] border-border/70 border-b last:border-b-0"
               key={hour.toString()}
             >
-              {index > 0 && (
-                <span className="-top-3 absolute left-0 flex h-6 w-16 max-w-full items-center justify-end bg-background pe-2 text-[10px] text-muted-foreground/70 sm:pe-4 sm:text-xs">
+              {index >= 0 && (
+                <span
+                  className={cn(
+                    "absolute left-0 flex h-6 w-16 max-w-full items-center justify-end bg-background pe-2 text-[10px] text-muted-foreground/70 sm:pe-4 sm:text-xs",
+                    index === 0 ? "top-0" : "-top-3",
+                  )}
+                >
                   {format(hour, "h a")}
                 </span>
               )}

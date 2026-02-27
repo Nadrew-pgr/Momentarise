@@ -149,3 +149,29 @@ Le mood logging est déplacé hors Slice 3 (backlog bien-être, plus tard).
 1. Intégration visuelle complète de `project/inbox_raw/AI_Chat_interface` dans `/sync` (la route `/sync` est un stub).
 2. Système de design tokens unifié web+mobile avec source de vérité partagée (`packages/ui-tokens`): non implémenté dans Slice 3 v2.
 3. Parité complète d’édition bloc web/mobile (toolbar avancée, extensions riches, comportement identique): partiel.
+
+## Addendum exécuté — Parité visuelle stricte + persistance backend (multi-device)
+
+### Endpoints ajoutés
+1. `GET /api/v1/preferences/calendar`
+2. `PATCH /api/v1/preferences/calendar`
+3. BFF web: `GET /api/preferences/calendar`
+4. BFF web: `PATCH /api/preferences/calendar`
+
+### Contrats et persistance
+1. `events.color` persisté en base et exposé dans `GET /events` et `GET /timeline`.
+2. `workspace_members.preferences` (JSONB) persiste `preferences.calendar.start_hour/end_hour`.
+3. Stratégie conflit multi-device appliquée aux préférences via `last_known_updated_at` + `409`.
+
+### Intégration UI
+1. `/timeline` (Coss) et `/calendar` (FullCalendar) utilisent les mêmes contrôles d’heures affichées.
+2. Les plages horaires utilisateur (start/end) sont persistées backend, plus de session/local-only.
+3. Couleur event et style “past event barré” harmonisés sur les deux moteurs.
+4. Mobile timeline lit/écrit les préférences backend et applique la plage horaire côté grille.
+
+### Validation exécutée (addendum)
+1. `npm run -w apps/web lint`
+2. `cd apps/web && npx tsc --noEmit`
+3. `cd apps/mobile && npx tsc --noEmit`
+4. `cd apps/api && uv run python -m py_compile src/api/v1/events.py src/api/v1/timeline.py src/api/v1/preferences.py src/schemas/event.py src/schemas/timeline.py src/schemas/preferences.py`
+5. `cd apps/api && uv run alembic upgrade head`
