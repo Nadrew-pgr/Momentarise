@@ -73,6 +73,24 @@ function upsertBySeq(messages: SyncChatMessage[], next: SyncChatMessage): SyncCh
   return [...rest, next].sort((a, b) => a.seq - b.seq);
 }
 
+function getPreviewPlanTitleKey(entityType: string, action: string): string {
+  const k = `${entityType}.${action}`.toLowerCase();
+  const map: Record<string, string> = {
+    "event.event.create": "pages.sync.previewPlan.titleEventCreate",
+    "event.event.update": "pages.sync.previewPlan.titleEventUpdate",
+    "event.event.delete": "pages.sync.previewPlan.titleEventDelete",
+    "item.item.create": "pages.sync.previewPlan.titleItemCreate",
+    "item.item.update": "pages.sync.previewPlan.titleItemUpdate",
+    "item.item.delete": "pages.sync.previewPlan.titleItemDelete",
+    "inbox.inbox.transform.preview": "pages.sync.previewPlan.titleInboxTransform",
+  };
+  if (map[k]) return map[k];
+  if (action.toLowerCase().includes("create")) return "pages.sync.previewPlan.titleEventCreate";
+  if (action.toLowerCase().includes("update")) return "pages.sync.previewPlan.titleEventUpdate";
+  if (action.toLowerCase().includes("delete")) return "pages.sync.previewPlan.titleEventDelete";
+  return "pages.sync.previewPlan.titleFallback";
+}
+
 export function SyncChatShell() {
   const { t } = useTranslation();
 
@@ -811,6 +829,9 @@ export function SyncChatShell() {
           onUndo={handleUndo}
           previewLabels={{
             title: t("pages.sync.previewPlan.title"),
+            planTitle: latestPreview
+              ? t(getPreviewPlanTitleKey(latestPreview.entity_type, latestPreview.action))
+              : undefined,
             summary: t("pages.sync.previewPlan.summary"),
             mutations: t("pages.sync.previewPlan.mutations"),
             notes: t("pages.sync.previewPlan.notes"),

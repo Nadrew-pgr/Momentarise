@@ -1,0 +1,1 @@
+apply the cursor/rules/self-improvement.mdc.

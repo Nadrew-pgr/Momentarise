@@ -5,30 +5,6 @@ Voir `project/docs/self-improvement.md` pour le détail des champs et la promoti
 
 ---
 
-## [LRN-20260228-005] correction — Appliquer la règle self-improvement à chaque fois (alwaysApply)
-
-**Logged**: 2026-02-28
-**Priority**: high
-**Status**: pending
-**Area**: process / agent
-
-### Summary
-La règle `.cursor/rules/self-improvement.mdc` est en `alwaysApply: true` : il faut écrire dans `.learnings/` **à chaque** erreur ou correction, pas seulement quand l’utilisateur le demande.
-
-### Details
-- **Attendu** : après une erreur → entrée dans `ERRORS.md` tout de suite ; après une correction utilisateur → entrée dans `LEARNINGS.md` (correction). Ne pas se contenter de corriger sans logger.
-- **Ce qui s’est passé** : les erreurs (parité calendrier, event card, etc.) ont été corrigées mais certaines n’ont été documentées dans ERRORS.md qu’après une demande explicite (« documente toutes les erreurs »).
-- La règle est lue au début de la session ; l’agent doit l’appliquer systématiquement à chaque tour où un des événements se produit (erreur, correction, idée).
-
-### Suggested Action
-À chaque fois qu’une commande échoue, qu’une exception apparaît ou que l’utilisateur corrige (« non c’est pas ça », « en fait… », « tu n’as pas compris ») : **d’abord ou en parallèle du fix**, ajouter l’entrée dans `.learnings/ERRORS.md` ou `LEARNINGS.md` selon le cas. Ne pas attendre que l’utilisateur demande « log les erreurs ».
-
-### Metadata
-- Related Files: `.cursor/rules/self-improvement.mdc`, `.learnings/ERRORS.md`, `.learnings/LEARNINGS.md`
-- See also: `project/docs/self-improvement.md` (Comportement attendu)
-
----
-
 ## [LRN-20260228-004] best_practice — Scroll page chat / dashboard (Next.js flex chain)
 
 **Logged**: 2026-02-28

@@ -20,6 +20,7 @@ import type { SyncPreview } from "@momentarise/shared";
 
 interface PreviewLabels {
   title: string;
+  planTitle?: string;
   summary: string;
   mutations: string;
   notes: string;

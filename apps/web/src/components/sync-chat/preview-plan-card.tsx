@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 
 interface PreviewPlanCardLabels {
   title: string;
+  /** Optional user-facing plan type title (e.g. "Création d'un moment"). When set, shown as main title instead of entity_type · action. */
+  planTitle?: string;
   summary: string;
   mutations: string;
   notes: string;
@@ -169,9 +171,7 @@ export function PreviewPlanCard({
   const summary = extractSummary(preview);
   const mutations = extractMutations(preview);
   const notes = extractNotes(preview);
-  const title = preview.entity_type
-    ? `${preview.entity_type} · ${preview.action}`
-    : labels.title;
+  const title = labels.planTitle ?? (preview.entity_type ? `${preview.entity_type} · ${preview.action}` : labels.title);
 
   return (
     <Plan className="sync-chat-preview-card rounded-2xl border border-border bg-background/95 shadow-sm" defaultOpen>

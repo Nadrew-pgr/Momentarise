@@ -97,7 +97,7 @@ export function Composer({
     <div className="sync-chat-composer-wrap pointer-events-none absolute inset-x-0 bottom-3 z-10 px-4">
       <TooltipProvider delayDuration={150}>
         <div className="pointer-events-auto mx-auto w-full max-w-3xl">
-          <div className="sync-chat-composer-box rounded-3xl border border-border bg-background p-4 shadow-lg">
+          <div className="rounded-3xl border-0 bg-background/90 p-3 shadow-sm ring-1 ring-border/30">
             <div className="flex items-end gap-2">
               <textarea
                 ref={textareaRef}

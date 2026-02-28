@@ -5,6 +5,13 @@ alwaysApply: true
 
 # Self-Improvement — Alimenter le journal .learnings/
 
+**À faire à chaque fois (même réponse que le fix ou la réponse) :**
+- Erreur corrigée (commande, exception, bug) → écrire une entrée dans `ERRORS.md`.
+- Utilisateur te corrige ou meilleure approche trouvée → écrire une entrée dans `LEARNINGS.md`.
+- Idée / feature exprimée → proposer de loguer et écrire dans `FEATURE_REQUESTS.md` ou `IDEAS.md`.
+
+Ne pas attendre que l’utilisateur lance /learnings ou demande « logue ça ». Faire l’entrée dans la même réponse.
+
 ## Objectif
 
 - **Dès qu’une erreur, une correction ou une idée apparaît** : écrire une entrée dans `.learnings/` pour éviter la récidive et centraliser les idées (au lieu de feuilles volantes ou notes éparses dans la doc).
