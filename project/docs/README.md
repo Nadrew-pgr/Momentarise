@@ -11,6 +11,7 @@ Documentation opérationnelle et de référence du monorepo Momentarise. Pour le
 | **mobile-components-reference.md** | Référence composants React Native / Expo (libs recommandées, statut, priorité, commandes d’install) |
 | **deploy-backend-render.md** | Déploiement de l’API (FastAPI) sur Render (PostgreSQL, Web Service, variables d’env) |
 | **timeline-troubleshooting.md** | Runbook calendrier/timeline (API down, conflit `409`, migration manquante `f405`) |
+| **capture-troubleshooting.md** | Runbook capture Universal Inbox (upload, jobs, artifacts, suggestions CTA, auto-apply, external capture) |
 
 ## Où mettre quoi
 

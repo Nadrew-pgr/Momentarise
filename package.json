@@ -1,8 +1,8 @@
 {
   "name": "momentarise",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ]
+  "workspaces": ["apps/*", "packages/*"],
+  "devDependencies": {
+    "tailwindcss": "^4"
+  }
 }

@@ -83,6 +83,9 @@
       "openSync": "Open Sync",
       "filter": {
         "all": "All",
+        "action": "Action",
+        "read": "Read",
+        "waiting": "Waiting",
         "notes": "Notes",
         "voice": "Voice",
         "photo": "Photo",
@@ -94,6 +97,7 @@
       "processSubmit": "Create item",
       "preview": "Preview",
       "apply": "Apply",
+      "reprocess": "Reprocess",
       "emptyList": "No captures. Add raw content to get started.",
       "emptyCapture": "Capture without text content.",
       "recentItems": "Recent items",
@@ -213,7 +217,19 @@
     },
     "me": {
       "title": "Me",
+      "subtitle": "Profile and automation preferences.",
       "placeholder": "Profile and settings — coming soon."
+    },
+    "settings": {
+      "calendarTitle": "Calendar preferences",
+      "calendarStartHour": "Start hour",
+      "calendarEndHour": "End hour",
+      "aiTitle": "AI capture preferences",
+      "aiMode": "Automation mode",
+      "aiModeProposalOnly": "Proposal only",
+      "aiModeAutoApply": "Auto apply",
+      "aiThreshold": "Auto apply threshold",
+      "aiMaxActions": "Max actions per capture"
     }
   }
 }

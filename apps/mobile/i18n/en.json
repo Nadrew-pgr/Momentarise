@@ -58,6 +58,10 @@
         "title": "Link",
         "subtitle": "Raw capture (placeholder)"
       },
+      "file": {
+        "title": "File",
+        "subtitle": "Raw capture (placeholder)"
+      },
       "event": {
         "title": "Event",
         "subtitle": "Create a calendar event"
@@ -108,12 +112,16 @@
       "processSubmit": "Create item",
       "preview": "Preview",
       "apply": "Apply",
+      "reprocess": "Reprocess",
       "emptyList": "No captures.",
       "emptyCapture": "Capture without text content.",
       "recentItems": "Recent items",
       "emptyItems": "No recent items.",
       "filter": {
         "all": "All",
+        "action": "Action",
+        "read": "Read",
+        "waiting": "Waiting",
         "notes": "Notes",
         "voice": "Voice",
         "photo": "Photo",
@@ -195,11 +203,17 @@
         "orange": "Orange"
       }
     },
-    "settings": {
-      "calendarTitle": "Calendar preferences",
-      "calendarStartHour": "Start hour",
-      "calendarEndHour": "End hour"
-    },
+  "settings": {
+    "calendarTitle": "Calendar preferences",
+    "calendarStartHour": "Start hour",
+    "calendarEndHour": "End hour",
+    "aiTitle": "AI capture preferences",
+    "aiMode": "Automation mode",
+    "aiModeProposalOnly": "Proposal only",
+    "aiModeAutoApply": "Auto apply",
+    "aiThreshold": "Auto apply threshold",
+    "aiMaxActions": "Max actions per capture"
+  },
     "sync": {
       "title": "Sync",
       "placeholder": "Sync page ready for next iterations (chat, preview/apply, AI tools)."

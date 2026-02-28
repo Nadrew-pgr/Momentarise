@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -11,85 +10,27 @@ import {
   Inbox as InboxIcon,
   Link2,
   Mic,
+  RefreshCw,
   Search,
   Trash2,
-  WandSparkles,
 } from "lucide-react";
-import type { CaptureType } from "@momentarise/shared";
+import type { CaptureActionSuggestion, CaptureType } from "@momentarise/shared";
 import {
   useApplyCapture,
   useDeleteCapture,
   useInbox,
-  usePreviewCapture,
   useProcessCapture,
+  useReprocessCapture,
   useRestoreCapture,
 } from "@/hooks/use-inbox";
-import {
-  useDeleteItemById,
-  useItems,
-  useRestoreItemById,
-} from "@/hooks/use-item";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type FilterKey = "all" | "notes" | "voice" | "photo" | "file" | "link";
+type FilterKey = "all" | "action" | "read" | "waiting";
 type SectionKey = "today" | "yesterday" | "earlier";
 
-type FeedEntry =
-  | {
-      type: "capture";
-      id: string;
-      at: Date;
-      title: string;
-      subtitle: string;
-      kindLabel: string;
-      status: string;
-      captureType: CaptureType;
-      channel: string | null;
-    }
-  | {
-      type: "item";
-      id: string;
-      at: Date;
-      title: string;
-      subtitle: string;
-      kindLabel: string;
-      itemKind: string;
-    };
-
-const captureFilters: Array<{ key: FilterKey; captureType?: CaptureType }> = [
-  { key: "all" },
-  { key: "notes", captureType: "text" },
-  { key: "voice", captureType: "voice" },
-  { key: "photo", captureType: "photo" },
-  { key: "file" },
-  { key: "link", captureType: "link" },
-];
-
-function firstLine(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  return trimmed.split("\n")[0]?.trim() ?? "";
-}
-
-function previewText(value: string): string {
-  const compact = value.replace(/\s+/g, " ").trim();
-  if (!compact) return "";
-  return compact.length > 120 ? `${compact.slice(0, 120)}…` : compact;
-}
-
-function resolveSectionKey(at: Date): SectionKey {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (at >= today) return "today";
-  if (at >= yesterday) return "yesterday";
-  return "earlier";
-}
-
-function captureIcon(type: CaptureType): ReactNode {
+function captureIcon(type: CaptureType) {
   switch (type) {
     case "voice":
       return <Mic className="h-4 w-4" />;
@@ -102,152 +43,110 @@ function captureIcon(type: CaptureType): ReactNode {
   }
 }
 
+function firstLine(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.split("\n")[0]?.trim() ?? "";
+}
+
+function previewText(value: string): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return "";
+  return compact.length > 120 ? `${compact.slice(0, 120)}...` : compact;
+}
+
+function resolveSectionKey(at: Date): SectionKey {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (at >= today) return "today";
+  if (at >= yesterday) return "yesterday";
+  return "earlier";
+}
+
+function relativeTime(now: Date, date: Date, locale: string): string {
+  const rtf = new Intl.RelativeTimeFormat(locale || "en-US", { numeric: "auto" });
+  const deltaMs = date.getTime() - now.getTime();
+  const absSeconds = Math.abs(deltaMs) / 1000;
+  if (absSeconds < 60) return rtf.format(Math.round(deltaMs / 1000), "second");
+  const absMinutes = absSeconds / 60;
+  if (absMinutes < 60) return rtf.format(Math.round(deltaMs / 60000), "minute");
+  const absHours = absMinutes / 60;
+  if (absHours < 24) return rtf.format(Math.round(deltaMs / 3600000), "hour");
+  return rtf.format(Math.round(deltaMs / 86400000), "day");
+}
+
+function isActionCapture(suggestions: CaptureActionSuggestion[]): boolean {
+  return suggestions.some((action) => action.type !== "review");
+}
+
 export default function InboxPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
-  const [processingCaptureId, setProcessingCaptureId] = useState<string | null>(null);
-  const [processingTitle, setProcessingTitle] = useState("");
-  const [previewByCaptureId, setPreviewByCaptureId] = useState<
-    Record<string, { suggested_title: string; suggested_kind: string; reason: string }>
-  >({});
+  const [reviewCaptureId, setReviewCaptureId] = useState<string | null>(null);
+  const [reviewTitle, setReviewTitle] = useState("");
 
-  const { data: inboxData, isLoading: inboxLoading } = useInbox();
-  const { data: itemsData, isLoading: itemsLoading } = useItems();
-  const previewCapture = usePreviewCapture();
+  const { data: inboxData, isLoading } = useInbox();
   const applyCapture = useApplyCapture();
   const processCapture = useProcessCapture();
+  const reprocessCapture = useReprocessCapture();
   const deleteCapture = useDeleteCapture();
   const restoreCapture = useRestoreCapture();
-  const deleteItemById = useDeleteItemById();
-  const restoreItemById = useRestoreItemById();
 
   const captures = inboxData?.captures;
-  const items = itemsData?.items;
 
-  const sectionLabel = useCallback(
-    (key: SectionKey) => {
-      if (key === "today") return t("pages.inbox.sectionToday");
-      if (key === "yesterday") return t("pages.inbox.sectionYesterday");
-      return t("pages.inbox.sectionEarlier");
-    },
-    [t]
-  );
-
-  const formatTime = useCallback(
-    (date: Date) =>
-      new Intl.DateTimeFormat(i18n.language || "en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(date),
-    [i18n.language]
-  );
-
-  const feed = useMemo(() => {
+  const filteredCaptures = useMemo(() => {
+    const source = captures ?? [];
     const query = search.trim().toLowerCase();
-    const allEntries: FeedEntry[] = [];
-    const captureList = captures ?? [];
-    const itemList = items ?? [];
+    const list = source.filter((capture) => {
+      const suggestions = capture.suggested_actions ?? [];
+      const waiting =
+        capture.status === "queued" ||
+        capture.status === "processing" ||
+        capture.status === "failed" ||
+        capture.requires_review;
+      const readable = capture.status === "ready" && !capture.requires_review;
+      if (activeFilter === "action" && !isActionCapture(suggestions)) return false;
+      if (activeFilter === "read" && !readable) return false;
+      if (activeFilter === "waiting" && !waiting) return false;
 
-    for (const capture of captureList) {
-      const title =
-        firstLine(capture.raw_content) ||
-        t("pages.inbox.captureFallbackTitle", { type: capture.capture_type });
-      const subtitle = previewText(capture.raw_content) || t("pages.inbox.emptyCapture");
-      const entry: FeedEntry = {
-        type: "capture",
-        id: capture.id,
-        at: new Date(capture.created_at),
-        title,
-        subtitle,
-        kindLabel: t("pages.inbox.kindCapture"),
-        status: capture.status,
-        captureType: capture.capture_type,
-        channel:
-          capture.metadata && typeof capture.metadata.channel === "string"
-            ? capture.metadata.channel
-            : null,
-      };
-      allEntries.push(entry);
-    }
-
-    for (const item of itemList) {
-      const entry: FeedEntry = {
-        type: "item",
-        id: item.id,
-        at: new Date(item.updated_at),
-        title: item.title,
-        subtitle: item.kind,
-        kindLabel: t("pages.inbox.kindItem"),
-        itemKind: item.kind,
-      };
-      allEntries.push(entry);
-    }
-
-    const filtered = allEntries.filter((entry) => {
-      if (activeFilter === "notes") {
-        if (entry.type === "item") return entry.itemKind === "note";
-        return entry.captureType === "text" || entry.channel === "note";
-      }
-      if (activeFilter === "file") {
-        if (entry.type !== "capture") return false;
-        return entry.channel === "file";
-      }
-      if (activeFilter !== "all") {
-        if (entry.type !== "capture") return false;
-        if (entry.captureType !== activeFilter) return false;
-      }
       if (!query) return true;
-      return `${entry.title} ${entry.subtitle}`.toLowerCase().includes(query);
+      const haystack = `${capture.raw_content} ${(capture.primary_action?.label ?? "").toString()}`;
+      return haystack.toLowerCase().includes(query);
     });
-
-    filtered.sort((a, b) => b.at.getTime() - a.at.getTime());
-    return filtered;
-  }, [activeFilter, captures, items, search, t]);
+    list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return list;
+  }, [activeFilter, captures, search]);
 
   const grouped = useMemo(() => {
-    const bySection: Record<SectionKey, FeedEntry[]> = {
+    const bySection: Record<SectionKey, typeof filteredCaptures> = {
       today: [],
       yesterday: [],
       earlier: [],
     };
-    for (const entry of feed) {
-      bySection[resolveSectionKey(entry.at)].push(entry);
+    for (const capture of filteredCaptures) {
+      bySection[resolveSectionKey(new Date(capture.created_at))].push(capture);
     }
     return bySection;
-  }, [feed]);
+  }, [filteredCaptures]);
 
-  const handlePreview = useCallback(
-    (captureId: string) => {
-      previewCapture.mutate(
-        { captureId },
-        {
-          onSuccess: (preview) => {
-            setPreviewByCaptureId((prev) => ({
-              ...prev,
-              [captureId]: {
-                suggested_title: preview.suggested_title,
-                suggested_kind: preview.suggested_kind,
-                reason: preview.reason,
-              },
-            }));
-          },
-        }
-      );
-    },
-    [previewCapture]
-  );
+  const handleAction = useCallback(
+    (captureId: string, action: CaptureActionSuggestion, fallbackTitle: string) => {
+      if (action.type === "review") {
+        setReviewCaptureId(captureId);
+        setReviewTitle(fallbackTitle);
+        return;
+      }
 
-  const handleApply = useCallback(
-    (captureId: string) => {
-      const preview = previewByCaptureId[captureId];
       applyCapture.mutate(
         {
           captureId,
-          payload: preview
-            ? { title: preview.suggested_title, kind: preview.suggested_kind as never }
-            : undefined,
+          payload: {
+            action_key: action.key,
+          },
         },
         {
           onSuccess: (res) => {
@@ -256,40 +155,38 @@ export default function InboxPage() {
         }
       );
     },
-    [applyCapture, previewByCaptureId, router]
+    [applyCapture, router]
   );
 
-  const handleSubmitProcess = useCallback(() => {
-    if (!processingCaptureId || !processingTitle.trim()) return;
+  const handleReviewSubmit = useCallback(() => {
+    if (!reviewCaptureId || !reviewTitle.trim()) return;
     processCapture.mutate(
-      { captureId: processingCaptureId, title: processingTitle.trim() },
+      { captureId: reviewCaptureId, title: reviewTitle.trim() },
       {
         onSuccess: (res) => {
-          setProcessingCaptureId(null);
-          setProcessingTitle("");
+          setReviewCaptureId(null);
+          setReviewTitle("");
           router.push(`/inbox/items/${res.item_id}`);
         },
       }
     );
-  }, [processCapture, processingCaptureId, processingTitle, router]);
+  }, [processCapture, reviewCaptureId, reviewTitle, router]);
 
-  const isLoading = inboxLoading || itemsLoading;
   const isBusy =
     applyCapture.isPending ||
     processCapture.isPending ||
+    reprocessCapture.isPending ||
     deleteCapture.isPending ||
-    deleteItemById.isPending ||
-    restoreCapture.isPending ||
-    restoreItemById.isPending;
+    restoreCapture.isPending;
+
+  const now = new Date();
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col">
       <header className="-mx-4 sticky top-0 z-20 border-b border-border/70 bg-background/95 px-4 pb-4 pt-2 backdrop-blur">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{t("pages.inbox.title")}</h1>
-            <p className="text-muted-foreground mt-1 text-sm">{t("pages.inbox.subtitle")}</p>
-          </div>
+        <div className="mb-4">
+          <h1 className="text-2xl font-semibold tracking-tight">{t("pages.inbox.title")}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{t("pages.inbox.subtitle")}</p>
         </div>
 
         <div className="relative mb-3">
@@ -303,16 +200,16 @@ export default function InboxPage() {
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {captureFilters.map((filter) => (
+          {(["all", "action", "read", "waiting"] as FilterKey[]).map((filter) => (
             <Button
-              key={filter.key}
+              key={filter}
               type="button"
               size="sm"
-              variant={activeFilter === filter.key ? "default" : "outline"}
+              variant={activeFilter === filter ? "default" : "outline"}
               className="shrink-0 rounded-full px-4"
-              onClick={() => setActiveFilter(filter.key)}
+              onClick={() => setActiveFilter(filter)}
             >
-              {t(`pages.inbox.filter.${filter.key}`)}
+              {t(`pages.inbox.filter.${filter}`)}
             </Button>
           ))}
         </div>
@@ -323,7 +220,7 @@ export default function InboxPage() {
           <div className="flex h-full min-h-[280px] items-center justify-center">
             <p className="text-muted-foreground text-sm">{t("pages.inbox.placeholder")}</p>
           </div>
-        ) : feed.length === 0 ? (
+        ) : filteredCaptures.length === 0 ? (
           <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-3 text-center">
             <InboxIcon className="text-muted-foreground h-10 w-10" />
             <p className="text-muted-foreground text-sm">{t("pages.inbox.emptyList")}</p>
@@ -336,181 +233,117 @@ export default function InboxPage() {
               return (
                 <section key={section} className="space-y-3">
                   <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                    {sectionLabel(section)}
+                    {t(`pages.inbox.section${section[0].toUpperCase()}${section.slice(1)}`)}
                   </h2>
                   <div className="space-y-3">
-                    {entries.map((entry) => {
-                      if (entry.type === "capture") {
-                        const preview = previewByCaptureId[entry.id];
-                        return (
-                          <article
-                            key={`capture-${entry.id}`}
-                            className="rounded-2xl border border-border/70 bg-card/90 p-4 shadow-sm"
-                          >
-                            <div className="mb-2 flex items-start justify-between gap-3">
-                              <div className="flex min-w-0 items-start gap-3">
-                                <div className="mt-0.5 rounded-full border border-border bg-background p-2">
-                                  {captureIcon(entry.captureType)}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold">{entry.title}</p>
-                                  <p className="text-muted-foreground mt-0.5 line-clamp-2 text-sm">
-                                    {entry.subtitle}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="shrink-0 text-right">
-                                <p className="text-muted-foreground text-xs">{formatTime(entry.at)}</p>
-                                <p className="text-muted-foreground mt-1 text-[11px] uppercase">
-                                  {entry.status}
-                                </p>
-                              </div>
-                            </div>
-
-                            {preview ? (
-                              <div className="mb-3 rounded-lg border border-border bg-background/70 p-2">
-                                <p className="text-xs font-medium">
-                                  {preview.suggested_title} ({preview.suggested_kind})
-                                </p>
-                                <p className="text-muted-foreground text-xs">{preview.reason}</p>
-                              </div>
-                            ) : null}
-
-                            {processingCaptureId === entry.id ? (
-                              <div className="flex flex-wrap items-end gap-2">
-                                <div className="min-w-[220px] flex-1">
-                                  <Label htmlFor={`process-title-${entry.id}`} className="mb-1 block text-xs">
-                                    {t("pages.inbox.processTitle")}
-                                  </Label>
-                                  <Input
-                                    id={`process-title-${entry.id}`}
-                                    value={processingTitle}
-                                    onChange={(event) => setProcessingTitle(event.target.value)}
-                                    placeholder={t("pages.item.title")}
-                                    className="h-9"
-                                  />
-                                </div>
-                                <Button
-                                  size="sm"
-                                  onClick={handleSubmitProcess}
-                                  disabled={!processingTitle.trim() || processCapture.isPending}
-                                >
-                                  {t("pages.inbox.processSubmit")}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setProcessingCaptureId(null);
-                                    setProcessingTitle("");
-                                  }}
-                                >
-                                  {t("pages.inbox.cancel")}
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handlePreview(entry.id)}
-                                  disabled={isBusy}
-                                >
-                                  {t("pages.inbox.preview")}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleApply(entry.id)}
-                                  disabled={isBusy}
-                                >
-                                  {t("pages.inbox.apply")}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setProcessingCaptureId(entry.id);
-                                    setProcessingTitle(preview?.suggested_title ?? entry.title);
-                                  }}
-                                  disabled={isBusy}
-                                >
-                                  <WandSparkles className="mr-1 h-3.5 w-3.5" />
-                                  {t("pages.inbox.process")}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() =>
-                                    deleteCapture.mutate(
-                                      { captureId: entry.id },
-                                      {
-                                        onSuccess: () => {
-                                          toast(t("pages.item.deleted"), {
-                                            action: {
-                                              label: t("pages.item.undoDelete"),
-                                              onClick: () =>
-                                                restoreCapture.mutate({ captureId: entry.id }),
-                                            },
-                                          });
-                                        },
-                                      }
-                                    )
-                                  }
-                                  disabled={isBusy}
-                                >
-                                  <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                  {t("pages.item.delete")}
-                                </Button>
-                              </div>
-                            )}
-                          </article>
-                        );
-                      }
-
+                    {entries.map((capture) => {
+                      const title =
+                        firstLine(capture.raw_content) ||
+                        t("pages.inbox.captureFallbackTitle", { type: capture.capture_type });
+                      const subtitle =
+                        previewText(capture.raw_content) || t("pages.inbox.emptyCapture");
+                      const suggestions = capture.suggested_actions.slice(0, 3);
+                      const createdAt = new Date(capture.created_at);
                       return (
                         <article
-                          key={`item-${entry.id}`}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => router.push(`/inbox/items/${entry.id}`)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              router.push(`/inbox/items/${entry.id}`);
-                            }
-                          }}
-                          className="cursor-pointer rounded-2xl border border-border/70 bg-card/90 p-4 shadow-sm transition hover:border-primary/30"
+                          key={capture.id}
+                          className="rounded-2xl border border-border/70 bg-card/90 p-4 shadow-sm"
                         >
                           <div className="mb-3 flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold">{entry.title}</p>
-                              <p className="text-muted-foreground mt-1 text-xs uppercase">
-                                {entry.subtitle}
-                              </p>
+                            <div className="flex min-w-0 items-start gap-3">
+                              <div className="mt-0.5 rounded-full border border-border bg-background p-2">
+                                {captureIcon(capture.capture_type)}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold">{title}</p>
+                                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-sm">
+                                  {subtitle}
+                                </p>
+                              </div>
                             </div>
-                            <p className="text-muted-foreground shrink-0 text-xs">{formatTime(entry.at)}</p>
+                            <p className="text-muted-foreground shrink-0 text-xs">
+                              {relativeTime(now, createdAt, i18n.language || "en-US")}
+                            </p>
                           </div>
+
+                          {reviewCaptureId === capture.id ? (
+                            <div className="mb-2 flex flex-wrap items-end gap-2">
+                              <div className="min-w-[220px] flex-1">
+                                <Label htmlFor={`review-title-${capture.id}`} className="mb-1 block text-xs">
+                                  {t("pages.inbox.processTitle")}
+                                </Label>
+                                <Input
+                                  id={`review-title-${capture.id}`}
+                                  value={reviewTitle}
+                                  onChange={(event) => setReviewTitle(event.target.value)}
+                                  placeholder={t("pages.item.title")}
+                                  className="h-9"
+                                />
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={handleReviewSubmit}
+                                disabled={!reviewTitle.trim() || processCapture.isPending}
+                              >
+                                {t("pages.inbox.processSubmit")}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setReviewCaptureId(null);
+                                  setReviewTitle("");
+                                }}
+                              >
+                                {t("pages.inbox.cancel")}
+                              </Button>
+                            </div>
+                          ) : null}
+
                           <div className="flex flex-wrap gap-2">
+                            {suggestions.map((action) => (
+                              <Button
+                                key={action.key}
+                                size="sm"
+                                variant={action.is_primary ? "default" : "outline"}
+                                onClick={() => handleAction(capture.id, action, title)}
+                                disabled={isBusy}
+                              >
+                                {action.label}
+                              </Button>
+                            ))}
+
+                            {capture.status === "failed" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => reprocessCapture.mutate({ captureId: capture.id })}
+                                disabled={isBusy}
+                              >
+                                <RefreshCw className="mr-1 h-3.5 w-3.5" />
+                                {t("pages.inbox.reprocess")}
+                              </Button>
+                            ) : null}
+
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                deleteItemById.mutate(
-                                  { itemId: entry.id },
+                              onClick={() =>
+                                deleteCapture.mutate(
+                                  { captureId: capture.id },
                                   {
                                     onSuccess: () => {
                                       toast(t("pages.item.deleted"), {
                                         action: {
                                           label: t("pages.item.undoDelete"),
                                           onClick: () =>
-                                            restoreItemById.mutate({ itemId: entry.id }),
+                                            restoreCapture.mutate({ captureId: capture.id }),
                                         },
                                       });
                                     },
                                   }
-                                );
-                              }}
+                                )
+                              }
                               disabled={isBusy}
                             >
                               <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -527,7 +360,6 @@ export default function InboxPage() {
           </div>
         )}
       </main>
-
     </div>
   );
 }

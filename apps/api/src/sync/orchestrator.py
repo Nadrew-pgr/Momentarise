@@ -151,6 +151,21 @@ class SyncOrchestrator:
             runtime_allowlist=None,
         )
 
+        raw_workspace_notes = run.context_json.get("workspace_notes")
+        workspace_notes = (
+            [str(note).strip() for note in raw_workspace_notes if str(note).strip()]
+            if isinstance(raw_workspace_notes, list)
+            else None
+        )
+        extra_system_prompt_raw = run.context_json.get("extra_system_prompt")
+        extra_system_prompt = (
+            str(extra_system_prompt_raw).strip()
+            if isinstance(extra_system_prompt_raw, str)
+            else None
+        )
+        user_timezone_raw = run.context_json.get("user_timezone")
+        user_timezone = str(user_timezone_raw).strip() if isinstance(user_timezone_raw, str) else None
+
         system_prompt, retrieval_snapshot, tool_snapshot = PromptComposer.compose(
             PromptComposerInput(
                 agent_name=agent_profile.name if agent_profile else "Sync",
@@ -158,12 +173,21 @@ class SyncOrchestrator:
                 user_message=clean_message,
                 retrieval_snippets=snippets,
                 allowed_tools=tools,
+                extra_system_prompt=extra_system_prompt,
+                workspace_notes=workspace_notes,
+                user_timezone=user_timezone,
+                runtime_info={
+                    "agent": str(agent_profile.id) if agent_profile else None,
+                    "mode": run.mode,
+                    "status": run.status,
+                    "model": run.selected_model,
+                },
             )
         )
         if prompt_instructions:
             system_prompt = f"{system_prompt}\nExtra instructions: {prompt_instructions}"
 
-        run.prompt_version = "v1"
+        run.prompt_version = "v2"
         run.prompt_mode = prompt_mode
         run.system_prompt_snapshot = system_prompt
         run.toolset_snapshot = tool_snapshot

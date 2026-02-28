@@ -214,6 +214,14 @@ export function BottomSheetCreate() {
             disabled={isBusy}
           />
           <CaptureOption
+            label={t("create.options.file.title")}
+            subtitle={t("create.options.file.subtitle")}
+            icon={<FileText size={18} color="#171717" />}
+            onPress={() => openCapture("file")}
+            translucent
+            disabled={isBusy}
+          />
+          <CaptureOption
             label={t("create.options.event.title")}
             subtitle={t("create.options.event.subtitle")}
             icon={<Calendar size={18} color="#171717" />}

@@ -42,12 +42,14 @@ export async function apiFetch(
 ): Promise<Response> {
   const token = await SecureStore.getItemAsync("access_token");
   const url = `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const isFormDataBody =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
   let res: Response;
   try {
     res = await fetch(url, {
       ...init,
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormDataBody ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
       },

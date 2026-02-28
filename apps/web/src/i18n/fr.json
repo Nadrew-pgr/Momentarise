@@ -83,6 +83,9 @@
       "openSync": "Ouvrir Sync",
       "filter": {
         "all": "Tout",
+        "action": "Action",
+        "read": "Lecture",
+        "waiting": "En attente",
         "notes": "Notes",
         "voice": "Voix",
         "photo": "Photo",
@@ -94,6 +97,7 @@
       "processSubmit": "Créer l'élément",
       "preview": "Prévisualiser",
       "apply": "Appliquer",
+      "reprocess": "Relancer",
       "emptyList": "Aucune capture. Ajoutez du brut pour commencer.",
       "emptyCapture": "Capture sans contenu texte.",
       "recentItems": "Éléments récents",
@@ -213,7 +217,19 @@
     },
     "me": {
       "title": "Moi",
+      "subtitle": "Profil et préférences d'automatisation.",
       "placeholder": "Profil et paramètres — bientôt disponible."
+    },
+    "settings": {
+      "calendarTitle": "Préférences calendrier",
+      "calendarStartHour": "Heure de début",
+      "calendarEndHour": "Heure de fin",
+      "aiTitle": "Préférences IA des captures",
+      "aiMode": "Mode d'automatisation",
+      "aiModeProposalOnly": "Proposition uniquement",
+      "aiModeAutoApply": "Application auto",
+      "aiThreshold": "Seuil auto-apply",
+      "aiMaxActions": "Max actions par capture"
     }
   }
 }

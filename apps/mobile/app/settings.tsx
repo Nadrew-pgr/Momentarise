@@ -10,6 +10,10 @@ import {
   useCalendarPreferences,
   useUpdateCalendarPreferences,
 } from "@/hooks/use-calendar-preferences";
+import {
+  useAiPreferences,
+  useUpdateAiPreferences,
+} from "@/hooks/use-ai-preferences";
 import { useEffect, useState } from "react";
 
 export default function SettingsScreen() {
@@ -17,8 +21,13 @@ export default function SettingsScreen() {
   const router = useRouter();
   const preferencesQuery = useCalendarPreferences();
   const updatePreferencesMutation = useUpdateCalendarPreferences();
+  const aiPreferencesQuery = useAiPreferences();
+  const updateAiPreferencesMutation = useUpdateAiPreferences();
   const [draftStartHour, setDraftStartHour] = useState(8);
   const [draftEndHour, setDraftEndHour] = useState(24);
+  const [draftAiMode, setDraftAiMode] = useState<"proposal_only" | "auto_apply">("proposal_only");
+  const [draftAutoApplyThreshold, setDraftAutoApplyThreshold] = useState(0.9);
+  const [draftMaxActions, setDraftMaxActions] = useState(3);
 
   useEffect(() => {
     if (preferencesQuery.data) {
@@ -27,10 +36,22 @@ export default function SettingsScreen() {
     }
   }, [preferencesQuery.data]);
 
+  useEffect(() => {
+    if (aiPreferencesQuery.data) {
+      setDraftAiMode(aiPreferencesQuery.data.mode);
+      setDraftAutoApplyThreshold(aiPreferencesQuery.data.auto_apply_threshold ?? 0.9);
+      setDraftMaxActions(aiPreferencesQuery.data.max_actions_per_capture ?? 3);
+    }
+  }, [aiPreferencesQuery.data]);
+
   const startCanDecrement = draftStartHour > 0;
   const startCanIncrement = draftStartHour < 23 && draftStartHour + 1 < draftEndHour;
   const endCanDecrement = draftEndHour - 1 > draftStartHour;
   const endCanIncrement = draftEndHour < 24;
+  const thresholdCanDecrement = draftAutoApplyThreshold > 0;
+  const thresholdCanIncrement = draftAutoApplyThreshold < 1;
+  const maxActionsCanDecrement = draftMaxActions > 1;
+  const maxActionsCanIncrement = draftMaxActions < 3;
 
   const saveSettings = async () => {
     if (draftEndHour <= draftStartHour) return;
@@ -40,8 +61,15 @@ export default function SettingsScreen() {
         end_hour: draftEndHour,
         last_known_updated_at: preferencesQuery.data?.updated_at,
       });
+      await updateAiPreferencesMutation.mutateAsync({
+        mode: draftAiMode,
+        auto_apply_threshold: Number(draftAutoApplyThreshold.toFixed(2)),
+        max_actions_per_capture: draftMaxActions,
+        last_known_updated_at: aiPreferencesQuery.data?.updated_at,
+      });
     } catch {
       await preferencesQuery.refetch();
+      await aiPreferencesQuery.refetch();
     }
   };
   return (
@@ -116,13 +144,113 @@ export default function SettingsScreen() {
                 {updatePreferencesMutation.error.message}
               </UiText>
             ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-3 rounded-xl border border-border bg-card">
+          <CardContent className="p-4">
+            <UiText className="text-sm font-semibold text-foreground">
+              {t("pages.settings.aiTitle")}
+            </UiText>
+
+            <View className="mt-4 flex-row items-center justify-between">
+              <UiText className="text-foreground">
+                {t("pages.settings.aiMode")}
+              </UiText>
+              <View className="flex-row gap-2">
+                <Pressable
+                  onPress={() => setDraftAiMode("proposal_only")}
+                  className={`rounded border px-3 py-1.5 ${
+                    draftAiMode === "proposal_only" ? "border-primary bg-primary/15" : "border-input"
+                  }`}
+                >
+                  <UiText className="text-foreground">
+                    {t("pages.settings.aiModeProposalOnly")}
+                  </UiText>
+                </Pressable>
+                <Pressable
+                  onPress={() => setDraftAiMode("auto_apply")}
+                  className={`rounded border px-3 py-1.5 ${
+                    draftAiMode === "auto_apply" ? "border-primary bg-primary/15" : "border-input"
+                  }`}
+                >
+                  <UiText className="text-foreground">
+                    {t("pages.settings.aiModeAutoApply")}
+                  </UiText>
+                </Pressable>
+              </View>
+            </View>
+
+            <View className="mt-3 flex-row items-center justify-between">
+              <UiText className="text-foreground">
+                {t("pages.settings.aiThreshold")}
+              </UiText>
+              <View className="flex-row items-center gap-2">
+                <Pressable
+                  disabled={!thresholdCanDecrement}
+                  onPress={() =>
+                    thresholdCanDecrement &&
+                    setDraftAutoApplyThreshold((v) => Math.max(0, v - 0.05))
+                  }
+                  className="rounded border border-input px-3 py-1.5"
+                >
+                  <UiText className="text-foreground">-</UiText>
+                </Pressable>
+                <UiText className="w-16 text-center text-foreground">
+                  {draftAutoApplyThreshold.toFixed(2)}
+                </UiText>
+                <Pressable
+                  disabled={!thresholdCanIncrement}
+                  onPress={() =>
+                    thresholdCanIncrement &&
+                    setDraftAutoApplyThreshold((v) => Math.min(1, v + 0.05))
+                  }
+                  className="rounded border border-input px-3 py-1.5"
+                >
+                  <UiText className="text-foreground">+</UiText>
+                </Pressable>
+              </View>
+            </View>
+
+            <View className="mt-3 flex-row items-center justify-between">
+              <UiText className="text-foreground">
+                {t("pages.settings.aiMaxActions")}
+              </UiText>
+              <View className="flex-row items-center gap-2">
+                <Pressable
+                  disabled={!maxActionsCanDecrement}
+                  onPress={() => maxActionsCanDecrement && setDraftMaxActions((v) => v - 1)}
+                  className="rounded border border-input px-3 py-1.5"
+                >
+                  <UiText className="text-foreground">-</UiText>
+                </Pressable>
+                <UiText className="w-16 text-center text-foreground">
+                  {draftMaxActions}
+                </UiText>
+                <Pressable
+                  disabled={!maxActionsCanIncrement}
+                  onPress={() => maxActionsCanIncrement && setDraftMaxActions((v) => v + 1)}
+                  className="rounded border border-input px-3 py-1.5"
+                >
+                  <UiText className="text-foreground">+</UiText>
+                </Pressable>
+              </View>
+            </View>
+
+            {updateAiPreferencesMutation.error instanceof Error ? (
+              <UiText className="mt-3 text-destructive text-xs">
+                {updateAiPreferencesMutation.error.message}
+              </UiText>
+            ) : null}
 
             <View className="mt-4 flex-row justify-end">
               <Button
                 size="sm"
                 onPress={() => void saveSettings()}
                 disabled={
-                  updatePreferencesMutation.isPending || draftEndHour <= draftStartHour
+                  updatePreferencesMutation.isPending ||
+                  updateAiPreferencesMutation.isPending ||
+                  draftEndHour <= draftStartHour
                 }
               >
                 <UiText>{t("common.save")}</UiText>

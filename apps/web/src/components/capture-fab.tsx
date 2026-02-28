@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { Bot, CalendarDays, Camera, FileText, Link2, Mic, Plus, X } from "lucide-react";
 import type { CaptureType } from "@momentarise/shared";
-import { useCreateCapture } from "@/hooks/use-inbox";
+import { useCreateCapture, useUploadCapture } from "@/hooks/use-inbox";
 import { useCreateItem } from "@/hooks/use-item";
 import { Button } from "@/components/ui/button";
 
@@ -27,10 +27,11 @@ export function CaptureFab() {
   const fabRef = useRef<HTMLButtonElement | null>(null);
 
   const createCapture = useCreateCapture();
+  const uploadCapture = useUploadCapture();
   const createItem = useCreateItem();
 
   const isHidden = pathname?.startsWith("/sync");
-  const isBusy = createCapture.isPending || createItem.isPending;
+  const isBusy = createCapture.isPending || uploadCapture.isPending || createItem.isPending;
 
   useEffect(() => {
     const onMove = (event: MouseEvent) => {
@@ -75,11 +76,12 @@ export function CaptureFab() {
         {
           onSuccess: () => {
             setFabOpen(false);
+            router.push("/inbox");
           },
         }
       );
     },
-    [createCapture]
+    [createCapture, router]
   );
 
   const createQuickNote = useCallback(() => {
@@ -105,12 +107,11 @@ export function CaptureFab() {
     (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
-      createCapture.mutate(
+      uploadCapture.mutate(
         {
-          raw_content: `File: ${file.name}`,
+          file,
+          captureType: "file",
           source: "manual",
-          capture_type: "text",
-          status: "captured",
           metadata: {
             source: "web_fab",
             channel: "file",
@@ -123,11 +124,12 @@ export function CaptureFab() {
           onSuccess: () => {
             setFabOpen(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
+            router.push("/inbox");
           },
         }
       );
     },
-    [createCapture]
+    [router, uploadCapture]
   );
 
   const openFilePicker = useCallback(() => {

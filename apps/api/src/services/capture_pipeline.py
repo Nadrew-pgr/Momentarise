@@ -203,8 +203,13 @@ async def store_upload_asset(
     capture: InboxCapture,
     upload: UploadFile,
     kind: str,
+    max_upload_bytes: int | None = None,
 ) -> CaptureAsset:
     data = await upload.read()
+    if max_upload_bytes is not None and len(data) > max_upload_bytes:
+        raise ValueError(
+            f"Upload exceeds maximum allowed size ({max_upload_bytes} bytes)"
+        )
     checksum = hashlib.sha256(data).hexdigest()
     ext = Path(upload.filename or "").suffix
     storage_key = f"{capture.id}/{uuid.uuid4().hex}{ext}"

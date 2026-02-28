@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.v1.auth import router as auth_router
+from src.api.v1.capture_external import router as capture_external_router
 from src.api.v1.events import router as events_router
 from src.api.v1.health import router as health_router
 from src.api.v1.inbox import router as inbox_router
@@ -30,4 +31,5 @@ app.include_router(events_router, prefix="/api/v1")
 app.include_router(inbox_router, prefix="/api/v1")
 app.include_router(items_router, prefix="/api/v1")
 app.include_router(preferences_router, prefix="/api/v1")
+app.include_router(capture_external_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
