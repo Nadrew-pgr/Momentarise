@@ -9,6 +9,10 @@ from src.models.ai_tool_call import AIToolCall
 from src.models.ai_usage_event import AIUsageEvent
 from src.models.automation_spec import AutomationRun, AutomationSpec
 from src.models.base import Base, BaseMixin
+from src.models.capture_action_suggestion import CaptureActionSuggestion
+from src.models.capture_artifact import CaptureArtifact
+from src.models.capture_asset import CaptureAsset
+from src.models.capture_job import CaptureJob
 from src.models.entity_link import EntityLink
 from src.models.enums import WorkspaceRole
 from src.models.event import Event
@@ -45,4 +49,8 @@ __all__ = [
     "AgentProfileVersion",
     "AutomationSpec",
     "AutomationRun",
+    "CaptureAsset",
+    "CaptureArtifact",
+    "CaptureJob",
+    "CaptureActionSuggestion",
 ]

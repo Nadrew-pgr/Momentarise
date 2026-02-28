@@ -53,3 +53,48 @@ Où sont stockées les convs de l’extension Codex, comment les exporter en mar
 - Voir aussi: GitHub openai/codex #2923 (config.toml TOML vs JSON, caches webview)
 
 ---
+
+## [LRN-20260228-002] product — Onboarding à définir
+
+**Logged**: 2026-02-28
+**Priority**: medium
+**Status**: pending
+**Area**: product / UX
+
+### Summary
+L’app nécessite une stratégie d’onboarding claire (étapes, contenu, moment d’apparition, conversion) pour éviter une première session confuse.
+
+### Details
+- Le login est en place mais aucun parcours guidé n’existe après l’auth.
+- Risque: utilisateur sans contexte produit (Timeline/Inbox/Sync).
+
+### Suggested Action
+Définir un onboarding minimal (1–3 écrans) + checklist première action (ex: créer une capture, ouvrir Timeline) avant d’enrichir.
+
+### Metadata
+- Related Files: `apps/mobile/app/login.tsx`, `apps/mobile/app/(tabs)/today.tsx`
+- See also: `project/docs/self-improvement.md`
+
+---
+
+## [LRN-20260228-003] correction — DateTimePicker manquant casse le bundling Expo
+
+**Logged**: 2026-02-28
+**Priority**: high
+**Status**: pending
+**Area**: mobile / build
+
+### Summary
+Le bundler Expo échoue si `@react-native-community/datetimepicker` n’est pas installé alors qu’il est importé (EventSheet).
+
+### Details
+- Erreur: `Unable to resolve "@react-native-community/datetimepicker"`.
+- En environnement offline, `npx expo install` échoue si le registry npm est inaccessible.
+
+### Suggested Action
+Installer en online: `cd apps/mobile && npx expo install @react-native-community/datetimepicker`.
+Prévoir un fallback si offline (picker simple sans dépendance native).
+
+### Metadata
+- Related Files: `apps/mobile/components/EventSheet.tsx`, `apps/mobile/package.json`
+- See also: logs Expo (bundling failed)

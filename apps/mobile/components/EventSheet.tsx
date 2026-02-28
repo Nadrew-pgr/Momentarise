@@ -120,6 +120,34 @@ export function EventSheet() {
     setActivePicker(null);
   }, [activePicker, pickerValue]);
 
+  const handleAndroidPickerChange = useCallback(
+    (event: { type?: string }, date?: Date) => {
+      if (event?.type === "dismissed") {
+        setActivePicker(null);
+        return;
+      }
+      if (date) {
+        setPickerValue(date);
+      }
+      // Apply immediately on Android to avoid extra modal UI
+      setTimeout(() => {
+        if (date) {
+          if (activePicker === "startDate") {
+            setStartDate((prev) => withDate(prev, date));
+          } else if (activePicker === "startTime") {
+            setStartDate((prev) => withTime(prev, date));
+          } else if (activePicker === "endDate") {
+            setEndDate((prev) => withDate(prev, date));
+          } else if (activePicker === "endTime") {
+            setEndDate((prev) => withTime(prev, date));
+          }
+        }
+        setActivePicker(null);
+      }, 0);
+    },
+    [activePicker]
+  );
+
   useEffect(() => {
     if (!isOpen) {
       setActivePicker(null);
@@ -394,41 +422,59 @@ export function EventSheet() {
           </Button>
         </View>
 
-        <Modal
-          transparent
-          visible={activePicker !== null}
-          animationType="fade"
-          onRequestClose={() => setActivePicker(null)}
-        >
-          <View className="flex-1 items-center justify-center bg-black/40 px-6">
-            <View className="w-full max-w-md rounded-2xl border border-border bg-card p-4">
-              <DateTimePicker
-                value={pickerValue}
-                mode={
-                  activePicker === "startDate" || activePicker === "endDate"
-                    ? "date"
-                    : "time"
-                }
-                display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={(event, date) => {
-                  if (event?.type === "dismissed") {
-                    setActivePicker(null);
-                    return;
+        {Platform.OS === "android" ? (
+          activePicker ? (
+            <DateTimePicker
+              value={pickerValue}
+              mode={
+                activePicker === "startDate" || activePicker === "endDate"
+                  ? "date"
+                  : "time"
+              }
+              display="default"
+              onChange={handleAndroidPickerChange}
+            />
+          ) : null
+        ) : (
+          <Modal
+            transparent
+            visible={activePicker !== null}
+            animationType="fade"
+            onRequestClose={() => setActivePicker(null)}
+          >
+            <View className="flex-1 items-center justify-center bg-black/40 px-6">
+              <View className="w-full max-w-md rounded-2xl border border-border bg-card p-4">
+                <DateTimePicker
+                  value={pickerValue}
+                  mode={
+                    activePicker === "startDate" || activePicker === "endDate"
+                      ? "date"
+                      : "time"
+                  }
+                  display="spinner"
+                  themeVariant="light"
+                  textColor="#111827"
+                  style={{ height: 216 }}
+                  onChange={(event, date) => {
+                    if (event?.type === "dismissed") {
+                      setActivePicker(null);
+                      return;
                   }
                   if (date) setPickerValue(date);
                 }}
               />
-              <View className="mt-4 flex-row justify-end gap-2">
-                <Button variant="outline" size="sm" onPress={() => setActivePicker(null)}>
-                  <UiText>{t("common.cancel")}</UiText>
-                </Button>
-                <Button size="sm" onPress={applyPickerValue}>
-                  <UiText>{t("common.save")}</UiText>
-                </Button>
+                <View className="mt-4 flex-row justify-end gap-2">
+                  <Button variant="outline" size="sm" onPress={() => setActivePicker(null)}>
+                    <UiText>{t("common.cancel")}</UiText>
+                  </Button>
+                  <Button size="sm" onPress={applyPickerValue}>
+                    <UiText>{t("common.save")}</UiText>
+                  </Button>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
+          </Modal>
+        )}
       </BottomSheetView>
     </BottomSheet>
   );

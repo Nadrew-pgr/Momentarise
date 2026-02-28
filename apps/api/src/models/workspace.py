@@ -23,6 +23,10 @@ class Workspace(BaseMixin, Base):
     items: Mapped[list["Item"]] = relationship(back_populates="workspace")  # noqa: F821
     events: Mapped[list["Event"]] = relationship(back_populates="workspace")  # noqa: F821
     inbox_captures: Mapped[list["InboxCapture"]] = relationship(back_populates="workspace")  # noqa: F821
+    capture_assets: Mapped[list["CaptureAsset"]] = relationship(back_populates="workspace")  # noqa: F821
+    capture_artifacts: Mapped[list["CaptureArtifact"]] = relationship(back_populates="workspace")  # noqa: F821
+    capture_jobs: Mapped[list["CaptureJob"]] = relationship(back_populates="workspace")  # noqa: F821
+    capture_action_suggestions: Mapped[list["CaptureActionSuggestion"]] = relationship(back_populates="workspace")  # noqa: F821
     entity_links: Mapped[list["EntityLink"]] = relationship(back_populates="workspace")  # noqa: F821
     ai_changes: Mapped[list["AIChange"]] = relationship(back_populates="workspace")  # noqa: F821
 

@@ -39,3 +39,7 @@ class InboxCapture(BaseMixin, Base):
     workspace: Mapped["Workspace"] = relationship(back_populates="inbox_captures")  # noqa: F821
     user: Mapped["User"] = relationship(back_populates="inbox_captures")  # noqa: F821
     derived_items: Mapped[list["Item"]] = relationship(back_populates="source_capture")  # noqa: F821
+    assets: Mapped[list["CaptureAsset"]] = relationship(back_populates="capture")  # noqa: F821
+    artifacts: Mapped[list["CaptureArtifact"]] = relationship(back_populates="capture")  # noqa: F821
+    jobs: Mapped[list["CaptureJob"]] = relationship(back_populates="capture")  # noqa: F821
+    action_suggestions: Mapped[list["CaptureActionSuggestion"]] = relationship(back_populates="capture")  # noqa: F821
