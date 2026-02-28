@@ -6,7 +6,7 @@ from typing import Any
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
@@ -14,6 +14,7 @@ from src.core.database import get_db
 from src.core.deps import get_current_user, get_current_workspace
 from src.models.ai_change import AIChange
 from src.models.agent_profile import AgentProfile, AgentProfileVersion
+from src.models.ai_message import AIMessage
 from src.models.ai_run import AIRun
 from src.models.automation_spec import AutomationSpec
 from src.models.user import User
@@ -35,7 +36,10 @@ from src.schemas.sync import (
     SyncPatchAgentRequest,
     SyncPatchAutomationRequest,
     SyncPublishAgentVersionResponse,
+    SyncRunListResponse,
+    SyncRunSummaryOut,
     SyncResumeMessage,
+    SyncEventsResponse,
     SyncRunOut,
     SyncRunResponse,
     SyncStreamRequest,
@@ -68,6 +72,25 @@ async def _get_run_or_404(
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
     return run
+
+
+def _extract_message_preview(content_json: dict[str, Any] | None) -> str:
+    if not isinstance(content_json, dict):
+        return ""
+
+    raw = content_json.get("text")
+    if not isinstance(raw, str):
+        raw = content_json.get("content")
+    if not isinstance(raw, str):
+        try:
+            raw = json.dumps(content_json, ensure_ascii=True)
+        except Exception:
+            raw = ""
+
+    compact = " ".join(raw.split())
+    if len(compact) <= 180:
+        return compact
+    return f"{compact[:177]}..."
 
 
 @router.get("/models", response_model=SyncModelListResponse)
@@ -116,6 +139,111 @@ async def get_run(
     return SyncRunResponse(run=SyncRunOut.model_validate(run))
 
 
+@router.get("/runs", response_model=SyncRunListResponse)
+async def list_runs(
+    limit: int = Query(default=30, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> SyncRunListResponse:
+    cursor_dt: datetime | None = None
+    if cursor:
+        try:
+            raw = cursor.replace("Z", "+00:00")
+            parsed = datetime.fromisoformat(raw)
+            cursor_dt = parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid cursor") from exc
+
+    filters: list[Any] = [
+        AIRun.workspace_id == workspace.workspace_id,
+        AIRun.deleted_at.is_(None),
+    ]
+    if cursor_dt is not None:
+        filters.append(AIRun.updated_at < cursor_dt)
+
+    run_result = await db.execute(
+        select(AIRun)
+        .where(*filters)
+        .order_by(AIRun.updated_at.desc(), AIRun.id.desc())
+        .limit(limit + 1)
+    )
+    fetched_runs = list(run_result.scalars().all())
+    has_more = len(fetched_runs) > limit
+    runs = fetched_runs[:limit]
+
+    run_ids = [run.id for run in runs]
+    message_by_run_id: dict[uuid.UUID, AIMessage] = {}
+    if run_ids:
+        latest_seq_subquery = (
+            select(
+                AIMessage.run_id.label("run_id"),
+                func.max(AIMessage.seq).label("max_seq"),
+            )
+            .where(
+                AIMessage.run_id.in_(run_ids),
+                AIMessage.deleted_at.is_(None),
+            )
+            .group_by(AIMessage.run_id)
+            .subquery()
+        )
+        message_result = await db.execute(
+            select(AIMessage).join(
+                latest_seq_subquery,
+                and_(
+                    AIMessage.run_id == latest_seq_subquery.c.run_id,
+                    AIMessage.seq == latest_seq_subquery.c.max_seq,
+                ),
+            )
+        )
+        for message in message_result.scalars().all():
+            message_by_run_id[message.run_id] = message
+
+    summaries: list[SyncRunSummaryOut] = []
+    for run in runs:
+        message = message_by_run_id.get(run.id)
+        summaries.append(
+            SyncRunSummaryOut(
+                id=run.id,
+                status=run.status,  # type: ignore[arg-type]
+                title=run.title,
+                selected_model=run.selected_model,
+                updated_at=run.updated_at,
+                last_message_preview=_extract_message_preview(message.content_json) if message else None,
+                last_message_at=message.created_at if message else None,
+            )
+        )
+
+    next_cursor = None
+    if has_more and runs:
+        next_cursor = runs[-1].updated_at.isoformat()
+
+    return SyncRunListResponse(runs=summaries, next_cursor=next_cursor)
+
+
+@router.get("/runs/{run_id}/events", response_model=SyncEventsResponse)
+async def list_run_events(
+    run_id: uuid.UUID,
+    from_seq: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> SyncEventsResponse:
+    orchestrator = SyncOrchestrator(
+        db=db,
+        workspace_id=workspace.workspace_id,
+        user_id=current_user.id,
+    )
+    run = await _get_run_or_404(db, workspace_id=workspace.workspace_id, run_id=run_id)
+    events = await orchestrator.replay_events(run, from_seq)
+    return SyncEventsResponse(
+        run_id=run.id,
+        from_seq=from_seq,
+        last_seq=run.last_seq,
+        events=events,
+    )
+
+
 @router.post("/runs/{run_id}/stream")
 async def stream_run(
     run_id: uuid.UUID,
@@ -133,20 +261,27 @@ async def stream_run(
     try:
         run = await orchestrator.get_run_or_raise(run_id)
         effective_from_seq = body.from_seq if body.from_seq is not None else from_seq_query
-        events = await orchestrator.stream_run(
-            run=run,
-            message=body.message,
-            from_seq=effective_from_seq,
-        )
     except SyncNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     async def event_generator():
-        for event in events:
+        async for event in orchestrator.stream_run_iter(
+            run=run,
+            message=body.message,
+            from_seq=effective_from_seq,
+        ):
             payload = event.model_dump(mode="json")
-            yield json.dumps(payload, ensure_ascii=True) + "\n"
+            yield f"data: {json.dumps(payload, ensure_ascii=True)}\n\n"
 
-    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-store",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/runs/{run_id}/answer", response_model=SyncRunResponse)
@@ -322,8 +457,9 @@ async def run_ws(
                         from_seq = int(from_seq)
                     except (TypeError, ValueError):
                         from_seq = None
-                events = await orchestrator.stream_run(run=run, message=message, from_seq=from_seq)
-                for event in events:
+                async for event in orchestrator.stream_run_iter(
+                    run=run, message=message, from_seq=from_seq
+                ):
                     await websocket.send_json(event.model_dump(mode="json"))
                 continue
     except WebSocketDisconnect:

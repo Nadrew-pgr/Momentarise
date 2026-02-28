@@ -16,6 +16,14 @@ import type React from "react";
 import { useMemo } from "react";
 
 import { EventGap, EventHeight } from "./constants";
+import {
+  CALENDAR_DAY_CELL_CLASSES,
+  CALENDAR_DAY_NUMBER_CLASSES,
+  CALENDAR_GRID_BORDER_CLASSES,
+  CALENDAR_MORE_LINK_CLASSES,
+  CALENDAR_MONTH_WEEKDAY_HEADER_CLASSES,
+  CALENDAR_OUTSIDE_MONTH_CELL_DATA_CLASSES,
+} from "./calendar-appearance";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
@@ -28,6 +36,7 @@ import {
   sortEvents,
 } from "./utils";
 import { DefaultStartHour } from "@/components/event-calendar/constants";
+import { cn } from "@/lib/utils";
 import {
   Popover,
   PopoverContent,
@@ -89,10 +98,10 @@ export function MonthView({
 
   return (
     <div className="contents" data-slot="month-view">
-      <div className="grid grid-cols-7 border-border/70 border-b">
+      <div className={cn("grid grid-cols-7 border-b", CALENDAR_GRID_BORDER_CLASSES)}>
         {weekdays.map((day) => (
           <div
-            className="py-2 text-center text-muted-foreground/70 text-sm"
+            className={CALENDAR_MONTH_WEEKDAY_HEADER_CLASSES}
             key={day}
           >
             {day}
@@ -122,7 +131,11 @@ export function MonthView({
 
               return (
                 <div
-                  className="group border-border/70 border-r border-b last:border-r-0 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70"
+                  className={cn(
+                    "group last:border-r-0",
+                    CALENDAR_DAY_CELL_CLASSES,
+                    CALENDAR_OUTSIDE_MONTH_CELL_DATA_CLASSES,
+                  )}
                   data-outside-cell={!isCurrentMonth || undefined}
                   data-today={isToday(day) || undefined}
                   key={day.toString()}
@@ -136,7 +149,12 @@ export function MonthView({
                       onEventCreate(startTime);
                     }}
                   >
-                    <div className="mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm group-data-today:bg-primary group-data-today:text-primary-foreground">
+                    <div
+                      className={cn(
+                        CALENDAR_DAY_NUMBER_CLASSES,
+                        "group-data-today:bg-primary group-data-today:text-primary-foreground",
+                      )}
+                    >
                       {format(day, "d")}
                     </div>
                     <div
@@ -204,7 +222,10 @@ export function MonthView({
                         <Popover modal>
                           <PopoverTrigger asChild>
                             <button
-                              className="mt-(--event-gap) flex h-(--event-height) w-full select-none items-center overflow-hidden px-1 text-left text-[10px] text-muted-foreground outline-none backdrop-blur-md transition hover:bg-muted/50 hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-2 sm:text-xs"
+                              className={cn(
+                                "mt-(--event-gap) flex h-(--event-height) w-full select-none items-center overflow-hidden px-1 text-left outline-none backdrop-blur-md transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-2",
+                                CALENDAR_MORE_LINK_CLASSES,
+                              )}
                               onClick={(e) => e.stopPropagation()}
                               type="button"
                             >

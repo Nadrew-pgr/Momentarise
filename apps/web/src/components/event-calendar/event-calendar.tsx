@@ -20,9 +20,9 @@ import { CalendarToolbar } from "@/features/calendar/ui/CalendarToolbar";
 
 export interface EventCalendarProps {
   events?: CalendarEvent[];
-  onEventAdd?: (event: CalendarEvent) => void | Promise<void>;
-  onEventUpdate?: (event: CalendarEvent) => void | Promise<void>;
-  onEventDelete?: (eventId: string) => void | Promise<void>;
+  onEventAdd?: (event: CalendarEvent) => CalendarEvent | Promise<CalendarEvent>;
+  onEventUpdate?: (event: CalendarEvent) => CalendarEvent | Promise<CalendarEvent>;
+  onEventDelete?: (eventId: string) => Promise<void>;
   onEventStartTracking?: (eventId: string) => void | Promise<void>;
   onEventStopTracking?: (eventId: string) => void | Promise<void>;
   isMutating?: boolean;
@@ -105,35 +105,35 @@ export function EventCalendar({
     setIsEventDialogOpen(true);
   };
 
-  const handleEventSave = (event: CalendarEvent) => {
+  const handleEventSave = async (event: CalendarEvent): Promise<CalendarEvent> => {
     if (event.id) {
-      onEventUpdate?.(event);
-      // Show toast notification when an event is updated
-      toast(`Event "${event.title}" updated`, {
+      const persisted = onEventUpdate ? await Promise.resolve(onEventUpdate(event)) : null;
+      // Show toast notification when a moment is updated
+      toast(`Moment "${event.title}" updated`, {
         description: format(new Date(event.start), "MMM d, yyyy"),
         position: "bottom-left",
       });
+      return persisted ?? event;
     } else {
-      onEventAdd?.(event);
-      // Show toast notification when an event is added
-      toast(`Event "${event.title}" added`, {
+      const persisted = onEventAdd ? await Promise.resolve(onEventAdd(event)) : null;
+      // Show toast notification when a moment is added
+      toast(`Moment "${event.title}" added`, {
         description: format(new Date(event.start), "MMM d, yyyy"),
         position: "bottom-left",
       });
+      return persisted ?? event;
     }
-    setIsEventDialogOpen(false);
-    setSelectedEvent(null);
   };
 
-  const handleEventDelete = (eventId: string) => {
+  const handleEventDelete = async (eventId: string) => {
     const deletedEvent = events.find((e) => e.id === eventId);
-    onEventDelete?.(eventId);
-    setIsEventDialogOpen(false);
-    setSelectedEvent(null);
+    if (onEventDelete) {
+      await onEventDelete(eventId);
+    }
 
-    // Show toast notification when an event is deleted
+    // Show toast notification when a moment is deleted
     if (deletedEvent) {
-      toast(`Event "${deletedEvent.title}" deleted`, {
+      toast(`Moment "${deletedEvent.title}" deleted`, {
         description: format(new Date(deletedEvent.start), "MMM d, yyyy"),
         position: "bottom-left",
       });
@@ -141,13 +141,17 @@ export function EventCalendar({
   };
 
   const handleEventUpdate = (updatedEvent: CalendarEvent) => {
-    onEventUpdate?.(updatedEvent);
-
-    // Show toast notification when an event is updated via drag and drop
-    toast(`Event "${updatedEvent.title}" moved`, {
-      description: format(new Date(updatedEvent.start), "MMM d, yyyy"),
-      position: "bottom-left",
-    });
+    void Promise.resolve(onEventUpdate?.(updatedEvent))
+      .then(() => {
+        // Show toast notification when a moment is updated via drag and drop
+        toast(`Moment "${updatedEvent.title}" moved`, {
+          description: format(new Date(updatedEvent.start), "MMM d, yyyy"),
+          position: "bottom-left",
+        });
+      })
+      .catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : "Failed to move moment");
+      });
   };
 
   const viewTitle = useMemo(

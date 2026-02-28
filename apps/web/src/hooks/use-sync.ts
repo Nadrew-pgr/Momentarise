@@ -14,6 +14,7 @@ import type {
   SyncPatchAgentRequest,
   SyncPatchAutomationRequest,
   SyncRun,
+  SyncRunSummary,
   SyncStreamRequest,
   SyncUndo,
   SyncUndoRequest,
@@ -32,13 +33,47 @@ import {
   syncPatchAgentRequestSchema,
   syncPatchAutomationRequestSchema,
   syncPublishAgentVersionResponseSchema,
+  syncRunListResponseSchema,
   syncRunsResponseSchema,
+  syncEventsResponseSchema,
   syncStreamRequestSchema,
   syncUndoRequestSchema,
   syncUndoSchema,
   syncValidateAutomationResponseSchema,
 } from "@momentarise/shared";
 import { fetchWithAuth } from "@/lib/bff-client";
+
+async function buildSyncHttpError(res: Response, fallback: string): Promise<Error> {
+  let detail = "";
+
+  try {
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      const payload = await res.json();
+      if (payload && typeof payload === "object") {
+        if (typeof (payload as { detail?: unknown }).detail === "string") {
+          detail = (payload as { detail: string }).detail;
+        } else if (
+          (payload as { detail?: unknown }).detail &&
+          typeof (payload as { detail: { message?: unknown } }).detail.message === "string"
+        ) {
+          detail = String((payload as { detail: { message: string } }).detail.message);
+        } else if (typeof (payload as { message?: unknown }).message === "string") {
+          detail = String((payload as { message: string }).message);
+        } else if (typeof (payload as { error?: unknown }).error === "string") {
+          detail = String((payload as { error: string }).error);
+        }
+      }
+    } else {
+      detail = (await res.text()).trim();
+    }
+  } catch {
+    detail = "";
+  }
+
+  const message = detail ? `${fallback}: ${detail}` : fallback;
+  return new Error(message);
+}
 
 export async function readSyncEventStream(
   res: Response,
@@ -56,6 +91,22 @@ export async function readSyncEventStream(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let sseDataBuffer = "";
+
+  const consumePayloadLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    const payload = JSON.parse(trimmed);
+    const parsed = syncEventEnvelopeSchema.parse(payload) as SyncEventEnvelope;
+    onEvent(parsed);
+  };
+
+  const consumeSseChunk = () => {
+    const trimmed = sseDataBuffer.trim();
+    sseDataBuffer = "";
+    if (!trimmed) return;
+    consumePayloadLine(trimmed);
+  };
 
   while (true) {
     const { done, value } = await reader.read();
@@ -65,18 +116,38 @@ export async function readSyncEventStream(
     buffer = lines.pop() ?? "";
     for (const line of lines) {
       const trimmed = line.trim();
-      if (!trimmed) continue;
-      const payload = JSON.parse(trimmed);
-      const parsed = syncEventEnvelopeSchema.parse(payload) as SyncEventEnvelope;
-      onEvent(parsed);
+      if (!trimmed) {
+        consumeSseChunk();
+        continue;
+      }
+
+      if (trimmed.startsWith("data:")) {
+        const fragment = trimmed.slice(5).trimStart();
+        sseDataBuffer = sseDataBuffer ? `${sseDataBuffer}\n${fragment}` : fragment;
+        continue;
+      }
+
+      if (trimmed.startsWith("event:") || trimmed.startsWith(":")) {
+        continue;
+      }
+
+      consumePayloadLine(trimmed);
     }
+  }
+
+  if (sseDataBuffer.trim()) {
+    consumeSseChunk();
   }
 
   const trailing = buffer.trim();
   if (trailing) {
-    const payload = JSON.parse(trailing);
-    const parsed = syncEventEnvelopeSchema.parse(payload) as SyncEventEnvelope;
-    onEvent(parsed);
+    if (trailing.startsWith("data:")) {
+      const fragment = trailing.slice(5).trimStart();
+      sseDataBuffer = sseDataBuffer ? `${sseDataBuffer}\n${fragment}` : fragment;
+      consumeSseChunk();
+    } else {
+      consumePayloadLine(trailing);
+    }
   }
 }
 
@@ -85,7 +156,7 @@ export function useSyncModels() {
     queryKey: ["sync", "models"],
     queryFn: async () => {
       const res = await fetchWithAuth("/api/sync/models");
-      if (!res.ok) throw new Error("Failed to fetch sync models");
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to fetch sync models");
       const data = await res.json();
       const parsed = syncModelsResponseSchema.parse(data);
       return parsed.models as SyncModel[];
@@ -103,7 +174,7 @@ export function useCreateSyncRun() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to create sync run");
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to create sync run");
       const data = await res.json();
       const parsed = syncRunsResponseSchema.parse(data);
       return parsed.run as SyncRun;
@@ -111,6 +182,7 @@ export function useCreateSyncRun() {
     onSuccess: (run) => {
       queryClient.setQueryData(["sync", "run", run.id], run);
       queryClient.invalidateQueries({ queryKey: ["sync", "changes"] });
+      queryClient.invalidateQueries({ queryKey: ["sync", "runs"] });
     },
   });
 }
@@ -121,10 +193,39 @@ export function useSyncRun(runId: string | null) {
     enabled: Boolean(runId),
     queryFn: async () => {
       const res = await fetchWithAuth(`/api/sync/runs/${runId}`);
-      if (!res.ok) throw new Error("Failed to fetch sync run");
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to fetch sync run");
       const data = await res.json();
       const parsed = syncRunsResponseSchema.parse(data);
       return parsed.run as SyncRun;
+    },
+  });
+}
+
+export function useSyncRuns(limit = 50) {
+  return useQuery<SyncRunSummary[]>({
+    queryKey: ["sync", "runs", limit],
+    queryFn: async () => {
+      const qs = new URLSearchParams({ limit: String(limit) });
+      const res = await fetchWithAuth(`/api/sync/runs?${qs.toString()}`);
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to fetch sync runs");
+      const data = await res.json();
+      const parsed = syncRunListResponseSchema.parse(data);
+      return parsed.runs as SyncRunSummary[];
+    },
+  });
+}
+
+export function useSyncRunEvents(runId: string | null, fromSeq = 0) {
+  return useQuery<SyncEventEnvelope[]>({
+    queryKey: ["sync", "events", runId, fromSeq],
+    enabled: Boolean(runId),
+    queryFn: async () => {
+      const qs = new URLSearchParams({ from_seq: String(fromSeq) });
+      const res = await fetchWithAuth(`/api/sync/runs/${runId}/events?${qs.toString()}`);
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to fetch sync run events");
+      const data = await res.json();
+      const parsed = syncEventsResponseSchema.parse(data);
+      return parsed.events as SyncEventEnvelope[];
     },
   });
 }
@@ -148,12 +249,13 @@ export function useSyncStream(onEvent: (event: SyncEventEnvelope) => void) {
         body: JSON.stringify(body),
         signal,
       });
-      if (!res.ok) throw new Error("Failed to stream sync run");
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to stream sync run");
       await readSyncEventStream(res, onEvent);
     },
     onSettled: (_, __, variables) => {
       queryClient.invalidateQueries({ queryKey: ["sync", "run", variables.runId] });
       queryClient.invalidateQueries({ queryKey: ["sync", "changes"] });
+      queryClient.invalidateQueries({ queryKey: ["sync", "runs"] });
     },
   });
 }
@@ -174,13 +276,14 @@ export function useApplySyncRun() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to apply preview");
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to apply preview");
       const data = await res.json();
       return syncApplySchema.parse(data) as SyncApply;
     },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["sync", "run", vars.runId] });
       queryClient.invalidateQueries({ queryKey: ["sync", "changes"] });
+      queryClient.invalidateQueries({ queryKey: ["sync", "runs"] });
     },
   });
 }
@@ -201,13 +304,14 @@ export function useUndoSyncRun() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to undo change");
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to undo change");
       const data = await res.json();
       return syncUndoSchema.parse(data) as SyncUndo;
     },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["sync", "run", vars.runId] });
       queryClient.invalidateQueries({ queryKey: ["sync", "changes"] });
+      queryClient.invalidateQueries({ queryKey: ["sync", "runs"] });
     },
   });
 }
@@ -219,7 +323,7 @@ export function useSyncChanges(runId?: string | null) {
     queryFn: async () => {
       const qs = runId ? `?run_id=${encodeURIComponent(runId)}` : "";
       const res = await fetchWithAuth(`/api/sync/changes${qs}`);
-      if (!res.ok) throw new Error("Failed to fetch sync changes");
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to fetch sync changes");
       const data = await res.json();
       const parsed = syncChangesResponseSchema.parse(data);
       return parsed.changes;

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
+const isoDatetimeSchema = z.string().datetime({ offset: true });
 
 export const syncRunModeSchema = z.enum(["free", "guided"]);
 export const syncPromptModeSchema = z.enum(["full", "minimal", "none"]);
@@ -46,8 +47,18 @@ export const syncRunSchema = z.object({
   system_prompt_snapshot: z.string().nullable(),
   toolset_snapshot: z.array(z.string()),
   retrieval_snapshot: z.array(jsonObjectSchema),
-  created_at: z.string().datetime(),
-  updated_at: z.string().datetime(),
+  created_at: isoDatetimeSchema,
+  updated_at: isoDatetimeSchema,
+});
+
+export const syncRunSummarySchema = z.object({
+  id: z.string().uuid(),
+  status: syncRunStatusSchema,
+  title: z.string().nullable(),
+  selected_model: z.string().nullable(),
+  updated_at: isoDatetimeSchema,
+  last_message_preview: z.string().nullable(),
+  last_message_at: isoDatetimeSchema.nullable(),
 });
 
 export const syncUsageSchema = z.object({
@@ -69,7 +80,7 @@ export const syncMessageSchema = z.object({
   model: z.string().nullable(),
   usage_json: syncUsageSchema.nullable().optional(),
   error_code: z.string().nullable(),
-  created_at: z.string().datetime(),
+  created_at: isoDatetimeSchema,
 });
 
 export const syncQuestionSchema = z.object({
@@ -80,7 +91,7 @@ export const syncQuestionSchema = z.object({
   prompt: z.string(),
   help_text: z.string().nullable().optional(),
   options: z.array(z.string()).default([]),
-  created_at: z.string().datetime(),
+  created_at: isoDatetimeSchema,
 });
 
 export const syncDraftSchema = z.object({
@@ -90,7 +101,7 @@ export const syncDraftSchema = z.object({
   title: z.string().nullable(),
   body_json: jsonObjectSchema,
   summary: z.string().nullable(),
-  created_at: z.string().datetime(),
+  created_at: isoDatetimeSchema,
 });
 
 export const syncPreviewSchema = z.object({
@@ -100,17 +111,38 @@ export const syncPreviewSchema = z.object({
   entity_type: z.string(),
   entity_id: z.string().uuid().nullable(),
   action: z.string(),
-  diff_json: jsonObjectSchema,
-  expires_at: z.string().datetime().nullable(),
+  diff_json: z
+    .object({
+      summary: z.string().optional(),
+      notes: z.array(z.string()).optional(),
+      mutation: z
+        .object({
+          kind: z.string(),
+          args: jsonObjectSchema,
+          display_summary: z.string().optional(),
+        })
+        .optional(),
+      mutations: z
+        .array(
+          z.object({
+            kind: z.string(),
+            args: jsonObjectSchema,
+            display_summary: z.string().optional(),
+          })
+        )
+        .optional(),
+    })
+    .passthrough(),
+  expires_at: isoDatetimeSchema.nullable(),
   undoable: z.boolean(),
-  created_at: z.string().datetime(),
+  created_at: isoDatetimeSchema,
 });
 
 export const syncApplySchema = z.object({
   run_id: z.string().uuid(),
   preview_id: z.string().uuid(),
   change_id: z.string().uuid(),
-  applied_at: z.string().datetime(),
+  applied_at: isoDatetimeSchema,
   undoable: z.boolean(),
 });
 
@@ -118,7 +150,7 @@ export const syncUndoSchema = z.object({
   run_id: z.string().uuid(),
   change_id: z.string().uuid(),
   undone: z.boolean(),
-  undone_at: z.string().datetime(),
+  undone_at: isoDatetimeSchema,
 });
 
 export const syncChangeSchema = z.object({
@@ -133,7 +165,7 @@ export const syncChangeSchema = z.object({
   before_payload: z.unknown().nullable(),
   after_payload: z.unknown().nullable(),
   undoable: z.boolean(),
-  created_at: z.string().datetime(),
+  created_at: isoDatetimeSchema,
 });
 
 export const syncCreateRunRequestSchema = z.object({
@@ -201,6 +233,38 @@ export const syncToolResultPayloadSchema = z.object({
   result_json: z.unknown().nullable(),
 });
 
+export const syncReasoningPayloadSchema = z.object({
+  summary: z.string().nullable().optional(),
+  content: z.string().nullable().optional(),
+  duration_ms: z.number().int().nonnegative().nullable().optional(),
+});
+
+export const syncSourceItemSchema = z.object({
+  id: z.string().optional(),
+  title: z.string(),
+  url: z.string().url(),
+  snippet: z.string().nullable().optional(),
+});
+
+export const syncSourcesPayloadSchema = z.object({
+  items: z.array(syncSourceItemSchema),
+});
+
+export const syncTaskPayloadSchema = z.object({
+  task_id: z.string(),
+  title: z.string(),
+  status: z.enum(["started", "completed", "failed"]),
+  detail: z.string().nullable().optional(),
+  tool_name: z.string().nullable().optional(),
+});
+
+export const syncQueuePayloadSchema = z.object({
+  queue_id: z.string(),
+  label: z.string(),
+  status: z.enum(["pending", "running", "completed", "failed"]),
+  detail: z.string().nullable().optional(),
+});
+
 export const syncEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("token"), payload: z.object({ delta: z.string() }) }),
   z.object({ type: z.literal("message"), payload: syncMessageSchema }),
@@ -214,13 +278,17 @@ export const syncEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("done"), payload: syncDoneEventPayloadSchema }),
   z.object({ type: z.literal("tool_call"), payload: syncToolCallPayloadSchema }),
   z.object({ type: z.literal("tool_result"), payload: syncToolResultPayloadSchema }),
+  z.object({ type: z.literal("reasoning"), payload: syncReasoningPayloadSchema }),
+  z.object({ type: z.literal("sources"), payload: syncSourcesPayloadSchema }),
+  z.object({ type: z.literal("task"), payload: syncTaskPayloadSchema }),
+  z.object({ type: z.literal("queue"), payload: syncQueuePayloadSchema }),
 ]);
 
 export const syncEventEnvelopeSchema = z
   .object({
     seq: z.number().int().nonnegative(),
     run_id: z.string().uuid(),
-    ts: z.string().datetime(),
+    ts: isoDatetimeSchema,
     trace_id: z.string().uuid().nullable(),
   })
   .and(syncEventSchema);
@@ -233,7 +301,7 @@ export const syncResumeMessageSchema = z.object({
 export const syncWsTokenResponseSchema = z.object({
   ws_url: z.string().url(),
   token: z.string(),
-  expires_at: z.string().datetime(),
+  expires_at: isoDatetimeSchema,
 });
 
 export const syncAgentOriginSchema = z.enum(["system", "user", "template"]);
@@ -251,8 +319,8 @@ export const syncAgentSchema = z.object({
   is_default: z.boolean(),
   is_active: z.boolean(),
   published_version: z.number().int().nullable(),
-  created_at: z.string().datetime(),
-  updated_at: z.string().datetime(),
+  created_at: isoDatetimeSchema,
+  updated_at: isoDatetimeSchema,
 });
 
 export const syncCreateAgentRequestSchema = z.object({
@@ -279,7 +347,7 @@ export const syncPatchAgentRequestSchema = z.object({
 export const syncPublishAgentVersionResponseSchema = z.object({
   agent_id: z.string().uuid(),
   version: z.number().int().positive(),
-  published_at: z.string().datetime(),
+  published_at: isoDatetimeSchema,
 });
 
 export const syncAutomationStatusSchema = z.enum(["draft", "active", "paused"]);
@@ -293,9 +361,9 @@ export const syncAutomationSchema = z.object({
   spec_json: jsonObjectSchema,
   status: syncAutomationStatusSchema,
   requires_confirm: z.boolean(),
-  last_validated_at: z.string().datetime().nullable(),
-  created_at: z.string().datetime(),
-  updated_at: z.string().datetime(),
+  last_validated_at: isoDatetimeSchema.nullable(),
+  created_at: isoDatetimeSchema,
+  updated_at: isoDatetimeSchema,
 });
 
 export const syncCreateAutomationRequestSchema = z.object({
@@ -326,8 +394,20 @@ export const syncRunsResponseSchema = z.object({
   run: syncRunSchema,
 });
 
+export const syncRunListResponseSchema = z.object({
+  runs: z.array(syncRunSummarySchema),
+  next_cursor: z.string().nullable().optional(),
+});
+
 export const syncMessagesResponseSchema = z.object({
   messages: z.array(syncMessageSchema),
+});
+
+export const syncEventsResponseSchema = z.object({
+  run_id: z.string().uuid(),
+  from_seq: z.number().int().nonnegative(),
+  last_seq: z.number().int().nonnegative(),
+  events: z.array(syncEventEnvelopeSchema),
 });
 
 export const syncChangesResponseSchema = z.object({
@@ -343,6 +423,7 @@ export const syncAutomationsResponseSchema = z.object({
 });
 
 export type SyncRun = z.infer<typeof syncRunSchema>;
+export type SyncRunSummary = z.infer<typeof syncRunSummarySchema>;
 export type SyncMessage = z.infer<typeof syncMessageSchema>;
 export type SyncQuestion = z.infer<typeof syncQuestionSchema>;
 export type SyncDraft = z.infer<typeof syncDraftSchema>;
@@ -354,6 +435,10 @@ export type SyncModel = z.infer<typeof syncModelSchema>;
 export type SyncModelCapabilities = z.infer<typeof syncModelCapabilitiesSchema>;
 export type SyncEvent = z.infer<typeof syncEventSchema>;
 export type SyncEventEnvelope = z.infer<typeof syncEventEnvelopeSchema>;
+export type SyncReasoningEventPayload = z.infer<typeof syncReasoningPayloadSchema>;
+export type SyncSourcesEventPayload = z.infer<typeof syncSourcesPayloadSchema>;
+export type SyncTaskEventPayload = z.infer<typeof syncTaskPayloadSchema>;
+export type SyncQueueEventPayload = z.infer<typeof syncQueuePayloadSchema>;
 export type SyncResumeMessage = z.infer<typeof syncResumeMessageSchema>;
 export type SyncWsTokenResponse = z.infer<typeof syncWsTokenResponseSchema>;
 export type SyncCreateRunRequest = z.input<typeof syncCreateRunRequestSchema>;
@@ -367,3 +452,5 @@ export type SyncPatchAgentRequest = z.input<typeof syncPatchAgentRequestSchema>;
 export type SyncAutomation = z.infer<typeof syncAutomationSchema>;
 export type SyncCreateAutomationRequest = z.input<typeof syncCreateAutomationRequestSchema>;
 export type SyncPatchAutomationRequest = z.input<typeof syncPatchAutomationRequestSchema>;
+export type SyncRunListResponse = z.infer<typeof syncRunListResponseSchema>;
+export type SyncEventsResponse = z.infer<typeof syncEventsResponseSchema>;

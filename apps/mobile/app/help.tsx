@@ -12,7 +12,7 @@ export default function HelpScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       <View className="flex-row items-center px-4 py-3 border-b border-border">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
+        <Pressable onPress={() => router.replace("/(tabs)/me")} className="p-2 -ml-2">
           <ChevronLeft size={24} color="#737373" />
         </Pressable>
         <UiText className="text-lg font-semibold text-foreground flex-1 ml-2">

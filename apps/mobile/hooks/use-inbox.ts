@@ -27,14 +27,17 @@ import {
   processCaptureResponseSchema,
   reprocessCaptureResponseSchema,
 } from "@momentarise/shared";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, readApiError } from "@/lib/api";
 
-export function useInbox() {
+export function useInbox(options?: { includeArchived?: boolean }) {
+  const includeArchived = options?.includeArchived ?? false;
   return useQuery<InboxListResponse>({
-    queryKey: ["inbox"],
+    queryKey: ["inbox", includeArchived],
     queryFn: async () => {
-      const res = await apiFetch("/api/v1/inbox");
-      if (!res.ok) throw new Error("Failed to fetch inbox");
+      const res = await apiFetch(
+        `/api/v1/inbox?include_archived=${includeArchived ? "true" : "false"}`
+      );
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch inbox"));
       const data = await res.json();
       return inboxListResponseSchema.parse(data) as InboxListResponse;
     },
@@ -47,7 +50,7 @@ export function useCaptureDetail(captureId: string | null) {
     enabled: Boolean(captureId),
     queryFn: async () => {
       const res = await apiFetch(`/api/v1/inbox/${captureId}`);
-      if (!res.ok) throw new Error("Failed to fetch capture detail");
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch capture detail"));
       const data = await res.json();
       return captureDetailResponseSchema.parse(data) as CaptureDetailResponse;
     },
@@ -60,7 +63,7 @@ export function useCaptureArtifacts(captureId: string | null) {
     enabled: Boolean(captureId),
     queryFn: async () => {
       const res = await apiFetch(`/api/v1/inbox/${captureId}/artifacts`);
-      if (!res.ok) throw new Error("Failed to fetch capture artifacts");
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch capture artifacts"));
       const data = await res.json();
       return captureArtifactsResponseSchema.parse(data) as CaptureArtifactsResponse;
     },
@@ -76,7 +79,7 @@ export function useCreateCapture() {
         method: "POST",
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to create capture");
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to create capture"));
       return res.json() as Promise<{ id: string }>;
     },
     onSuccess: () => {
@@ -113,7 +116,7 @@ export function useUploadCapture() {
         method: "POST",
         body: form,
       });
-      if (!res.ok) throw new Error("Failed to upload capture");
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to upload capture"));
       const data = await res.json();
       return captureUploadResponseSchema.parse(data) as CaptureUploadResponse;
     },
@@ -139,7 +142,7 @@ export function usePreviewCapture() {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to preview capture");
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to preview capture"));
       const data = await res.json();
       return capturePreviewResponseSchema.parse(data) as CapturePreviewResponse;
     },
@@ -161,7 +164,7 @@ export function useApplyCapture() {
         method: "POST",
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to apply capture");
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to apply capture"));
       const data = await res.json();
       return applyCaptureResponseSchema.parse(data) as ApplyCaptureResponse;
     },
@@ -179,7 +182,7 @@ export function useReprocessCapture() {
       const res = await apiFetch(`/api/v1/inbox/${captureId}/reprocess`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error("Failed to reprocess capture");
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to reprocess capture"));
       const data = await res.json();
       return reprocessCaptureResponseSchema.parse(data) as ReprocessCaptureResponse;
     },
@@ -203,7 +206,7 @@ export function useProcessCapture() {
         method: "POST",
         body: JSON.stringify({ title }),
       });
-      if (!res.ok) throw new Error("Failed to process capture");
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to process capture"));
       const data = await res.json();
       return processCaptureResponseSchema.parse(data) as ProcessCaptureResponse;
     },
@@ -222,7 +225,7 @@ export function useDeleteCapture() {
       const res = await apiFetch(`/api/v1/inbox/${captureId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Failed to delete capture");
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to delete capture"));
       const data = await res.json();
       return captureActionResponseSchema.parse(data) as CaptureActionResponse;
     },
@@ -240,7 +243,7 @@ export function useRestoreCapture() {
       const res = await apiFetch(`/api/v1/inbox/${captureId}/restore`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error("Failed to restore capture");
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to restore capture"));
       const data = await res.json();
       return captureActionResponseSchema.parse(data) as CaptureActionResponse;
     },

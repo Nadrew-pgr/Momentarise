@@ -13,8 +13,11 @@ export const eventOutSchema = z.object({
   id: z.string().uuid(),
   item_id: z.string().uuid(),
   title: z.string(),
+  description: z.string().nullable(),
   start_at: z.string().datetime(),
   end_at: z.string().datetime(),
+  all_day: z.boolean(),
+  location: z.string().nullable(),
   estimated_time_seconds: z.number().int(),
   actual_time_acc_seconds: z.number().int(),
   is_tracking: z.boolean(),
@@ -30,8 +33,11 @@ export const timelineResponseSchema = z.object({
 
 export const eventCreateRequestSchema = z.object({
   title: z.string().min(1),
+  description: z.string().optional().nullable(),
   start_at: z.string().datetime(),
   end_at: z.string().datetime(),
+  all_day: z.boolean().optional(),
+  location: z.string().optional().nullable(),
   estimated_time_seconds: z.number().int().min(0).optional(),
   item_id: z.string().uuid().optional().nullable(),
   color: eventColorSchema.optional(),
@@ -39,8 +45,11 @@ export const eventCreateRequestSchema = z.object({
 
 export const eventUpdateRequestSchema = z.object({
   title: z.string().min(1).optional(),
+  description: z.string().optional().nullable(),
   start_at: z.string().datetime().optional(),
   end_at: z.string().datetime().optional(),
+  all_day: z.boolean().optional(),
+  location: z.string().optional().nullable(),
   estimated_time_seconds: z.number().int().min(0).optional(),
   last_known_updated_at: z.string().datetime().optional(),
   color: eventColorSchema.optional(),

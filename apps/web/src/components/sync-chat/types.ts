@@ -9,6 +9,7 @@ export interface SyncChatMessage {
   content: string;
   createdAt: Date;
   imageData?: string;
+  delivery?: "sent" | "pending" | "failed";
 }
 
 export interface SyncToolTimelineEntry {
@@ -19,6 +20,46 @@ export interface SyncToolTimelineEntry {
   status: string;
   summary?: string;
   createdAt: Date;
+}
+
+export interface SyncReasoningEntry {
+  id: string;
+  seq: number;
+  summary?: string;
+  content?: string;
+  durationMs?: number;
+}
+
+export interface SyncSourceItem {
+  id: string;
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+export interface SyncSourcesEntry {
+  id: string;
+  seq: number;
+  items: SyncSourceItem[];
+}
+
+export interface SyncTaskEntry {
+  id: string;
+  seq: number;
+  taskId: string;
+  title: string;
+  status: "started" | "completed" | "failed";
+  detail?: string;
+  toolName?: string;
+}
+
+export interface SyncQueueEntry {
+  id: string;
+  seq: number;
+  queueId: string;
+  label: string;
+  status: "pending" | "running" | "completed" | "failed";
+  detail?: string;
 }
 
 export interface SyncNotice {

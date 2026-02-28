@@ -71,7 +71,7 @@ export function DashboardHeader() {
             type="button"
             size="icon"
             variant="outline"
-            className="h-8 w-8 xl:hidden"
+            className="h-8 w-8"
             onClick={openSyncActions}
             aria-label={t("pages.sync.actions.open")}
           >

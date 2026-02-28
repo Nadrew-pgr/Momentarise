@@ -22,7 +22,6 @@ export function AgendaView({
 }: AgendaViewProps) {
   // Show events for the next days based on constant
   const days = useMemo(() => {
-    console.log("Agenda view updating with date:", currentDate.toISOString());
     return Array.from({ length: AgendaDaysToShow }, (_, i) =>
       addDays(new Date(currentDate), i),
     );
@@ -30,7 +29,6 @@ export function AgendaView({
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log("Agenda view event clicked:", event);
     onEventSelect(event);
   };
 
@@ -47,9 +45,9 @@ export function AgendaView({
             className="mb-2 text-muted-foreground/50"
             size={32}
           />
-          <h3 className="font-medium text-lg">No events found</h3>
+          <h3 className="font-medium text-lg">No moments found</h3>
           <p className="text-muted-foreground">
-            There are no events scheduled for this time period.
+            There are no moments scheduled for this time period.
           </p>
         </div>
       ) : (

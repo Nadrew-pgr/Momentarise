@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
 from src.core.database import get_db
 from src.core.deps import get_current_user, get_current_workspace
+from src.api.v1.inbox import _maybe_auto_apply_capture
 from src.models.inbox_capture import InboxCapture
 from src.models.user import User
 from src.models.workspace import WorkspaceMember
@@ -77,6 +78,7 @@ async def create_external_capture(
         source=body.source or "extension",
         capture_type=body.capture_type,
         status="queued",
+        actor="sync" if (body.source or "").strip().lower() in {"sync", "agent", "automation"} else "user",
         meta={
             **body.metadata,
             "external": {
@@ -90,6 +92,7 @@ async def create_external_capture(
 
     await enqueue_default_jobs(db, capture)
     await process_capture_jobs(db, capture)
+    await _maybe_auto_apply_capture(db=db, workspace=workspace, capture=capture)
 
     await db.commit()
     await db.refresh(capture)

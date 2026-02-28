@@ -17,12 +17,27 @@ class CalendarPreferencesUpdateRequest(BaseModel):
 
 
 AiMode = Literal["proposal_only", "auto_apply"]
+CaptureProviderKind = Literal["mistral", "openai", "heuristic"]
+
+
+class CaptureProviderSetting(BaseModel):
+    provider: CaptureProviderKind
+    model: str = Field(min_length=1)
+    language: str | None = None
+    fallback_enabled: bool = True
+
+
+class CaptureProviderPreferences(BaseModel):
+    transcription: CaptureProviderSetting
+    ocr: CaptureProviderSetting
+    vlm: CaptureProviderSetting
 
 
 class AiPreferencesResponse(BaseModel):
     mode: AiMode
     auto_apply_threshold: float = Field(ge=0, le=1)
     max_actions_per_capture: int = Field(ge=1, le=3)
+    capture_provider_preferences: CaptureProviderPreferences
     updated_at: datetime
 
 
@@ -30,4 +45,5 @@ class AiPreferencesUpdateRequest(BaseModel):
     mode: AiMode
     auto_apply_threshold: float = Field(ge=0, le=1)
     max_actions_per_capture: int = Field(ge=1, le=3)
+    capture_provider_preferences: CaptureProviderPreferences | None = None
     last_known_updated_at: datetime | None = None

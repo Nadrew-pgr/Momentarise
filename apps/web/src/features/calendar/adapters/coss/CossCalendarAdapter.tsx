@@ -14,8 +14,8 @@ import type {
 interface CossCalendarAdapterProps {
   events: EventOut[];
   onRangeChange: (range: CalendarRangeChange) => void;
-  onCreate: (input: CalendarCreateInput) => Promise<void>;
-  onUpdate: (input: CalendarUpdateInput) => Promise<void>;
+  onCreate: (input: CalendarCreateInput) => Promise<EventOut>;
+  onUpdate: (input: CalendarUpdateInput) => Promise<EventOut>;
   onDelete: (eventId: string) => Promise<void>;
   onStartTracking: (eventId: string) => Promise<void>;
   onStopTracking: (eventId: string) => Promise<void>;
@@ -23,6 +23,22 @@ interface CossCalendarAdapterProps {
   endHour: number;
   onDisplayHoursChange: (startHour: number, endHour: number) => Promise<void>;
   isMutating: boolean;
+}
+
+function toCalendarEvent(event: EventOut): CalendarEvent {
+  return {
+    id: event.id,
+    itemId: event.item_id,
+    updatedAt: event.updated_at,
+    title: event.title,
+    description: event.description ?? undefined,
+    start: new Date(event.start_at),
+    end: new Date(event.end_at),
+    allDay: event.all_day,
+    location: event.location ?? undefined,
+    color: event.color,
+    isTracking: event.is_tracking,
+  };
 }
 
 export function CossCalendarAdapter({
@@ -43,47 +59,56 @@ export function CossCalendarAdapter({
   }, [events]);
 
   const calendarEvents = useMemo<CalendarEvent[]>(() => {
-    return events.map((event) => ({
-      allDay: false,
-      color: event.color,
-      end: new Date(event.end_at),
-      id: event.id,
-      start: new Date(event.start_at),
-      title: event.title,
-      isTracking: event.is_tracking,
-    }));
+    return events.map(toCalendarEvent);
   }, [events]);
 
-  const handleCreate = (calendarEvent: CalendarEvent) => {
-    void onCreate({
-      title: calendarEvent.title,
-      start: calendarEvent.start,
-      end: calendarEvent.end,
-      color: calendarEvent.color,
-    }).catch((err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to create event");
-    });
+  const handleCreate = async (calendarEvent: CalendarEvent): Promise<CalendarEvent> => {
+    try {
+      const created = await onCreate({
+        title: calendarEvent.title,
+        description: calendarEvent.description,
+        start: calendarEvent.start,
+        end: calendarEvent.end,
+        allDay: calendarEvent.allDay,
+        location: calendarEvent.location,
+        color: calendarEvent.color,
+      });
+      return toCalendarEvent(created);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create moment");
+      throw err;
+    }
   };
 
-  const handleUpdate = (calendarEvent: CalendarEvent) => {
+  const handleUpdate = async (calendarEvent: CalendarEvent): Promise<CalendarEvent> => {
     const source = eventById.get(calendarEvent.id);
 
-    void onUpdate({
-      eventId: calendarEvent.id,
-      title: calendarEvent.title,
-      start: calendarEvent.start,
-      end: calendarEvent.end,
-      lastKnownUpdatedAt: source?.updated_at,
-      color: calendarEvent.color,
-    }).catch((err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update event");
-    });
+    try {
+      const updated = await onUpdate({
+        eventId: calendarEvent.id,
+        title: calendarEvent.title,
+        description: calendarEvent.description,
+        start: calendarEvent.start,
+        end: calendarEvent.end,
+        lastKnownUpdatedAt: source?.updated_at,
+        allDay: calendarEvent.allDay,
+        location: calendarEvent.location,
+        color: calendarEvent.color,
+      });
+      return toCalendarEvent(updated);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update moment");
+      throw err;
+    }
   };
 
-  const handleDelete = (eventId: string) => {
-    void onDelete(eventId).catch((err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete event");
-    });
+  const handleDelete = async (eventId: string): Promise<void> => {
+    try {
+      await onDelete(eventId);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete moment");
+      throw err;
+    }
   };
 
   return (

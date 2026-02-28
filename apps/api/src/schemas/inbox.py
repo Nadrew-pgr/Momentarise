@@ -15,6 +15,17 @@ CaptureActionType = Literal[
     "summarize",
     "review",
 ]
+CaptureCategory = Literal[
+    "finance",
+    "communication",
+    "schedule",
+    "document",
+    "travel",
+    "personal",
+    "general",
+]
+CaptureActor = Literal["user", "sync", "system"]
+CaptureBadgeKind = Literal["type", "category", "actor", "tag", "status"]
 ItemKind = Literal["note", "objective", "task", "resource"]
 
 
@@ -26,6 +37,13 @@ class CaptureActionSuggestionOut(BaseModel):
     requires_confirm: bool
     preview_payload: dict[str, Any] = Field(default_factory=dict)
     is_primary: bool = False
+
+
+class CaptureBadgeOut(BaseModel):
+    key: str
+    label: str
+    kind: CaptureBadgeKind
+    tone: Literal["default", "secondary", "outline"] = "outline"
 
 
 class InboxCaptureOut(BaseModel):
@@ -41,6 +59,13 @@ class InboxCaptureOut(BaseModel):
     suggested_actions: list[CaptureActionSuggestionOut] = Field(default_factory=list)
     primary_action: CaptureActionSuggestionOut | None = None
     requires_review: bool = False
+    archived: bool = False
+    archived_reason: Literal["applied", "deleted"] | None = None
+    deleted_at: datetime | None = None
+    category: CaptureCategory | None = None
+    actor: CaptureActor = "user"
+    tags: list[str] = Field(default_factory=list)
+    badges: list[CaptureBadgeOut] = Field(default_factory=list)
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
@@ -76,6 +101,9 @@ class CaptureAssetOut(BaseModel):
         serialization_alias="metadata",
     )
     created_at: datetime
+    preview_kind: Literal["audio", "image", "pdf", "text", "binary"] = "binary"
+    file_name: str = ""
+    content_path: str = ""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -111,6 +139,8 @@ class CaptureDetailResponse(BaseModel):
     assets: list[CaptureAssetOut]
     artifacts: list[CaptureArtifactOut]
     jobs: list[CaptureJobOut]
+    pipeline_trace: list[dict[str, Any]] = Field(default_factory=list)
+    artifacts_summary: dict[str, Any] = Field(default_factory=dict)
 
 
 class CaptureArtifactsResponse(BaseModel):

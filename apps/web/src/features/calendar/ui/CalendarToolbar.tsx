@@ -115,7 +115,7 @@ export function CalendarToolbar({
           disabled={disableActions}
         >
           <RiCalendarCheckLine aria-hidden="true" className="min-[480px]:hidden" size={16} />
-          <span className="max-[479px]:sr-only">Today</span>
+          <span className="max-[479px]:sr-only">{t("common.today")}</span>
         </Button>
         <div className="flex items-center sm:gap-2">
           <Button aria-label="Previous" onClick={onPrevious} size="icon" variant="ghost" disabled={disableActions}>

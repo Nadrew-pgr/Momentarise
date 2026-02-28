@@ -17,6 +17,12 @@ class Workspace(BaseMixin, Base):
     owner_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
+    preferences: Mapped[dict] = mapped_column(
+        MutableDict.as_mutable(JSONB),
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
 
     owner: Mapped["User"] = relationship(back_populates="owned_workspaces")  # noqa: F821
     members: Mapped[list["WorkspaceMember"]] = relationship(back_populates="workspace")
@@ -27,6 +33,8 @@ class Workspace(BaseMixin, Base):
     capture_artifacts: Mapped[list["CaptureArtifact"]] = relationship(back_populates="workspace")  # noqa: F821
     capture_jobs: Mapped[list["CaptureJob"]] = relationship(back_populates="workspace")  # noqa: F821
     capture_action_suggestions: Mapped[list["CaptureActionSuggestion"]] = relationship(back_populates="workspace")  # noqa: F821
+    capture_tags: Mapped[list["CaptureTag"]] = relationship(back_populates="workspace")  # noqa: F821
+    capture_tag_links: Mapped[list["CaptureTagLink"]] = relationship(back_populates="workspace")  # noqa: F821
     entity_links: Mapped[list["EntityLink"]] = relationship(back_populates="workspace")  # noqa: F821
     ai_changes: Mapped[list["AIChange"]] = relationship(back_populates="workspace")  # noqa: F821
 

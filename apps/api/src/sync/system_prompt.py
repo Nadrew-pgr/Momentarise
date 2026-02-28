@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-PromptMode = Literal["full", "minimal", "none"]
+PromptMode = Literal["full", "minimal", "none", "capture_analysis"]
 
 
 @dataclass(slots=True)
@@ -16,6 +17,8 @@ class SystemPromptParams:
     extra_system_prompt: str | None = None
     workspace_notes: list[str] | None = None
     user_timezone: str | None = None
+    user_now: datetime | None = None
+    locale: str | None = None
     runtime_info: dict[str, str | None] | None = None
 
 
@@ -24,7 +27,7 @@ def _clean(value: str | None) -> str:
 
 
 def _normalize_mode(mode: str) -> PromptMode:
-    if mode in {"full", "minimal", "none"}:
+    if mode in {"full", "minimal", "none", "capture_analysis"}:
         return mode  # type: ignore[return-value]
     return "full"
 
@@ -45,6 +48,9 @@ def _build_tools_section(allowed_tools: list[dict]) -> list[str]:
     lines = [
         "## Tooling",
         "Use only declared tools. Never execute writes without preview/apply confirmation.",
+        "When the user asks to create, update, plan, or change something in the workspace, you MUST call one of the preview tools (item.preview, event.preview, inbox.transform.preview) so a structured preview card is shown. Replying only in text for such intents is not allowed.",
+        "The plan is the structured preview card (with Apply/Cancel) that appears when you call a preview tool. You must call the tool so this card is shown; do not only describe the change in plain text.",
+        "When calling preview tools (item.preview, event.preview, inbox.transform.preview), always pass display_summary with the same user-facing text you would put in your reply for that change: event title, schedule (e.g. \"Horaire : 09:00 - 09:30 (30 min)\"), color in user language, and a short description if relevant. This text is shown in the plan card instead of raw parameters.",
     ]
 
     if not allowed_tools:
@@ -81,8 +87,22 @@ def _build_safety_section() -> list[str]:
         "## Safety",
         "- Preview-first policy: propose change -> emit preview -> wait for apply.",
         "- Never claim an apply succeeded unless an applied event exists.",
-        "- On uncertainty, ask a clarifying question before suggesting a mutation.",
+        "- Ask at most one blocking clarification question when critical data is missing.",
         "- Do not fabricate tool outputs, ids, or external facts.",
+        "",
+    ]
+
+
+def _build_autonomous_policy_section() -> list[str]:
+    return [
+        "## Autonomous Planning Policy",
+        "- Infer missing defaults when safe (title, duration, color, scheduling window).",
+        "- Do not ask for fields that can be inferred from context, memory, or preferences.",
+        "- For planning/scheduling/edit intents, proactively call preview tools before replying (`event.preview`, `item.preview`, `inbox.transform.preview`).",
+        "- Do NOT describe planned changes or steps in plain text only. Always emit a structured preview via the preview tools so the user gets a preview card with Apply/Cancel.",
+        "- Avoid long questionnaires: ask at most one blocking question only when a critical field cannot be inferred.",
+        "- Resolve relative dates/times into absolute datetimes with timezone in outputs.",
+        "- If assumptions are made, state them briefly and proceed with preview-first execution.",
         "",
     ]
 
@@ -91,7 +111,9 @@ def _build_reply_contract_section() -> list[str]:
     return [
         "## Reply Contract",
         "- Keep answers concise and actionable.",
-        "- If user asks for a plan, provide numbered steps.",
+        "- Use the user's own words and correct spelling; do not merge or invent words (e.g. write \"ma journée\" not \"manjournée\", \"ma semaine\" not \"masemaine\").",
+        "- Do not output a plan or list of steps as plain text when the user wants to apply changes; use the preview tools instead so a structured preview card is shown.",
+        "- If the user only asks for an explanation (no mutation), you may reply in text.",
         "- If context is insufficient, ask one direct question.",
         "- Use markdown only when it improves readability.",
         "",
@@ -145,15 +167,29 @@ def _build_workspace_section(params: SystemPromptParams) -> list[str]:
     return lines
 
 
-def _build_time_section(user_timezone: str | None) -> list[str]:
-    if not _clean(user_timezone):
-        return []
-
-    now_utc = datetime.now(UTC).isoformat()
+def _build_time_section(user_timezone: str | None, user_now: datetime | None, locale: str | None) -> list[str]:
+    timezone_name = _clean(user_timezone) or "UTC"
+    now_utc_dt = user_now.astimezone(UTC) if user_now is not None else datetime.now(UTC)
+    try:
+        local_zone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        local_zone = UTC
+        timezone_name = "UTC"
+    local_now = now_utc_dt.astimezone(local_zone)
+    now_utc = now_utc_dt.isoformat()
+    local_iso = local_now.isoformat()
+    local_weekday = local_now.strftime("%A")
+    local_date = local_now.strftime("%Y-%m-%d")
+    local_time = local_now.strftime("%H:%M")
     return [
         "## Current Time",
-        f"User timezone: {_clean(user_timezone)}",
+        f"User timezone: {timezone_name}",
+        f"Locale: {_clean(locale) or 'fr-FR'}",
+        f"Today in user timezone: {local_date} ({local_weekday})",
+        f"Current local time: {local_time}",
+        f"Local datetime ISO: {local_iso}",
         f"UTC now: {now_utc}",
+        "Use these values as ground truth for all date/time reasoning.",
         "",
     ]
 
@@ -191,11 +227,27 @@ def build_agent_system_prompt(params: SystemPromptParams) -> str:
     lines.extend(_build_workspace_section(params))
     lines.extend(_build_runtime_section(params.runtime_info))
 
+    if mode == "capture_analysis":
+        lines.extend(_build_safety_section())
+        lines.extend(
+            [
+                "## Capture Analysis Contract",
+                "- You are analyzing an inbox capture and proposing action candidates.",
+                "- Output must be strict JSON with keys: normalized_facts, questions_if_needed, action_candidates.",
+                "- Never mutate data directly.",
+                "",
+            ]
+        )
+        lines.extend(_build_time_section(params.user_timezone, params.user_now, params.locale))
+        lines.extend(_build_context_section(params.extra_system_prompt))
+        return "\n".join([line for line in lines if line is not None]).strip()
+
     if mode == "full":
         lines.extend(_build_safety_section())
+        lines.extend(_build_autonomous_policy_section())
         lines.extend(_build_reply_contract_section())
         lines.extend(_build_memory_section(params.retrieval_snippets))
-        lines.extend(_build_time_section(params.user_timezone))
+        lines.extend(_build_time_section(params.user_timezone, params.user_now, params.locale))
         lines.extend(_build_context_section(params.extra_system_prompt))
 
     return "\n".join([line for line in lines if line is not None]).strip()

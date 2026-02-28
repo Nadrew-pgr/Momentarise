@@ -4,7 +4,8 @@
     "retry": "Retry",
     "today": "Today",
     "cancel": "Cancel",
-    "save": "Save"
+    "save": "Save",
+    "loading": "Loading..."
   },
   "nav": {
     "today": "Today",
@@ -52,7 +53,17 @@
       "emptyNextEvent": "No event scheduled.",
       "nextAction": "Next action",
       "emptyNextAction": "No action planned.",
-      "emptyHint": "Add items from Inbox to fill this view."
+      "emptyHint": "Add items from Inbox to fill this view.",
+      "dailyDigest": "Daily digest",
+      "dailyDigestPlaceholder": "Your focus today…",
+      "prioritiesDone": "{{total}} priorities",
+      "focusMode": "FOCUS MODE",
+      "inboxPreview": "Inbox preview",
+      "viewAll": "View all",
+      "priorityHigh": "High",
+      "priorityMedium": "Medium",
+      "priorityLow": "Low",
+      "now": "Now"
     },
     "inbox": {
       "title": "Inbox",
@@ -70,6 +81,14 @@
       "kindCapture": "Capture",
       "kindItem": "Item",
       "openItem": "Open item",
+      "openCapture": "Open capture",
+      "aiSummary": "AI summary",
+      "suggestedActions": "Suggested actions",
+      "applySelected": "Apply action",
+      "sourceFile": "Source file",
+      "voiceTitle": "Voice title",
+      "voiceDescription": "Voice description",
+      "voiceDescriptionPlaceholder": "Add context to help create better actions.",
       "quickCreateTitle": "Quick capture",
       "quickCreateDescription": "Use one entry point and decide later how to process it.",
       "quickInputLabel": "Raw content (optional)",
@@ -98,11 +117,29 @@
       "preview": "Preview",
       "apply": "Apply",
       "reprocess": "Reprocess",
+      "restore": "Restore",
+      "badgeApplied": "Applied",
+      "badgeDeleted": "Deleted",
+      "loadError": "Unable to load inbox.",
       "emptyList": "No captures. Add raw content to get started.",
       "emptyCapture": "Capture without text content.",
       "recentItems": "Recent items",
       "emptyItems": "No recent items.",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "linkUrlPlaceholder": "Paste a URL",
+      "linkUrlInvalid": "Invalid URL. Only http(s) links are supported.",
+      "linkSubmit": "Add link",
+      "viewActive": "Active",
+      "viewArchived": "Archived",
+      "sortNewest": "Newest first",
+      "sortOldest": "Oldest first",
+      "sortA2Z": "A → Z",
+      "sortZ2A": "Z → A",
+      "showDeleted": "Show deleted",
+      "hideDeleted": "Hide deleted",
+      "openSite": "Open site",
+      "openDownload": "Open / Download",
+      "transcriptionLimited": "Limited transcription"
     },
     "item": {
       "details": "Details",
@@ -156,6 +193,23 @@
         "undoneSuccess": "Change undone.",
         "noTime": "Now"
       },
+      "drawer": {
+        "title": "Sync"
+      },
+      "history": {
+        "title": "History",
+        "search": "Search conversations...",
+        "empty": "No conversation found.",
+        "lastUpdate": "Updated",
+        "model": "Model"
+      },
+      "previewPlan": {
+        "title": "Apply Plan",
+        "summary": "Summary",
+        "mutations": "Proposed mutations",
+        "notes": "Notes",
+        "pending": "Pending"
+      },
       "status": {
         "streaming": "Sync is thinking...",
         "ready": "Sync is ready",
@@ -170,12 +224,16 @@
           "cancelled": "Cancelled"
         }
       },
-      "warning": {
-        "title": "Warning"
-      },
-      "error": {
-        "title": "Error",
-        "generic": "Something went wrong. Please try again."
+  "warning": {
+    "title": "Warning"
+  },
+  "activity": {
+    "title": "Agent activity",
+    "queueLabel": "actions"
+  },
+  "error": {
+    "title": "Error",
+    "generic": "Something went wrong. Please try again."
       },
       "roles": {
         "assistant": "Sync",
@@ -187,16 +245,19 @@
         "log": "Sync conversation"
       },
       "message": {
-        "imageAlt": "Uploaded image"
+        "imageAlt": "Uploaded image",
+        "pending": "Sending...",
+        "failed": "Failed",
+        "scrollToBottom": "Scroll to bottom"
       }
     },
     "timeline": {
       "title": "Timeline",
       "placeholder": "This section is coming in Slice 1.",
-      "emptyDay": "No events this day.",
+      "emptyDay": "No moments this day.",
       "start": "Start",
       "stop": "Stop",
-      "emptyHint": "Add events from Inbox to see them here."
+      "emptyHint": "Add moments from Inbox to see them here."
     },
     "calendar": {
       "title": "Calendar",
@@ -208,12 +269,61 @@
       "displayHours": "Hours",
       "displayHoursStart": "Start",
       "displayHoursEnd": "End",
-      "create": "Create event",
-      "edit": "Edit event",
+      "create": "Create moment",
+      "edit": "Edit moment",
       "start": "Start",
       "end": "End",
       "save": "Save",
-      "titlePlaceholder": "Untitled event"
+      "titlePlaceholder": "Untitled moment",
+      "momentTitleCreate": "Create Moment",
+      "momentTitleEdit": "Edit Moment",
+      "momentDescriptionCreate": "Create a new moment",
+      "momentDescriptionEdit": "Edit this moment details and content",
+      "momentTabs": {
+        "details": "Details",
+        "content": "Content",
+        "coach": "Coach"
+      },
+      "momentFields": {
+        "title": "Title",
+        "description": "Description",
+        "startDate": "Start Date",
+        "startTime": "Start Time",
+        "endDate": "End Date",
+        "endTime": "End Time",
+        "allDay": "All day",
+        "location": "Location",
+        "color": "Color",
+        "pickDate": "Pick a date",
+        "selectTime": "Select time"
+      },
+      "momentLinks": {
+        "title": "Linked entities",
+        "afterCreate": "Links become available after the moment is created.",
+        "loading": "Loading links...",
+        "empty": "No links yet."
+      },
+      "momentContent": {
+        "saving": "Saving content...",
+        "saved": "Content saved",
+        "saveError": "Content save failed",
+        "deferred": "Content will be saved after creating the moment"
+      },
+      "coachPlaceholder": "Coach tab is coming soon.",
+      "actions": {
+        "start": "Start",
+        "stop": "Stop",
+        "delete": "Delete moment"
+      },
+      "errors": {
+        "timeOutOfRange": "Selected time must be between {{start}}:00 and {{end}}:00",
+        "endBeforeStart": "End date cannot be before start date",
+        "contentAttachFailed": "Moment saved, but content could not be attached yet",
+        "saveMoment": "Failed to save moment",
+        "saveContent": "Failed to save content",
+        "deleteMoment": "Failed to delete moment"
+      },
+      "saving": "Saving..."
     },
     "me": {
       "title": "Me",

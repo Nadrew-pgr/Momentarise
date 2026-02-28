@@ -11,8 +11,11 @@ EventColor = Literal["sky", "amber", "violet", "rose", "emerald", "orange"]
 
 class EventCreateRequest(BaseModel):
     title: str = Field(min_length=1)
+    description: str | None = None
     start_at: datetime
     end_at: datetime
+    all_day: bool = False
+    location: str | None = None
     estimated_time_seconds: int | None = Field(default=None, ge=0)
     item_id: uuid.UUID | None = None
     color: EventColor | None = None
@@ -20,8 +23,11 @@ class EventCreateRequest(BaseModel):
 
 class EventUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1)
+    description: str | None = None
     start_at: datetime | None = None
     end_at: datetime | None = None
+    all_day: bool | None = None
+    location: str | None = None
     estimated_time_seconds: int | None = Field(default=None, ge=0)
     last_known_updated_at: datetime | None = None
     color: EventColor | None = None

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,6 +22,11 @@ class Event(BaseMixin, Base):
     estimated_time_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     actual_time_acc_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_tracking: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location: Mapped[str | None] = mapped_column(Text, nullable=True)
+    all_day: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     color: Mapped[str] = mapped_column(
         nullable=False, default="sky", server_default="sky"
     )

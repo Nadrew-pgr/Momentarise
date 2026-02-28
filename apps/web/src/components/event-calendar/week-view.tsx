@@ -20,6 +20,14 @@ import type React from "react";
 import { useMemo } from "react";
 
 import { WeekCellsHeight } from "./constants";
+import {
+  CALENDAR_AXIS_LABEL_CLASSES,
+  CALENDAR_DAY_CELL_CLASSES,
+  CALENDAR_DAY_HEADER_CLASSES,
+  CALENDAR_DAY_HEADER_TODAY_CLASSES,
+  CALENDAR_GRID_BORDER_CLASSES,
+  CALENDAR_HEADER_ROW_CLASSES,
+} from "./calendar-appearance";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
@@ -235,13 +243,21 @@ export function WeekView({
 
   return (
     <div className="flex h-full flex-col" data-slot="week-view">
-      <div className="sticky top-0 z-30 grid grid-cols-8 border-border/70 border-b bg-background/80 backdrop-blur-md">
-        <div className="py-2 text-center text-muted-foreground/70 text-sm">
+      <div
+        className={cn(
+          "sticky top-0 z-30 grid grid-cols-8",
+          CALENDAR_HEADER_ROW_CLASSES,
+        )}
+      >
+        <div className={CALENDAR_DAY_HEADER_CLASSES}>
           <span className="max-[479px]:sr-only">{format(new Date(), "O")}</span>
         </div>
         {days.map((day) => (
           <div
-            className="py-2 text-center text-muted-foreground/70 text-sm data-today:font-medium data-today:text-foreground"
+            className={cn(
+              CALENDAR_DAY_HEADER_CLASSES,
+              isToday(day) && CALENDAR_DAY_HEADER_TODAY_CLASSES,
+            )}
             data-today={isToday(day) || undefined}
             key={day.toString()}
           >
@@ -254,10 +270,15 @@ export function WeekView({
       </div>
 
       {showAllDaySection && (
-        <div className="border-border/70 border-b bg-muted/50">
+        <div className={cn("border-b bg-muted/50", CALENDAR_GRID_BORDER_CLASSES)}>
           <div className="grid grid-cols-8">
-            <div className="relative border-border/70 border-r">
-              <span className="absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[10px] text-muted-foreground/70 sm:pe-4 sm:text-xs">
+            <div className={cn("relative", CALENDAR_GRID_BORDER_CLASSES, "border-r")}>
+              <span
+                className={cn(
+                  "absolute bottom-0 left-0 h-6 w-16 max-w-full text-right",
+                  CALENDAR_AXIS_LABEL_CLASSES,
+                )}
+              >
                 All day
               </span>
             </div>
@@ -274,7 +295,10 @@ export function WeekView({
 
               return (
                 <div
-                  className="relative border-border/70 border-r p-1 last:border-r-0"
+                  className={cn(
+                    "relative border-r p-1 last:border-r-0",
+                    CALENDAR_GRID_BORDER_CLASSES,
+                  )}
                   data-today={isToday(day) || undefined}
                   key={day.toString()}
                 >
@@ -319,16 +343,20 @@ export function WeekView({
       )}
 
       <div className="grid flex-1 grid-cols-8 overflow-hidden">
-        <div className="grid auto-cols-fr border-border/70 border-r">
+        <div className={cn("grid auto-cols-fr", CALENDAR_GRID_BORDER_CLASSES, "border-r")}>
           {hours.map((hour, index) => (
             <div
-              className="relative min-h-[var(--week-cells-height)] border-border/70 border-b last:border-b-0"
+              className={cn(
+                "relative min-h-[var(--week-cells-height)] border-b last:border-b-0",
+                CALENDAR_GRID_BORDER_CLASSES,
+              )}
               key={hour.toString()}
             >
               {index >= 0 && (
                 <span
                   className={cn(
-                    "absolute left-0 flex h-6 w-16 max-w-full items-center justify-end bg-background pe-2 text-[10px] text-muted-foreground/70 sm:pe-4 sm:text-xs",
+                    "absolute left-0",
+                    CALENDAR_AXIS_LABEL_CLASSES,
                     index === 0 ? "top-0" : "-top-3",
                   )}
                 >
@@ -341,7 +369,10 @@ export function WeekView({
 
         {days.map((day, dayIndex) => (
           <div
-            className="relative grid auto-cols-fr border-border/70 border-r last:border-r-0"
+            className={cn(
+              "relative grid auto-cols-fr last:border-r-0",
+              CALENDAR_DAY_CELL_CLASSES,
+            )}
             data-today={isToday(day) || undefined}
             key={day.toString()}
           >
@@ -387,7 +418,10 @@ export function WeekView({
               const hourValue = getHours(hour);
               return (
                 <div
-                  className="relative min-h-[var(--week-cells-height)] border-border/70 border-b last:border-b-0"
+                  className={cn(
+                    "relative min-h-[var(--week-cells-height)] border-b last:border-b-0",
+                    CALENDAR_GRID_BORDER_CLASSES,
+                  )}
                   key={hour.toString()}
                 >
                   {/* Quarter-hour intervals */}

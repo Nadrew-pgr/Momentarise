@@ -28,6 +28,13 @@ class InboxCapture(BaseMixin, Base):
     status: Mapped[str] = mapped_column(
         Text, nullable=False, default="captured", server_default="captured"
     )
+    category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="user",
+        server_default="user",
+    )
     meta: Mapped[dict] = mapped_column(
         "metadata",
         MutableDict.as_mutable(JSONB),
@@ -43,3 +50,4 @@ class InboxCapture(BaseMixin, Base):
     artifacts: Mapped[list["CaptureArtifact"]] = relationship(back_populates="capture")  # noqa: F821
     jobs: Mapped[list["CaptureJob"]] = relationship(back_populates="capture")  # noqa: F821
     action_suggestions: Mapped[list["CaptureActionSuggestion"]] = relationship(back_populates="capture")  # noqa: F821
+    tag_links: Mapped[list["CaptureTagLink"]] = relationship(back_populates="capture")  # noqa: F821

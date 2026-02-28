@@ -39,7 +39,7 @@ export function useEventsRange(from: string | null, to: string | null) {
       if (from) qs.set("from", from);
       if (to) qs.set("to", to);
       const res = await fetchWithAuth(`/api/events?${qs.toString()}`);
-      if (!res.ok) throw await parseApiError(res, "Failed to fetch events");
+      if (!res.ok) throw await parseApiError(res, "Failed to fetch moments");
       const data = await res.json();
       return eventsRangeResponseSchema.parse(data) as EventsRangeResponse;
     },
@@ -56,7 +56,7 @@ export function useCreateEvent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw await parseApiError(res, "Failed to create event");
+      if (!res.ok) throw await parseApiError(res, "Failed to create moment");
       const data = await res.json();
       return eventOutSchema.parse(data) as EventOut;
     },
@@ -84,7 +84,7 @@ export function useUpdateEvent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw await parseApiError(res, "Failed to update event");
+      if (!res.ok) throw await parseApiError(res, "Failed to update moment");
       const data = await res.json();
       return eventOutSchema.parse(data) as EventOut;
     },
@@ -103,7 +103,7 @@ export function useDeleteEvent() {
       const res = await fetchWithAuth(`/api/events/${eventId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw await parseApiError(res, "Failed to delete event");
+      if (!res.ok) throw await parseApiError(res, "Failed to delete moment");
       const data = await res.json();
       return eventDeleteResponseSchema.parse(data) as EventDeleteResponse;
     },

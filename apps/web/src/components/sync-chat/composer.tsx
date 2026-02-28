@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { ReactNode } from "react";
 import { Brain, Mic, Paperclip, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +42,7 @@ interface ComposerProps {
   attachSoonLabel: string;
   enableVoice?: boolean;
   enableAttach?: boolean;
+  afterComposer?: ReactNode;
 }
 
 export function Composer({
@@ -63,6 +65,7 @@ export function Composer({
   attachSoonLabel,
   enableVoice = false,
   enableAttach = false,
+  afterComposer = null,
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -91,7 +94,7 @@ export function Composer({
   const currentModel = models.find((model) => model.id === selectedModel);
 
   return (
-    <div className="sync-chat-composer-wrap pointer-events-none absolute inset-x-0 bottom-4 z-20 px-4">
+    <div className="sync-chat-composer-wrap pointer-events-none absolute inset-x-0 bottom-3 z-10 px-4">
       <TooltipProvider delayDuration={150}>
         <div className="pointer-events-auto mx-auto w-full max-w-3xl">
           <div className="sync-chat-composer-box rounded-3xl border border-border bg-background p-4 shadow-lg">
@@ -112,11 +115,11 @@ export function Composer({
                 <button
                   type="button"
                   onClick={onStop}
-                  className="relative flex h-9 w-9 shrink-0 items-center justify-center"
+                  className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
                   aria-label={stopLabel}
                 >
-                  <AnimatedOrb size={36} variant="danger" />
-                  <Square className="absolute h-4 w-4 text-red-700" fill="currentColor" />
+                  <AnimatedOrb size={36} variant="stop" />
+                  <Square className="absolute h-4 w-4" fill="currentColor" />
                 </button>
               ) : (
                 <button
@@ -202,6 +205,7 @@ export function Composer({
             </div>
           </div>
         </div>
+        {afterComposer ? <div className="pointer-events-auto mx-auto mt-2 w-full max-w-3xl">{afterComposer}</div> : null}
       </TooltipProvider>
     </div>
   );

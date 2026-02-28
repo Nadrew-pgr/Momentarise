@@ -1,9 +1,10 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 from src.sync.system_prompt import SystemPromptParams, build_agent_system_prompt
 
-PromptMode = Literal["full", "minimal", "none"]
+PromptMode = Literal["full", "minimal", "none", "capture_analysis"]
 
 
 @dataclass(slots=True)
@@ -16,6 +17,8 @@ class PromptComposerInput:
     extra_system_prompt: str | None = None
     workspace_notes: list[str] | None = None
     user_timezone: str | None = None
+    user_now: datetime | None = None
+    locale: str | None = None
     runtime_info: dict[str, str | None] | None = None
 
 
@@ -39,6 +42,8 @@ class PromptComposer:
                 extra_system_prompt=data.extra_system_prompt,
                 workspace_notes=data.workspace_notes,
                 user_timezone=data.user_timezone,
+                user_now=data.user_now,
+                locale=data.locale,
                 runtime_info=data.runtime_info,
             )
         )

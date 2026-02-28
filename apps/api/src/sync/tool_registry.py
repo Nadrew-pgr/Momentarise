@@ -11,23 +11,43 @@ class ToolDefinition:
 DEFAULT_TOOLS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="memory.search",
-        description="Search workspace memory chunks",
+        description="Search workspace memory chunks by query.",
         is_write=False,
     ),
     ToolDefinition(
-        name="inbox.preview_changes",
-        description="Build a non-mutating preview for inbox/item updates",
+        name="calendar.events.range",
+        description="Read events in a date range with titles and durations.",
         is_write=False,
     ),
     ToolDefinition(
-        name="items.apply_update",
-        description="Apply a validated preview to an item",
-        is_write=True,
+        name="calendar.preferences.get",
+        description="Read workspace calendar preferences (working hours).",
+        is_write=False,
     ),
     ToolDefinition(
-        name="events.schedule",
-        description="Schedule or update calendar events",
-        is_write=True,
+        name="calendar.patterns.suggest",
+        description="Suggest default duration/color for similar event titles.",
+        is_write=False,
+    ),
+    ToolDefinition(
+        name="travel.estimate",
+        description="Estimate travel duration between origin and destination.",
+        is_write=False,
+    ),
+    ToolDefinition(
+        name="item.preview",
+        description="Build a preview mutation for item create/update.",
+        is_write=False,
+    ),
+    ToolDefinition(
+        name="event.preview",
+        description="Build a preview mutation for event create/update/delete.",
+        is_write=False,
+    ),
+    ToolDefinition(
+        name="inbox.transform.preview",
+        description="Build a preview to transform an inbox capture into item/event.",
+        is_write=False,
     ),
 )
 

@@ -15,6 +15,10 @@ import type React from "react";
 import { useMemo } from "react";
 
 import { WeekCellsHeight } from "./constants";
+import {
+  CALENDAR_AXIS_LABEL_CLASSES,
+  CALENDAR_GRID_BORDER_CLASSES,
+} from "./calendar-appearance";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
@@ -208,14 +212,19 @@ export function DayView({
   return (
     <div className="contents" data-slot="day-view">
       {showAllDaySection && (
-        <div className="border-border/70 border-t bg-muted/50">
+        <div className={cn("border-t bg-muted/50", CALENDAR_GRID_BORDER_CLASSES)}>
           <div className="grid grid-cols-[3rem_1fr] sm:grid-cols-[4rem_1fr]">
             <div className="relative">
-              <span className="absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[10px] text-muted-foreground/70 sm:pe-4 sm:text-xs">
+              <span
+                className={cn(
+                  "absolute bottom-0 left-0 h-6 w-16 max-w-full text-right",
+                  CALENDAR_AXIS_LABEL_CLASSES,
+                )}
+              >
                 All day
               </span>
             </div>
-            <div className="relative border-border/70 border-r p-1 last:border-r-0">
+            <div className={cn("relative border-r p-1 last:border-r-0", CALENDAR_GRID_BORDER_CLASSES)}>
               {allDayEvents.map((event) => {
                 const eventStart = new Date(event.start);
                 const eventEnd = new Date(event.end);
@@ -241,17 +250,26 @@ export function DayView({
         </div>
       )}
 
-      <div className="grid flex-1 grid-cols-[3rem_1fr] overflow-hidden border-border/70 border-t sm:grid-cols-[4rem_1fr]">
+      <div
+        className={cn(
+          "grid flex-1 grid-cols-[3rem_1fr] overflow-hidden border-t sm:grid-cols-[4rem_1fr]",
+          CALENDAR_GRID_BORDER_CLASSES,
+        )}
+      >
         <div>
           {hours.map((hour, index) => (
             <div
-              className="relative h-[var(--week-cells-height)] border-border/70 border-b last:border-b-0"
+              className={cn(
+                "relative h-[var(--week-cells-height)] border-b last:border-b-0",
+                CALENDAR_GRID_BORDER_CLASSES,
+              )}
               key={hour.toString()}
             >
               {index >= 0 && (
                 <span
                   className={cn(
-                    "absolute left-0 flex h-6 w-16 max-w-full items-center justify-end bg-background pe-2 text-[10px] text-muted-foreground/70 sm:pe-4 sm:text-xs",
+                    "absolute left-0",
+                    CALENDAR_AXIS_LABEL_CLASSES,
                     index === 0 ? "top-0" : "-top-3",
                   )}
                 >
@@ -306,7 +324,10 @@ export function DayView({
             const hourValue = getHours(hour);
             return (
               <div
-                className="relative h-[var(--week-cells-height)] border-border/70 border-b last:border-b-0"
+                className={cn(
+                  "relative h-[var(--week-cells-height)] border-b last:border-b-0",
+                  CALENDAR_GRID_BORDER_CLASSES,
+                )}
                 key={hour.toString()}
               >
                 {/* Quarter-hour intervals */}

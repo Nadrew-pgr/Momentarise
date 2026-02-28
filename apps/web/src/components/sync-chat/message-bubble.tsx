@@ -12,6 +12,8 @@ interface MessageBubbleProps {
   toolLabel: string;
   systemLabel: string;
   imageAlt: string;
+  pendingLabel: string;
+  failedLabel: string;
   isStreaming?: boolean;
 }
 
@@ -44,6 +46,8 @@ export function MessageBubble({
   toolLabel,
   systemLabel,
   imageAlt,
+  pendingLabel,
+  failedLabel,
   isStreaming = false,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
@@ -56,6 +60,7 @@ export function MessageBubble({
     toolLabel,
     systemLabel,
   });
+  const deliveryState = message.delivery ?? "sent";
 
   return (
     <div
@@ -91,7 +96,9 @@ export function MessageBubble({
             isUser
               ? "rounded-br-md border-border bg-background text-foreground shadow-sm"
               : "rounded-bl-md border-border/50 bg-muted/20 text-foreground",
-            isTool && "bg-muted/40"
+            isTool && "bg-muted/40",
+            isUser && deliveryState === "failed" && "border-destructive/50 bg-destructive/10",
+            isUser && deliveryState === "pending" && "opacity-80"
           )}
         >
           {isUser ? (
@@ -119,7 +126,11 @@ export function MessageBubble({
           )}
         </div>
 
-        <span className="text-muted-foreground mt-1 text-xs">{formatTime(message.createdAt)}</span>
+        <span className="text-muted-foreground mt-1 text-xs">
+          {formatTime(message.createdAt)}
+          {isUser && deliveryState === "pending" ? ` · ${pendingLabel}` : ""}
+          {isUser && deliveryState === "failed" ? ` · ${failedLabel}` : ""}
+        </span>
       </div>
     </div>
   );

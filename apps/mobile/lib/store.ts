@@ -3,15 +3,19 @@ import { create } from "zustand";
 interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
+  hasCompletedOnboarding: boolean;
   setAuthenticated: (value: boolean) => void;
   setLoading: (value: boolean) => void;
+  setHasCompletedOnboarding: (value: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: true,
+  hasCompletedOnboarding: false,
   setAuthenticated: (value) => set({ isAuthenticated: value }),
   setLoading: (value) => set({ isLoading: value }),
+  setHasCompletedOnboarding: (value) => set({ hasCompletedOnboarding: value }),
 }));
 
 interface CreateSheetState {

@@ -5,6 +5,53 @@ Voir `project/docs/self-improvement.md` pour le détail des champs et la promoti
 
 ---
 
+## [LRN-20260228-005] correction — Appliquer la règle self-improvement à chaque fois (alwaysApply)
+
+**Logged**: 2026-02-28
+**Priority**: high
+**Status**: pending
+**Area**: process / agent
+
+### Summary
+La règle `.cursor/rules/self-improvement.mdc` est en `alwaysApply: true` : il faut écrire dans `.learnings/` **à chaque** erreur ou correction, pas seulement quand l’utilisateur le demande.
+
+### Details
+- **Attendu** : après une erreur → entrée dans `ERRORS.md` tout de suite ; après une correction utilisateur → entrée dans `LEARNINGS.md` (correction). Ne pas se contenter de corriger sans logger.
+- **Ce qui s’est passé** : les erreurs (parité calendrier, event card, etc.) ont été corrigées mais certaines n’ont été documentées dans ERRORS.md qu’après une demande explicite (« documente toutes les erreurs »).
+- La règle est lue au début de la session ; l’agent doit l’appliquer systématiquement à chaque tour où un des événements se produit (erreur, correction, idée).
+
+### Suggested Action
+À chaque fois qu’une commande échoue, qu’une exception apparaît ou que l’utilisateur corrige (« non c’est pas ça », « en fait… », « tu n’as pas compris ») : **d’abord ou en parallèle du fix**, ajouter l’entrée dans `.learnings/ERRORS.md` ou `LEARNINGS.md` selon le cas. Ne pas attendre que l’utilisateur demande « log les erreurs ».
+
+### Metadata
+- Related Files: `.cursor/rules/self-improvement.mdc`, `.learnings/ERRORS.md`, `.learnings/LEARNINGS.md`
+- See also: `project/docs/self-improvement.md` (Comportement attendu)
+
+---
+
+## [LRN-20260228-004] best_practice — Scroll page chat / dashboard (Next.js flex chain)
+
+**Logged**: 2026-02-28
+**Priority**: medium
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Sur une page type chat (header + zone scrollable + input fixe), si tout le contenu (y compris header et input) défile, c’est que la hauteur n’est pas contrainte dans la chaîne flex du layout.
+
+### Details
+- Un wrapper `flex-1 min-h-0 overflow-hidden` sur la page seule ne suffit pas : le parent (contenu du layout) et au-dessus doivent aussi permettre au flex de « rétrécir ». Sinon `flex-1` prend tout l’espace mais le contenu pousse et c’est toute la page qui scroll.
+- **Chaîne à respecter** : (1) Racine dashboard = hauteur viewport fixe (`h-svh overflow-hidden` sur le wrapper du SidebarProvider, pas seulement `min-h-svh`). (2) SidebarInset et la div de contenu du layout avec `min-h-0` pour que les enfants `flex-1` puissent avoir une hauteur bornée. (3) Zone de contenu du layout en `overflow-auto` pour que les pages longues (Today, Inbox) scrollent dans cette zone. (4) Page chat (et sync) : wrapper `flex-1 min-h-0 overflow-hidden` ; seul le bloc conversation (ex. StickToBottom / Conversation) a le scroll.
+
+### Suggested Action
+Pour toute nouvelle page « plein écran » avec zone scrollable (chat, éditeur, etc.) : vérifier que le layout dashboard a bien `h-svh overflow-hidden` en racine, `min-h-0` sur SidebarInset et sur la div qui wrap `{children}`, et que la page elle-même a un wrapper `flex-1 min-h-0 overflow-hidden` avec le scroll uniquement dans le composant dédié.
+
+### Metadata
+- Related Files: `apps/web/src/components/ui/sidebar.tsx`, `apps/web/src/app/(dashboard)/layout.tsx`, `apps/web/src/app/(dashboard)/chat/page.tsx`, `apps/web/src/components/chatbot.tsx`
+- See also: sync page (même pattern), Conversation / StickToBottom (ai-elements)
+
+---
+
 ## [LRN-20260227-001] correction — Timeline mobile (layout et UX)
 
 **Logged**: 2026-02-27
@@ -98,3 +145,26 @@ Prévoir un fallback si offline (picker simple sans dépendance native).
 ### Metadata
 - Related Files: `apps/mobile/components/EventSheet.tsx`, `apps/mobile/package.json`
 - See also: logs Expo (bundling failed)
+
+---
+
+## [LRN-20260228-004] best_practice — Guardrails de lane en multi-agents
+
+**Logged**: 2026-02-28
+**Priority**: high
+**Status**: applied
+**Area**: process / repo
+
+### Summary
+Quand plusieurs agents modifient Sync/Capture/InBox en parallèle, il faut un garde-fou automatique qui bloque les commits hors lane.
+
+### Details
+- Mise en place d’un check red-zone (`scripts/check-lane-boundary.mjs`) basé sur `git diff --name-only --cached`.
+- Les fichiers hot-path Sync/Capture/InBox sont explicitement listés et bloquent le commit.
+- Hook git local versionné: `.githooks/pre-commit` + activation via `git config core.hooksPath .githooks`.
+
+### Suggested Action
+Conserver la red-zone à jour selon les ownerships de sprint, et exiger `npm run lane:check` avant merge sur branche d’intégration.
+
+### Metadata
+- Related Files: `scripts/check-lane-boundary.mjs`, `.githooks/pre-commit`, `README.md`

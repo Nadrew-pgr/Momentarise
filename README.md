@@ -135,8 +135,19 @@ Momentarise/
 | Lancer le web | `apps/web/` | `npm run dev` |
 | Installer deps Mobile | `apps/mobile/` | `npm install` |
 | Lancer le mobile | `apps/mobile/` | `npx expo start` |
+| Vérifier la lane (red zone) | `Momentarise/` | `npm run lane:check` |
 
 ## Dépannage rapide
+
+### Guardrail lane (travail multi-agents)
+
+Pour activer le hook git local de blocage red-zone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Le hook exécute `npm run lane:check` avant chaque commit.
 
 ### Erreur SQLAlchemy `sqlalche.me/e/20/f405` (colonne inexistante)
 

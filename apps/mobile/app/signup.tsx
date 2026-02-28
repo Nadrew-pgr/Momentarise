@@ -15,7 +15,6 @@ import { signup } from "@/lib/auth";
 import { useAuthStore } from "@/lib/store";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Text as UiText } from "@/components/ui/text";
 
 export default function SignupScreen() {
@@ -64,14 +63,19 @@ export default function SignupScreen() {
         >
           <View className="mx-auto w-full max-w-md gap-6">
             <View className="items-center">
-              <UiText className="text-3xl font-bold text-foreground">{t("auth.signUpTitle")}</UiText>
-              <UiText className="mt-2 text-muted-foreground">{t("auth.signUpDescription")}</UiText>
+              <UiText className="text-3xl font-bold text-foreground">
+                {t("auth.signUpTitle")}
+              </UiText>
+              <UiText className="mt-2 text-muted-foreground">
+                {t("auth.signUpDescription")}
+              </UiText>
             </View>
 
-            <Card className="rounded-2xl border border-border bg-card">
-              <CardContent className="gap-4 p-5">
+            <View className="gap-4">
               <View>
-                <UiText className="mb-1 text-sm font-medium text-foreground">{t("auth.email")}</UiText>
+                <UiText className="mb-1 text-sm font-medium text-foreground">
+                  {t("auth.email")}
+                </UiText>
                 <Input
                   placeholder="you@example.com"
                   value={email}
@@ -84,7 +88,9 @@ export default function SignupScreen() {
               </View>
 
               <View>
-                <UiText className="mb-1 text-sm font-medium text-foreground">{t("auth.password")}</UiText>
+                <UiText className="mb-1 text-sm font-medium text-foreground">
+                  {t("auth.password")}
+                </UiText>
                 <Input
                   placeholder="••••••••"
                   value={password}
@@ -103,19 +109,24 @@ export default function SignupScreen() {
                 onPress={handleSubmit}
                 disabled={loading}
               >
-                {loading ? <ActivityIndicator color="white" /> : <UiText>{t("auth.signUpSubmit")}</UiText>}
+                {loading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <UiText>{t("auth.signUpSubmit")}</UiText>
+                )}
               </Button>
 
               <View className="mt-4 flex-row justify-center">
-                <UiText className="text-sm text-muted-foreground">{t("auth.hasAccount")} </UiText>
+                <UiText className="text-sm text-muted-foreground">
+                  {t("auth.hasAccount")}{" "}
+                </UiText>
                 <TouchableOpacity onPress={() => router.back()}>
                   <UiText className="text-sm font-medium text-foreground underline">
                     {t("auth.signIn")}
                   </UiText>
                 </TouchableOpacity>
               </View>
-              </CardContent>
-            </Card>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

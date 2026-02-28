@@ -7,21 +7,32 @@ import type {
   SyncMessage,
   SyncPreview,
   SyncQuestion,
+  SyncRunSummary,
 } from "@momentarise/shared";
 import { useTranslation } from "react-i18next";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   useApplySyncRun,
   useCreateSyncRun,
   useSyncChanges,
   useSyncModels,
+  useSyncRunEvents,
+  useSyncRuns,
   useSyncStream,
   useUndoSyncRun,
 } from "@/hooks/use-sync";
 import { ActionsRail } from "./actions-rail";
 import { Composer } from "./composer";
-import { MessageList } from "./message-list";
-import type { SyncChatMessage, SyncNotice, SyncToolTimelineEntry } from "./types";
+import { ConversationView } from "./conversation-view";
+import { HistoryDrawer } from "./history-drawer";
+import type {
+  SyncChatMessage,
+  SyncNotice,
+  SyncQueueEntry,
+  SyncReasoningEntry,
+  SyncSourcesEntry,
+  SyncTaskEntry,
+  SyncToolTimelineEntry,
+} from "./types";
 
 const MODEL_STORAGE_KEY = "sync-selected-model";
 
@@ -29,6 +40,13 @@ interface ActionFeedbackEntry {
   id: string;
   kind: "applied" | "undo";
   createdAt: Date;
+}
+
+interface PendingUserMessage {
+  id: string;
+  content: string;
+  createdAt: Date;
+  status: "pending" | "failed";
 }
 
 function toErrorMessage(error: unknown, fallback: string): string {
@@ -63,6 +81,7 @@ export function SyncChatShell() {
   const [selectedModel, setSelectedModel] = useState<string>("");
 
   const [messages, setMessages] = useState<SyncChatMessage[]>([]);
+  const [pendingUserMessages, setPendingUserMessages] = useState<PendingUserMessage[]>([]);
   const [streamingAssistantBuffer, setStreamingAssistantBuffer] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
 
@@ -71,25 +90,36 @@ export function SyncChatShell() {
   const [latestDraft, setLatestDraft] = useState<SyncDraft | null>(null);
   const [toolTimeline, setToolTimeline] = useState<SyncToolTimelineEntry[]>([]);
   const [notices, setNotices] = useState<SyncNotice[]>([]);
+  const [reasoningEntries, setReasoningEntries] = useState<SyncReasoningEntry[]>([]);
+  const [sourcesEntries, setSourcesEntries] = useState<SyncSourcesEntry[]>([]);
+  const [taskEntries, setTaskEntries] = useState<SyncTaskEntry[]>([]);
+  const [queueEntries, setQueueEntries] = useState<SyncQueueEntry[]>([]);
   const [actionFeedback, setActionFeedback] = useState<ActionFeedbackEntry[]>([]);
 
   const [transportError, setTransportError] = useState<string | null>(null);
   const [pendingRetryMessage, setPendingRetryMessage] = useState<string | null>(null);
-  const [isActionsSheetOpen, setIsActionsSheetOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isHydratingRun, setIsHydratingRun] = useState(false);
 
   const seqSeenRef = useRef<Set<number>>(new Set());
   const lastSeqRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const { data: models = [] } = useSyncModels();
+  const { data: runs = [], isLoading: isLoadingRuns } = useSyncRuns();
   const { data: changes = [] } = useSyncChanges(runId);
+  const { data: runEvents = [], isLoading: isLoadingRunEvents, error: runEventsError } = useSyncRunEvents(
+    isHydratingRun ? runId : null,
+    0
+  );
 
   const createRun = useCreateSyncRun();
   const applyRun = useApplySyncRun();
   const undoRun = useUndoSyncRun();
 
-  function resetLocalState() {
+  const resetLocalState = useCallback(() => {
     setMessages([]);
+    setPendingUserMessages([]);
     setStreamingAssistantBuffer("");
     setIsStreaming(false);
     setLatestPreview(null);
@@ -97,22 +127,26 @@ export function SyncChatShell() {
     setLatestDraft(null);
     setToolTimeline([]);
     setNotices([]);
+    setReasoningEntries([]);
+    setSourcesEntries([]);
+    setTaskEntries([]);
+    setQueueEntries([]);
     setActionFeedback([]);
     setTransportError(null);
     setPendingRetryMessage(null);
 
     lastSeqRef.current = 0;
     seqSeenRef.current = new Set();
-  }
+  }, []);
 
-  function appendNotice(next: SyncNotice) {
+  const appendNotice = useCallback((next: SyncNotice) => {
     setNotices((prev) => {
       const merged = [next, ...prev.filter((item) => item.id !== next.id)];
       return merged.slice(0, 8);
     });
-  }
+  }, []);
 
-  function appendToolTimeline(next: SyncToolTimelineEntry) {
+  const appendToolTimeline = useCallback((next: SyncToolTimelineEntry) => {
     setToolTimeline((prev) => {
       const existingIndex = prev.findIndex((entry) => entry.id === next.id);
       if (existingIndex === -1) return [next, ...prev].slice(0, 20);
@@ -121,9 +155,37 @@ export function SyncChatShell() {
       copy[existingIndex] = { ...copy[existingIndex], ...next };
       return copy;
     });
-  }
+  }, []);
 
-  function pushActionFeedback(kind: "applied" | "undo") {
+  const appendReasoning = useCallback((next: SyncReasoningEntry) => {
+    setReasoningEntries((prev) => {
+      const merged = [next, ...prev.filter((entry) => entry.id !== next.id)];
+      return merged.slice(0, 20);
+    });
+  }, []);
+
+  const appendSources = useCallback((next: SyncSourcesEntry) => {
+    setSourcesEntries((prev) => {
+      const merged = [next, ...prev.filter((entry) => entry.id !== next.id)];
+      return merged.slice(0, 20);
+    });
+  }, []);
+
+  const appendTaskEntry = useCallback((next: SyncTaskEntry) => {
+    setTaskEntries((prev) => {
+      const merged = [next, ...prev.filter((entry) => entry.id !== next.id)];
+      return merged.slice(0, 40);
+    });
+  }, []);
+
+  const appendQueueEntry = useCallback((next: SyncQueueEntry) => {
+    setQueueEntries((prev) => {
+      const merged = [next, ...prev.filter((entry) => entry.id !== next.id)];
+      return merged.slice(0, 40);
+    });
+  }, []);
+
+  const pushActionFeedback = useCallback((kind: "applied" | "undo") => {
     const entry: ActionFeedbackEntry = {
       id: crypto.randomUUID(),
       kind,
@@ -131,9 +193,9 @@ export function SyncChatShell() {
     };
 
     setActionFeedback((prev) => [entry, ...prev].slice(0, 6));
-  }
+  }, []);
 
-  function handleStreamEvent(event: SyncEventEnvelope) {
+  const handleStreamEvent = useCallback((event: SyncEventEnvelope) => {
     if (seqSeenRef.current.has(event.seq)) return;
     seqSeenRef.current.add(event.seq);
 
@@ -155,9 +217,21 @@ export function SyncChatShell() {
           role: payload.role,
           content: extractMessageContent(payload),
           createdAt: new Date(payload.created_at),
+          delivery: "sent",
         };
 
         setMessages((prev) => upsertBySeq(prev, nextMessage));
+        if (payload.role === "user") {
+          setPendingUserMessages((prev) => {
+            if (prev.length === 0) return prev;
+            const nextContent = nextMessage.content.trim().toLowerCase();
+            const index = prev.findIndex(
+              (item) => item.content.trim().toLowerCase() === nextContent
+            );
+            if (index === -1) return prev;
+            return prev.filter((_, idx) => idx !== index);
+          });
+        }
         setStreamingAssistantBuffer("");
         setPendingRetryMessage(null);
         break;
@@ -189,6 +263,28 @@ export function SyncChatShell() {
           status: payload.status,
           createdAt: new Date(event.ts),
         });
+        appendTaskEntry({
+          id: `${event.run_id}-${event.seq}-task`,
+          seq: event.seq,
+          taskId: payload.tool_call_id,
+          title: payload.tool_name,
+          status: payload.status,
+          detail: payload.status === "started" ? undefined : payload.status,
+          toolName: payload.tool_name,
+        });
+        appendQueueEntry({
+          id: `${event.run_id}-${event.seq}-queue`,
+          seq: event.seq,
+          queueId: payload.tool_call_id,
+          label: payload.tool_name,
+          status:
+            payload.status === "started"
+              ? "running"
+              : payload.status === "completed"
+                ? "completed"
+                : "failed",
+          detail: payload.status,
+        });
         break;
       }
 
@@ -201,6 +297,100 @@ export function SyncChatShell() {
           status: payload.status,
           summary: payload.summary ?? undefined,
           createdAt: new Date(event.ts),
+        });
+        appendTaskEntry({
+          id: `${event.run_id}-${event.seq}-task-result`,
+          seq: event.seq,
+          taskId: payload.tool_call_id,
+          title: payload.summary ?? "Tool result",
+          status: payload.status,
+          detail: payload.summary ?? undefined,
+        });
+        appendQueueEntry({
+          id: `${event.run_id}-${event.seq}-queue-result`,
+          seq: event.seq,
+          queueId: payload.tool_call_id,
+          label: payload.summary ?? "Tool result",
+          status: payload.status === "completed" ? "completed" : "failed",
+          detail: payload.status,
+        });
+        break;
+      }
+
+      case "reasoning": {
+        const payload = event.payload;
+        appendReasoning({
+          id: `${event.run_id}-${event.seq}-reasoning`,
+          seq: event.seq,
+          summary: payload.summary ?? undefined,
+          content: payload.content ?? undefined,
+          durationMs:
+            typeof payload.duration_ms === "number" && Number.isFinite(payload.duration_ms)
+              ? payload.duration_ms
+              : undefined,
+        });
+        break;
+      }
+
+      case "sources": {
+        const payload = event.payload;
+        const items =
+          Array.isArray(payload.items)
+            ? payload.items.reduce<SyncSourcesEntry["items"]>((acc, item, index) => {
+                if (!item || typeof item !== "object") return acc;
+                const raw = item as {
+                  id?: unknown;
+                  title?: unknown;
+                  url?: unknown;
+                  snippet?: unknown;
+                };
+                const title = typeof raw.title === "string" ? raw.title : "";
+                const url = typeof raw.url === "string" ? raw.url : "";
+                if (!title || !url) return acc;
+                acc.push({
+                  id:
+                    typeof raw.id === "string" && raw.id.trim()
+                      ? raw.id
+                      : `${event.run_id}-${event.seq}-${index}`,
+                  title,
+                  url,
+                  snippet: typeof raw.snippet === "string" ? raw.snippet : undefined,
+                });
+                return acc;
+              }, [])
+            : [];
+        if (items.length === 0) break;
+        appendSources({
+          id: `${event.run_id}-${event.seq}-sources`,
+          seq: event.seq,
+          items,
+        });
+        break;
+      }
+
+      case "task": {
+        const payload = event.payload;
+        appendTaskEntry({
+          id: `${event.run_id}-${event.seq}-task-explicit`,
+          seq: event.seq,
+          taskId: payload.task_id,
+          title: payload.title,
+          status: payload.status,
+          detail: payload.detail ?? undefined,
+          toolName: payload.tool_name ?? undefined,
+        });
+        break;
+      }
+
+      case "queue": {
+        const payload = event.payload;
+        appendQueueEntry({
+          id: `${event.run_id}-${event.seq}-queue-explicit`,
+          seq: event.seq,
+          queueId: payload.queue_id,
+          label: payload.label,
+          status: payload.status,
+          detail: payload.detail ?? undefined,
         });
         break;
       }
@@ -232,7 +422,15 @@ export function SyncChatShell() {
       default:
         break;
     }
-  }
+  }, [
+    appendNotice,
+    appendQueueEntry,
+    appendReasoning,
+    appendSources,
+    appendTaskEntry,
+    appendToolTimeline,
+    pushActionFeedback,
+  ]);
 
   const streamRun = useSyncStream(handleStreamEvent);
 
@@ -260,9 +458,48 @@ export function SyncChatShell() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isHydratingRun) return;
+    if (!runId) return;
+    if (runEventsError) {
+      setTransportError(toErrorMessage(runEventsError, t("pages.sync.error.generic")));
+      setIsHydratingRun(false);
+      return;
+    }
+    if (isLoadingRunEvents) return;
+
+    resetLocalState();
+    for (const event of [...runEvents].sort((a, b) => a.seq - b.seq)) {
+      handleStreamEvent(event);
+    }
+    setIsHydratingRun(false);
+  }, [
+    handleStreamEvent,
+    isHydratingRun,
+    isLoadingRunEvents,
+    resetLocalState,
+    runEvents,
+    runEventsError,
+    runId,
+    t,
+  ]);
+
   const mappedModels = useMemo(
     () => models.map((model) => ({ id: model.id, label: model.label })),
     [models]
+  );
+
+  const mappedPendingMessages = useMemo<SyncChatMessage[]>(
+    () =>
+      pendingUserMessages.map((message, index) => ({
+        id: `pending-${message.id}`,
+        seq: Number.MAX_SAFE_INTEGER - 5000 + index,
+        role: "user",
+        content: message.content,
+        createdAt: message.createdAt,
+        delivery: message.status,
+      })),
+    [pendingUserMessages]
   );
 
   const latestUndoableChange = useMemo(
@@ -291,13 +528,20 @@ export function SyncChatShell() {
       context_json: {},
     });
 
-    resetLocalState();
     setRunId(created.id);
     return created.id;
   }, [createRun, models, runId, selectedModel]);
 
   const startStream = useCallback(
-    async ({ runId: targetRunId, message }: { runId: string; message: string }) => {
+    async ({
+      runId: targetRunId,
+      message,
+      optimisticMessageId,
+    }: {
+      runId: string;
+      message: string;
+      optimisticMessageId?: string;
+    }) => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -309,6 +553,7 @@ export function SyncChatShell() {
       setTransportError(null);
       setIsStreaming(true);
       if (message.length > 0) setStreamingAssistantBuffer("");
+      let streamSucceeded = false;
 
       try {
         await streamRun.mutateAsync({
@@ -319,6 +564,7 @@ export function SyncChatShell() {
           },
           signal: controller.signal,
         });
+        streamSucceeded = true;
 
         if (message.length > 0) {
           setPendingRetryMessage(null);
@@ -331,9 +577,21 @@ export function SyncChatShell() {
 
           if (message.length > 0 && lastSeqRef.current === streamStartSeq) {
             setPendingRetryMessage(message);
+            if (optimisticMessageId) {
+              setPendingUserMessages((prev) =>
+                prev.map((item) =>
+                  item.id === optimisticMessageId ? { ...item, status: "failed" } : item
+                )
+              );
+            }
+          } else if (optimisticMessageId) {
+            setPendingUserMessages((prev) => prev.filter((item) => item.id !== optimisticMessageId));
           }
         }
       } finally {
+        if (streamSucceeded && optimisticMessageId && lastSeqRef.current > streamStartSeq) {
+          setPendingUserMessages((prev) => prev.filter((item) => item.id !== optimisticMessageId));
+        }
         setIsStreaming(false);
         abortControllerRef.current = null;
       }
@@ -345,13 +603,27 @@ export function SyncChatShell() {
     const message = composerValue.trim();
     if (!message || isStreaming) return;
 
+    setLatestPreview(null);
+    const optimisticMessageId = crypto.randomUUID();
+    setPendingUserMessages((prev) => [
+      ...prev,
+      {
+        id: optimisticMessageId,
+        content: message,
+        createdAt: new Date(),
+        status: "pending",
+      },
+    ]);
     setComposerValue("");
 
     try {
       const targetRunId = await ensureRun();
-      await startStream({ runId: targetRunId, message });
+      await startStream({ runId: targetRunId, message, optimisticMessageId });
     } catch (error) {
       setTransportError(toErrorMessage(error, t("pages.sync.error.generic")));
+      setPendingUserMessages((prev) =>
+        prev.map((item) => (item.id === optimisticMessageId ? { ...item, status: "failed" } : item))
+      );
       setComposerValue(message);
     }
   }, [composerValue, ensureRun, isStreaming, startStream, t]);
@@ -399,7 +671,7 @@ export function SyncChatShell() {
     } catch (error) {
       setTransportError(toErrorMessage(error, t("pages.sync.error.generic")));
     }
-  }, [applyRun, latestPreview, runId, t]);
+  }, [applyRun, latestPreview, pushActionFeedback, runId, t]);
 
   const handleUndo = useCallback(async () => {
     if (!runId || !latestUndoableChange) return;
@@ -419,7 +691,7 @@ export function SyncChatShell() {
     } catch (error) {
       setTransportError(toErrorMessage(error, t("pages.sync.error.generic")));
     }
-  }, [latestUndoableChange, runId, t, undoRun]);
+  }, [latestUndoableChange, pushActionFeedback, runId, t, undoRun]);
 
   const handleNewChat = useCallback(async () => {
     setTransportError(null);
@@ -437,11 +709,27 @@ export function SyncChatShell() {
         context_json: {},
       });
       resetLocalState();
+      setIsHydratingRun(false);
       setRunId(created.id);
     } catch (error) {
       setTransportError(toErrorMessage(error, t("pages.sync.error.generic")));
     }
-  }, [createRun, selectedModel, t]);
+  }, [createRun, resetLocalState, selectedModel, t]);
+
+  const handleSelectRun = useCallback(
+    (run: SyncRunSummary) => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      setTransportError(null);
+      setPendingRetryMessage(null);
+      resetLocalState();
+      setRunId(run.id);
+      setIsHydratingRun(true);
+    },
+    [resetLocalState]
+  );
 
   useEffect(() => {
     const onNewChat = () => {
@@ -449,7 +737,7 @@ export function SyncChatShell() {
     };
 
     const onOpenActions = () => {
-      setIsActionsSheetOpen(true);
+      setIsDrawerOpen(true);
     };
 
     window.addEventListener("sync-chat:new-chat", onNewChat);
@@ -503,23 +791,47 @@ export function SyncChatShell() {
   return (
     <section className="sync-chat-surface relative flex h-full min-h-0 flex-1 overflow-hidden bg-background">
       <div className="relative min-h-0 flex-1">
-        <MessageList
+        <ConversationView
           messages={messages}
+          pendingMessages={mappedPendingMessages}
           streamingBuffer={streamingAssistantBuffer}
           isStreaming={isStreaming}
           notices={notices}
           error={transportError}
+          reasoningEntries={reasoningEntries}
+          sourceEntries={sourcesEntries}
+          taskEntries={taskEntries}
+          queueEntries={queueEntries}
+          latestPreview={latestPreview}
+          canApply={canApply}
+          canUndo={canUndo}
+          isApplying={applyRun.isPending}
+          isUndoing={undoRun.isPending}
+          onApply={handleApply}
+          onUndo={handleUndo}
+          previewLabels={{
+            title: t("pages.sync.previewPlan.title"),
+            summary: t("pages.sync.previewPlan.summary"),
+            mutations: t("pages.sync.previewPlan.mutations"),
+            notes: t("pages.sync.previewPlan.notes"),
+            apply: t("pages.sync.actions.apply"),
+            undo: t("pages.sync.actions.undo"),
+            pending: t("pages.sync.previewPlan.pending"),
+          }}
           assistantLabel={t("pages.sync.roles.assistant")}
           userLabel={t("pages.sync.roles.user")}
           toolLabel={t("pages.sync.roles.tool")}
           systemLabel={t("pages.sync.roles.system")}
-          imageAlt={t("pages.sync.message.imageAlt")}
           emptyTitle={t("pages.sync.empty.title")}
           emptySubtitle={t("pages.sync.empty.subtitle")}
           errorTitle={t("pages.sync.error.title")}
           warningTitle={t("pages.sync.warning.title")}
+          pendingLabel={t("pages.sync.message.pending")}
+          failedLabel={t("pages.sync.message.failed")}
           retryLabel={t("pages.sync.retry")}
           logAriaLabel={t("pages.sync.aria.log")}
+          activityTitle={t("pages.sync.activity.title")}
+          queueLabel={t("pages.sync.activity.queueLabel")}
           onRetry={handleRetry}
         />
 
@@ -544,16 +856,28 @@ export function SyncChatShell() {
         />
       </div>
 
-      <Sheet open={isActionsSheetOpen} onOpenChange={setIsActionsSheetOpen}>
-        <SheetContent side="right" className="w-[86vw] p-0 sm:max-w-sm">
-          <SheetHeader className="sr-only">
-            <SheetTitle>{t("pages.sync.actions.title")}</SheetTitle>
-          </SheetHeader>
-          {actionsRail}
-        </SheetContent>
-      </Sheet>
-
-      <div className="sync-chat-rail hidden w-[340px] border-l border-border/60 bg-muted/20 xl:block">{actionsRail}</div>
+      <HistoryDrawer
+        open={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
+        runs={runs}
+        selectedRunId={runId}
+        isLoadingRuns={isLoadingRuns}
+        onSelectRun={(nextRunId) => {
+          const run = runs.find((entry) => entry.id === nextRunId);
+          if (!run) return;
+          handleSelectRun(run);
+        }}
+        actionsContent={actionsRail}
+        labels={{
+          title: t("pages.sync.drawer.title"),
+          historyTab: t("pages.sync.history.title"),
+          actionsTab: t("pages.sync.actions.title"),
+          searchPlaceholder: t("pages.sync.history.search"),
+          empty: t("pages.sync.history.empty"),
+          lastUpdate: t("pages.sync.history.lastUpdate"),
+          model: t("pages.sync.history.model"),
+        }}
+      />
     </section>
   );
 }

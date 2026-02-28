@@ -40,6 +40,33 @@ export const captureActionTypeSchema = z.enum([
   "review",
 ]);
 
+export const captureCategorySchema = z.enum([
+  "finance",
+  "communication",
+  "schedule",
+  "document",
+  "travel",
+  "personal",
+  "general",
+]);
+
+export const captureActorSchema = z.enum(["user", "sync", "system"]);
+
+export const captureBadgeKindSchema = z.enum([
+  "type",
+  "category",
+  "actor",
+  "tag",
+  "status",
+]);
+
+export const captureBadgeSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  kind: captureBadgeKindSchema,
+  tone: z.enum(["default", "secondary", "outline"]).default("outline"),
+});
+
 const metadataRecordSchema = z.record(z.string(), z.unknown());
 
 export const captureActionSuggestionSchema = z.object({
@@ -63,16 +90,44 @@ const inboxCaptureOutWireSchema = z.object({
   suggested_actions: z.array(captureActionSuggestionSchema).default([]),
   primary_action: captureActionSuggestionSchema.nullable().optional(),
   requires_review: z.boolean().optional(),
+  archived: z.boolean().optional(),
+  archived_reason: z.enum(["applied", "deleted"]).nullable().optional(),
+  deleted_at: z.string().datetime().nullable().optional(),
+  category: captureCategorySchema.nullable().optional(),
+  actor: captureActorSchema.optional(),
+  tags: z.array(z.string()).optional(),
+  badges: z.array(captureBadgeSchema).optional(),
   created_at: z.string().datetime(),
 });
 
 export const inboxCaptureOutSchema = inboxCaptureOutWireSchema.transform(
-  ({ meta, metadata, requires_review, primary_action, suggested_actions, ...rest }) => ({
+  ({
+    meta,
+    metadata,
+    requires_review,
+    primary_action,
+    suggested_actions,
+    archived,
+    archived_reason,
+    deleted_at,
+    category,
+    actor,
+    tags,
+    badges,
+    ...rest
+  }) => ({
     ...rest,
     metadata: metadata ?? meta ?? {},
     suggested_actions,
     primary_action: primary_action ?? null,
     requires_review: requires_review ?? false,
+    archived: archived ?? false,
+    archived_reason: archived_reason ?? null,
+    deleted_at: deleted_at ?? null,
+    category: category ?? null,
+    actor: actor ?? "user",
+    tags: tags ?? [],
+    badges: badges ?? [],
   })
 );
 
@@ -104,14 +159,20 @@ const captureAssetWireSchema = z.object({
   metadata: metadataRecordSchema.optional(),
   meta: metadataRecordSchema.optional(),
   created_at: z.string().datetime(),
+  preview_kind: z.enum(["audio", "image", "pdf", "text", "binary"]).optional(),
+  file_name: z.string().optional(),
+  content_path: z.string().optional(),
 });
 
 export const captureAssetOutSchema = captureAssetWireSchema.transform(
-  ({ meta, metadata, ...rest }) => ({
+  ({ meta, metadata, preview_kind, file_name, content_path, ...rest }) => ({
     ...rest,
     metadata: metadata ?? meta ?? {},
     duration_ms: rest.duration_ms ?? null,
     checksum: rest.checksum ?? null,
+    preview_kind: preview_kind ?? "binary",
+    file_name: file_name ?? "",
+    content_path: content_path ?? "",
   })
 );
 
@@ -142,6 +203,8 @@ export const captureDetailResponseSchema = z.object({
   assets: z.array(captureAssetOutSchema),
   artifacts: z.array(captureArtifactOutSchema),
   jobs: z.array(captureJobOutSchema),
+  pipeline_trace: z.array(metadataRecordSchema).default([]),
+  artifacts_summary: metadataRecordSchema.default({}),
 });
 
 export const captureArtifactsResponseSchema = z.object({
@@ -207,6 +270,9 @@ export type CapturePipelineStatus = z.infer<typeof capturePipelineStatusSchema>;
 export type CaptureType = z.infer<typeof captureTypeSchema>;
 export type CaptureStatus = z.infer<typeof captureStatusSchema>;
 export type CaptureActionType = z.infer<typeof captureActionTypeSchema>;
+export type CaptureCategory = z.infer<typeof captureCategorySchema>;
+export type CaptureActor = z.infer<typeof captureActorSchema>;
+export type CaptureBadge = z.infer<typeof captureBadgeSchema>;
 export type CaptureActionSuggestion = z.infer<typeof captureActionSuggestionSchema>;
 export type InboxCaptureOut = z.infer<typeof inboxCaptureOutSchema>;
 export type InboxListResponse = z.infer<typeof inboxListResponseSchema>;

@@ -67,6 +67,21 @@ class SyncRunResponse(BaseModel):
     run: SyncRunOut
 
 
+class SyncRunSummaryOut(BaseModel):
+    id: uuid.UUID
+    status: SyncRunStatus
+    title: str | None = None
+    selected_model: str | None = None
+    updated_at: datetime
+    last_message_preview: str | None = None
+    last_message_at: datetime | None = None
+
+
+class SyncRunListResponse(BaseModel):
+    runs: list[SyncRunSummaryOut]
+    next_cursor: str | None = None
+
+
 class SyncUsageOut(BaseModel):
     input_tokens: int
     output_tokens: int
@@ -224,6 +239,38 @@ class SyncToolResultPayload(BaseModel):
     result_json: dict[str, Any] | None = None
 
 
+class SyncReasoningPayload(BaseModel):
+    summary: str | None = None
+    content: str | None = None
+    duration_ms: int | None = None
+
+
+class SyncSourceItemPayload(BaseModel):
+    id: str | None = None
+    title: str
+    url: str
+    snippet: str | None = None
+
+
+class SyncSourcesPayload(BaseModel):
+    items: list[SyncSourceItemPayload] = Field(default_factory=list)
+
+
+class SyncTaskPayload(BaseModel):
+    task_id: str
+    title: str
+    status: Literal["started", "completed", "failed"]
+    detail: str | None = None
+    tool_name: str | None = None
+
+
+class SyncQueuePayload(BaseModel):
+    queue_id: str
+    label: str
+    status: Literal["pending", "running", "completed", "failed"]
+    detail: str | None = None
+
+
 class SyncUsagePayload(BaseModel):
     provider: str | None = None
     model: str | None = None
@@ -252,12 +299,23 @@ class SyncEventEnvelope(BaseModel):
         "done",
         "tool_call",
         "tool_result",
+        "reasoning",
+        "sources",
+        "task",
+        "queue",
     ]
     payload: dict[str, Any]
 
 
 class SyncMessagesResponse(BaseModel):
     messages: list[SyncMessageOut]
+
+
+class SyncEventsResponse(BaseModel):
+    run_id: uuid.UUID
+    from_seq: int
+    last_seq: int
+    events: list[SyncEventEnvelope]
 
 
 class SyncAgentsResponse(BaseModel):

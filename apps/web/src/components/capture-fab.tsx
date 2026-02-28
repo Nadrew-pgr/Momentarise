@@ -4,17 +4,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { Bot, CalendarDays, Camera, FileText, Link2, Mic, Plus, X } from "lucide-react";
-import type { CaptureType } from "@momentarise/shared";
+import { Bot, CalendarDays, Camera, FileText, Link2, Loader2, Mic, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 import { useCreateCapture, useUploadCapture } from "@/hooks/use-inbox";
 import { useCreateItem } from "@/hooks/use-item";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
-function fallbackCaptureContent(type: CaptureType): string {
-  if (type === "voice") return "Voice capture";
-  if (type === "photo") return "Photo capture";
-  if (type === "link") return "Link capture";
-  return "Quick capture";
+const DEV = typeof process !== "undefined" && process.env.NODE_ENV === "development";
+function devLog(event: string, payload?: Record<string, unknown>) {
+  if (DEV) {
+    console.log("[capture_fab]", event, payload ?? "");
+  }
 }
 
 export function CaptureFab() {
@@ -24,14 +33,30 @@ export function CaptureFab() {
   const [fabOpen, setFabOpen] = useState(false);
   const [fabProximity, setFabProximity] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
   const fabRef = useRef<HTMLButtonElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingChunksRef = useRef<BlobPart[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkUrlInput, setLinkUrlInput] = useState("");
+  const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
 
   const createCapture = useCreateCapture();
   const uploadCapture = useUploadCapture();
   const createItem = useCreateItem();
 
   const isHidden = pathname?.startsWith("/sync");
-  const isBusy = createCapture.isPending || uploadCapture.isPending || createItem.isPending;
+  const isBusy = createCapture.isPending || uploadCapture.isPending || createItem.isPending || isRecording;
+
+  const cleanupRecordingStream = useCallback(() => {
+    if (recordingStreamRef.current) {
+      recordingStreamRef.current.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     const onMove = (event: MouseEvent) => {
@@ -63,28 +88,24 @@ export function CaptureFab() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [fabOpen]);
 
-  const createQuickCapture = useCallback(
-    (captureType: CaptureType, channel?: string) => {
-      createCapture.mutate(
-        {
-          raw_content: fallbackCaptureContent(captureType),
-          source: "manual",
-          capture_type: captureType,
-          status: "captured",
-          metadata: { source: "web_fab", channel: channel ?? captureType },
-        },
-        {
-          onSuccess: () => {
-            setFabOpen(false);
-            router.push("/inbox");
-          },
-        }
-      );
-    },
-    [createCapture, router]
-  );
+  useEffect(() => {
+    if (!fabOpen && isRecording) {
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+    }
+  }, [fabOpen, isRecording]);
+
+  useEffect(() => {
+    return () => {
+      cleanupRecordingStream();
+    };
+  }, [cleanupRecordingStream]);
 
   const createQuickNote = useCallback(() => {
+    devLog("action_clicked", { key: "note" });
+    setPendingActionKey("note");
     const title = `${t("pages.inbox.noteFallbackTitle")} ${new Date().toLocaleString()}`;
     createItem.mutate(
       {
@@ -96,8 +117,13 @@ export function CaptureFab() {
       },
       {
         onSuccess: (item) => {
+          setPendingActionKey(null);
           setFabOpen(false);
           router.push(`/inbox/items/${item.id}`);
+        },
+        onError: (error) => {
+          setPendingActionKey(null);
+          toast.error(error instanceof Error ? error.message : "Unable to create note");
         },
       }
     );
@@ -107,6 +133,7 @@ export function CaptureFab() {
     (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
+      devLog("upload_started", { channel: "file", file_name: file.name });
       uploadCapture.mutate(
         {
           file,
@@ -126,6 +153,78 @@ export function CaptureFab() {
             if (fileInputRef.current) fileInputRef.current.value = "";
             router.push("/inbox");
           },
+          onError: (error) => {
+            devLog("upload_failed", { channel: "file", error: String(error) });
+            toast.error(error instanceof Error ? error.message : "Unable to upload file");
+          },
+        }
+      );
+    },
+    [router, uploadCapture]
+  );
+
+  const handleChoosePhoto = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      devLog("upload_started", { channel: "photo", file_name: file.name });
+      uploadCapture.mutate(
+        {
+          file,
+          captureType: "photo",
+          source: "manual",
+          metadata: {
+            source: "web_fab",
+            channel: "photo",
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          },
+        },
+        {
+          onSuccess: () => {
+            setFabOpen(false);
+            if (photoInputRef.current) photoInputRef.current.value = "";
+            router.push("/inbox");
+          },
+          onError: (error) => {
+            devLog("upload_failed", { channel: "photo", error: String(error) });
+            toast.error(error instanceof Error ? error.message : "Unable to upload photo");
+          },
+        }
+      );
+    },
+    [router, uploadCapture]
+  );
+
+  const handleChooseAudio = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      devLog("upload_started", { channel: "voice_audio_file", file_name: file.name });
+      uploadCapture.mutate(
+        {
+          file,
+          captureType: "voice",
+          source: "manual",
+          metadata: {
+            source: "web_fab",
+            channel: "voice_audio_file",
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          },
+        },
+        {
+          onSuccess: () => {
+            setFabOpen(false);
+            if (audioInputRef.current) audioInputRef.current.value = "";
+            router.push("/inbox");
+          },
+          onError: (error) => {
+            devLog("upload_failed", { channel: "voice_audio_file", error: String(error) });
+            toast.error(error instanceof Error ? error.message : "Unable to upload voice");
+          },
         }
       );
     },
@@ -133,15 +232,175 @@ export function CaptureFab() {
   );
 
   const openFilePicker = useCallback(() => {
+    devLog("picker_opened", { key: "file" });
     fileInputRef.current?.click();
   }, []);
+
+  const openPhotoPicker = useCallback(() => {
+    devLog("picker_opened", { key: "photo" });
+    photoInputRef.current?.click();
+  }, []);
+
+  const openAudioPicker = useCallback(() => {
+    devLog("picker_opened", { key: "audio" });
+    audioInputRef.current?.click();
+  }, []);
+
+  const stopVoiceRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
+    if (recorder.state !== "inactive") {
+      recorder.stop();
+    }
+  }, []);
+
+  const uploadRecordedVoice = useCallback(
+    (blob: Blob, mimeType: string) => {
+      devLog("upload_started", { channel: "voice_media_recorder" });
+      const extension = mimeType.includes("ogg")
+        ? "ogg"
+        : mimeType.includes("mp4")
+          ? "m4a"
+          : "webm";
+      const fileName = `voice-${Date.now()}.${extension}`;
+      const file = new File([blob], fileName, { type: mimeType || "audio/webm" });
+
+      uploadCapture.mutate(
+        {
+          file,
+          captureType: "voice",
+          source: "manual",
+          metadata: {
+            source: "web_fab",
+            channel: "voice_media_recorder",
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          },
+        },
+        {
+          onSuccess: () => {
+            setFabOpen(false);
+            router.push("/inbox");
+          },
+          onError: (error) => {
+            devLog("upload_failed", { channel: "voice_media_recorder", error: String(error) });
+            toast.error(error instanceof Error ? error.message : "Unable to upload voice");
+          },
+        }
+      );
+    },
+    [router, uploadCapture]
+  );
+
+  const startVoiceRecording = useCallback(async () => {
+    const supportsRecording =
+      typeof navigator !== "undefined" &&
+      typeof MediaRecorder !== "undefined" &&
+      Boolean(navigator.mediaDevices?.getUserMedia);
+    if (!supportsRecording) {
+      openAudioPicker();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+          ? "audio/mp4"
+          : "";
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      recordingChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordingChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const chunks = recordingChunksRef.current;
+        recordingChunksRef.current = [];
+        mediaRecorderRef.current = null;
+        setIsRecording(false);
+        cleanupRecordingStream();
+        if (!chunks.length) return;
+        const resolvedMimeType = recorder.mimeType || "audio/webm";
+        const blob = new Blob(chunks, { type: resolvedMimeType });
+        if (blob.size > 0) {
+          uploadRecordedVoice(blob, resolvedMimeType);
+        }
+      };
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+    } catch {
+      cleanupRecordingStream();
+      openAudioPicker();
+    }
+  }, [cleanupRecordingStream, openAudioPicker, uploadRecordedVoice]);
+
+  const openLinkDialog = useCallback(() => {
+    setLinkUrlInput("");
+    setLinkDialogOpen(true);
+  }, []);
+
+  const submitLinkCapture = useCallback(() => {
+    let value = linkUrlInput.trim();
+    if (!value) return;
+    if (!value.includes("://")) {
+      value = `https://${value}`;
+    }
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      toast.error(t("pages.inbox.linkUrlInvalid"));
+      return;
+    }
+    if (!["http:", "https:"].includes(url.protocol)) {
+      toast.error(t("pages.inbox.linkUrlInvalid"));
+      return;
+    }
+    devLog("action_clicked", { key: "link", url: url.toString() });
+    setPendingActionKey("link");
+    createCapture.mutate(
+      {
+        raw_content: url.toString(),
+        source: "manual",
+        capture_type: "link",
+        status: "captured",
+        metadata: { source: "web_fab", channel: "link" },
+      },
+      {
+        onSuccess: () => {
+          setPendingActionKey(null);
+          setLinkDialogOpen(false);
+          setLinkUrlInput("");
+          setFabOpen(false);
+          router.push("/inbox");
+        },
+        onError: (error) => {
+          setPendingActionKey(null);
+          toast.error(error instanceof Error ? error.message : "Unable to create link capture");
+        },
+      }
+    );
+  }, [createCapture, linkUrlInput, router, t]);
+
+  const promptLinkCapture = useCallback(() => {
+    openLinkDialog();
+  }, [openLinkDialog]);
 
   const fabActions = useMemo(
     () => {
       const fr = (i18n.language || "").toLowerCase().startsWith("fr");
       return [
         { key: "note", icon: <FileText className="h-4 w-4" />, label: fr ? "Note" : "Note" },
-        { key: "voice", icon: <Mic className="h-4 w-4" />, label: fr ? "Parler" : "Voice" },
+        { key: "voice", icon: <Mic className="h-4 w-4" />, label: isRecording ? (fr ? "Stop" : "Stop") : fr ? "Parler" : "Voice" },
         { key: "photo", icon: <Camera className="h-4 w-4" />, label: fr ? "Scan" : "Scan" },
         { key: "file", icon: <FileText className="h-4 w-4" />, label: fr ? "Fichier" : "File" },
         { key: "link", icon: <Link2 className="h-4 w-4" />, label: fr ? "Lien" : "Link" },
@@ -149,21 +408,26 @@ export function CaptureFab() {
         { key: "sync", icon: <Bot className="h-4 w-4" />, label: "Sync" },
       ];
     },
-    [i18n.language]
+    [i18n.language, isRecording]
   );
 
   const handleFabAction = useCallback(
     (key: string) => {
+      if (key !== "link") devLog("action_clicked", { key });
       if (key === "note") {
         createQuickNote();
         return;
       }
       if (key === "voice") {
-        createQuickCapture("voice");
+        if (isRecording) {
+          stopVoiceRecording();
+        } else {
+          void startVoiceRecording();
+        }
         return;
       }
       if (key === "photo") {
-        createQuickCapture("photo");
+        openPhotoPicker();
         return;
       }
       if (key === "file") {
@@ -171,7 +435,7 @@ export function CaptureFab() {
         return;
       }
       if (key === "link") {
-        createQuickCapture("link");
+        promptLinkCapture();
         return;
       }
       if (key === "event") {
@@ -184,7 +448,16 @@ export function CaptureFab() {
         router.push("/sync");
       }
     },
-    [createQuickCapture, createQuickNote, openFilePicker, router]
+    [
+      createQuickNote,
+      isRecording,
+      openFilePicker,
+      openPhotoPicker,
+      promptLinkCapture,
+      router,
+      startVoiceRecording,
+      stopVoiceRecording,
+    ]
   );
 
   if (isHidden) return null;
@@ -212,12 +485,12 @@ export function CaptureFab() {
           return (
             <div
               key={entry.key}
-              className={`absolute flex h-16 w-16 flex-col items-center justify-start gap-1 transition-all ${
-                fabOpen ? "pointer-events-auto" : "pointer-events-none"
-              }`}
+              className={`absolute flex flex-col items-center justify-start transition-all ${fabOpen ? "pointer-events-auto" : "pointer-events-none"
+                }`}
               style={{
                 left: `${x}px`,
                 top: `${y}px`,
+                width: `${itemSize}px`,
                 transform: `scale(${fabOpen ? 1 : 0.7})`,
                 opacity: fabOpen ? 1 : 0,
                 transitionDuration: "260ms",
@@ -229,15 +502,19 @@ export function CaptureFab() {
                 type="button"
                 aria-label={entry.label}
                 title={entry.label}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-border/80 bg-background/95 shadow-md backdrop-blur"
+                className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full border border-border/80 bg-background/95 shadow-md backdrop-blur transition-colors hover:bg-muted/50 disabled:opacity-60"
                 onClick={() => handleFabAction(entry.key)}
                 disabled={isBusy}
               >
-                {entry.icon}
+                {pendingActionKey === entry.key ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  entry.icon
+                )}
+                <span className="rounded-full bg-background/85 px-2 py-0.5 text-[10px] font-medium leading-none text-foreground/90 shadow-sm">
+                  {entry.label}
+                </span>
               </button>
-              <span className="rounded-full bg-background/85 px-2 py-0.5 text-[10px] font-medium leading-none text-foreground/90 shadow-sm">
-                {entry.label}
-              </span>
             </div>
           );
         })}
@@ -265,6 +542,59 @@ export function CaptureFab() {
       </Button>
 
       <input ref={fileInputRef} type="file" className="hidden" onChange={handleChooseFile} />
+      <input
+        ref={photoInputRef}
+        type="file"
+        className="hidden"
+        accept="image/*"
+        capture="environment"
+        onChange={handleChoosePhoto}
+      />
+      <input
+        ref={audioInputRef}
+        type="file"
+        className="hidden"
+        accept="audio/*"
+        onChange={handleChooseAudio}
+      />
+
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("pages.inbox.quickCreateLink")}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label htmlFor="link-url">{t("pages.inbox.linkUrlPlaceholder")}</Label>
+              <Input
+                id="link-url"
+                type="url"
+                placeholder="https://…"
+                value={linkUrlInput}
+                onChange={(e) => setLinkUrlInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitLinkCapture();
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLinkDialogOpen(false);
+                setLinkUrlInput("");
+              }}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={submitLinkCapture} disabled={!linkUrlInput.trim() || createCapture.isPending}>
+              {createCapture.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("pages.inbox.linkSubmit")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

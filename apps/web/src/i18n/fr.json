@@ -4,7 +4,8 @@
     "retry": "Réessayer",
     "today": "Aujourd'hui",
     "cancel": "Annuler",
-    "save": "Enregistrer"
+    "save": "Enregistrer",
+    "loading": "Chargement..."
   },
   "nav": {
     "today": "Aujourd'hui",
@@ -52,7 +53,17 @@
       "emptyNextEvent": "Aucun événement prévu.",
       "nextAction": "Prochaine action",
       "emptyNextAction": "Aucune action planifiée.",
-      "emptyHint": "Ajoutez des éléments depuis l'Inbox pour remplir cette vue."
+      "emptyHint": "Ajoutez des éléments depuis l'Inbox pour remplir cette vue.",
+      "dailyDigest": "Résumé du jour",
+      "dailyDigestPlaceholder": "Votre focus aujourd'hui…",
+      "prioritiesDone": "{{total}} priorités",
+      "focusMode": "MODE FOCUS",
+      "inboxPreview": "Aperçu boîte de réception",
+      "viewAll": "Voir tout",
+      "priorityHigh": "Haute",
+      "priorityMedium": "Moyenne",
+      "priorityLow": "Basse",
+      "now": "Maintenant"
     },
     "inbox": {
       "title": "Boîte de réception",
@@ -70,6 +81,14 @@
       "kindCapture": "Capture",
       "kindItem": "Élément",
       "openItem": "Ouvrir l'élément",
+      "openCapture": "Ouvrir la capture",
+      "aiSummary": "Résumé IA",
+      "suggestedActions": "Actions suggérées",
+      "applySelected": "Appliquer l'action",
+      "sourceFile": "Fichier source",
+      "voiceTitle": "Titre vocal",
+      "voiceDescription": "Description vocale",
+      "voiceDescriptionPlaceholder": "Ajoutez du contexte pour améliorer les actions proposées.",
       "quickCreateTitle": "Capture rapide",
       "quickCreateDescription": "Utilisez un point d’entrée unique et décidez ensuite du traitement.",
       "quickInputLabel": "Contenu brut (optionnel)",
@@ -98,11 +117,29 @@
       "preview": "Prévisualiser",
       "apply": "Appliquer",
       "reprocess": "Relancer",
+      "restore": "Restaurer",
+      "badgeApplied": "Appliqué",
+      "badgeDeleted": "Supprimé",
+      "loadError": "Impossible de charger l'inbox.",
       "emptyList": "Aucune capture. Ajoutez du brut pour commencer.",
       "emptyCapture": "Capture sans contenu texte.",
       "recentItems": "Éléments récents",
       "emptyItems": "Aucun élément récent.",
-      "cancel": "Annuler"
+      "cancel": "Annuler",
+      "linkUrlPlaceholder": "Collez une URL",
+      "linkUrlInvalid": "URL invalide. Seuls les liens http(s) sont acceptés.",
+      "linkSubmit": "Ajouter le lien",
+      "viewActive": "Actif",
+      "viewArchived": "Archivé",
+      "sortNewest": "Plus récents",
+      "sortOldest": "Plus anciens",
+      "sortA2Z": "A → Z",
+      "sortZ2A": "Z → A",
+      "showDeleted": "Afficher supprimés",
+      "hideDeleted": "Masquer supprimés",
+      "openSite": "Ouvrir le site",
+      "openDownload": "Ouvrir / Télécharger",
+      "transcriptionLimited": "Transcription limitée"
     },
     "item": {
       "details": "Détails",
@@ -156,6 +193,23 @@
         "undoneSuccess": "Changement annulé.",
         "noTime": "Maintenant"
       },
+      "drawer": {
+        "title": "Sync"
+      },
+      "history": {
+        "title": "Historique",
+        "search": "Rechercher une conversation...",
+        "empty": "Aucune conversation trouvée.",
+        "lastUpdate": "Maj",
+        "model": "Modèle"
+      },
+      "previewPlan": {
+        "title": "Plan d'application",
+        "summary": "Résumé",
+        "mutations": "Mutations proposées",
+        "notes": "Notes",
+        "pending": "En attente"
+      },
       "status": {
         "streaming": "Sync réfléchit...",
         "ready": "Sync est prêt",
@@ -170,12 +224,16 @@
           "cancelled": "Annulé"
         }
       },
-      "warning": {
-        "title": "Avertissement"
-      },
-      "error": {
-        "title": "Erreur",
-        "generic": "Une erreur est survenue. Veuillez réessayer."
+  "warning": {
+    "title": "Avertissement"
+  },
+  "activity": {
+    "title": "Activité agent",
+    "queueLabel": "actions"
+  },
+  "error": {
+    "title": "Erreur",
+    "generic": "Une erreur est survenue. Veuillez réessayer."
       },
       "roles": {
         "assistant": "Sync",
@@ -187,16 +245,19 @@
         "log": "Conversation Sync"
       },
       "message": {
-        "imageAlt": "Image importée"
+        "imageAlt": "Image importée",
+        "pending": "Envoi...",
+        "failed": "Échec",
+        "scrollToBottom": "Aller en bas"
       }
     },
     "timeline": {
       "title": "Timeline",
       "placeholder": "Cette section arrive dans la Slice 1.",
-      "emptyDay": "Aucun événement ce jour.",
+      "emptyDay": "Aucun moment ce jour.",
       "start": "Démarrer",
       "stop": "Arrêter",
-      "emptyHint": "Ajoutez des événements depuis l'Inbox pour les voir ici."
+      "emptyHint": "Ajoutez des moments depuis l'Inbox pour les voir ici."
     },
     "calendar": {
       "title": "Calendrier",
@@ -208,12 +269,61 @@
       "displayHours": "Heures",
       "displayHoursStart": "Début",
       "displayHoursEnd": "Fin",
-      "create": "Créer un événement",
-      "edit": "Modifier l'événement",
+      "create": "Créer un moment",
+      "edit": "Modifier le moment",
       "start": "Début",
       "end": "Fin",
       "save": "Enregistrer",
-      "titlePlaceholder": "Événement sans titre"
+      "titlePlaceholder": "Moment sans titre",
+      "momentTitleCreate": "Créer un moment",
+      "momentTitleEdit": "Modifier le moment",
+      "momentDescriptionCreate": "Créer un nouveau moment",
+      "momentDescriptionEdit": "Modifier les détails et le contenu de ce moment",
+      "momentTabs": {
+        "details": "Détails",
+        "content": "Contenu",
+        "coach": "Coach"
+      },
+      "momentFields": {
+        "title": "Titre",
+        "description": "Description",
+        "startDate": "Date de début",
+        "startTime": "Heure de début",
+        "endDate": "Date de fin",
+        "endTime": "Heure de fin",
+        "allDay": "Toute la journée",
+        "location": "Lieu",
+        "color": "Couleur",
+        "pickDate": "Choisir une date",
+        "selectTime": "Choisir l'heure"
+      },
+      "momentLinks": {
+        "title": "Entités liées",
+        "afterCreate": "Les liens seront disponibles après la création du moment.",
+        "loading": "Chargement des liens...",
+        "empty": "Aucun lien pour le moment."
+      },
+      "momentContent": {
+        "saving": "Enregistrement du contenu...",
+        "saved": "Contenu enregistré",
+        "saveError": "Échec de l'enregistrement du contenu",
+        "deferred": "Le contenu sera enregistré après la création du moment"
+      },
+      "coachPlaceholder": "L'onglet Coach arrive bientôt.",
+      "actions": {
+        "start": "Démarrer",
+        "stop": "Arrêter",
+        "delete": "Supprimer le moment"
+      },
+      "errors": {
+        "timeOutOfRange": "L'heure doit être comprise entre {{start}}:00 et {{end}}:00",
+        "endBeforeStart": "La date de fin ne peut pas être avant la date de début",
+        "contentAttachFailed": "Moment enregistré, mais impossible d'attacher le contenu",
+        "saveMoment": "Impossible d'enregistrer le moment",
+        "saveContent": "Impossible d'enregistrer le contenu",
+        "deleteMoment": "Impossible de supprimer le moment"
+      },
+      "saving": "Enregistrement..."
     },
     "me": {
       "title": "Moi",

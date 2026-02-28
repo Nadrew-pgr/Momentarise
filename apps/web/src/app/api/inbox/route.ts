@@ -1,7 +1,10 @@
 import { proxyWithAuth } from "@/lib/bff";
 
-export async function GET() {
-  return proxyWithAuth("/api/v1/inbox");
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const includeArchived = url.searchParams.get("include_archived");
+  const suffix = includeArchived ? `?include_archived=${includeArchived}` : "";
+  return proxyWithAuth(`/api/v1/inbox${suffix}`);
 }
 
 export async function POST(request: Request) {

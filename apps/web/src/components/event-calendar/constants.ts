@@ -1,3 +1,9 @@
+/**
+ * Layout and timing constants for the event calendar.
+ * Visual tokens (grid borders, header colors, today badge, fonts) are defined in
+ * globals.css under .calendar-parity and theme variables (--border, --muted-foreground, etc.).
+ * Shared Tailwind class strings live in calendar-appearance.ts.
+ */
 export const EventHeight = 24;
 
 // Vertical gap between events in pixels - controls spacing in month view

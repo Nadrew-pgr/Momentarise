@@ -29,8 +29,11 @@ def _event_to_out(event: Event) -> EventOut:
         id=event.id,
         item_id=event.item_id,
         title=event.item.title if event.item else "",
+        description=event.description,
         start_at=event.start_at,
         end_at=event.end_at,
+        all_day=event.all_day,
+        location=event.location,
         estimated_time_seconds=event.estimated_time_seconds,
         actual_time_acc_seconds=event.actual_time_acc_seconds,
         is_tracking=event.is_tracking,
@@ -146,8 +149,11 @@ async def create_event(
     event = Event(
         workspace_id=workspace.workspace_id,
         item_id=item.id,
+        description=body.description,
         start_at=body.start_at,
         end_at=body.end_at,
+        all_day=body.all_day,
+        location=body.location,
         color=body.color or "sky",
         estimated_time_seconds=_resolve_estimated_time_seconds(
             body.start_at,
@@ -195,6 +201,12 @@ async def update_event(
         event.estimated_time_seconds = body.estimated_time_seconds
     if body.title is not None and event.item is not None:
         event.item.title = body.title
+    if "description" in body.model_fields_set:
+        event.description = body.description
+    if body.all_day is not None:
+        event.all_day = body.all_day
+    if "location" in body.model_fields_set:
+        event.location = body.location
     if body.color is not None:
         event.color = body.color
 

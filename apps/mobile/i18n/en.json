@@ -107,12 +107,24 @@
       "noteFallbackTitle": "Note",
       "kindCapture": "Capture",
       "kindItem": "Item",
+      "openCapture": "Open capture",
+      "aiSummary": "AI summary",
+      "suggestedActions": "Suggested actions",
+      "applySelected": "Apply action",
+      "sourceFile": "Source file",
+      "voiceTitle": "Voice title",
+      "voiceDescription": "Voice description",
+      "voiceDescriptionPlaceholder": "Add context to help create better actions.",
       "process": "Structure",
       "processTitle": "Item title",
       "processSubmit": "Create item",
       "preview": "Preview",
       "apply": "Apply",
       "reprocess": "Reprocess",
+      "restore": "Restore",
+      "badgeApplied": "Applied",
+      "badgeDeleted": "Deleted",
+      "loadError": "Unable to load inbox.",
       "emptyList": "No captures.",
       "emptyCapture": "Capture without text content.",
       "recentItems": "Recent items",
@@ -172,7 +184,8 @@
       "toolbar": {
         "today": "Today",
         "prev": "Prev",
-        "next": "Next"
+        "next": "Next",
+        "switchView": "Switch view (current: {{view}})"
       },
       "eventErrors": {
         "endBeforeStart": "End date cannot be before start date.",
@@ -201,6 +214,25 @@
         "rose": "Rose",
         "emerald": "Emerald",
         "orange": "Orange"
+      }
+    },
+    "onboarding": {
+      "skip": "Skip",
+      "next": "Next",
+      "getStarted": "Start using Momentarise",
+      "steps": {
+        "capture": {
+          "title": "Capture first, organize later",
+          "description": "Use the central + button to save notes, links, files, photos, and voice captures quickly."
+        },
+        "timeline": {
+          "title": "Own your timeline",
+          "description": "Switch Day, Week, and Month views, then adjust your working hours in Settings."
+        },
+        "sync": {
+          "title": "Sync helps with decisions",
+          "description": "Use Sync to review suggestions, preview changes, and apply only what you confirm."
+        }
       }
     },
   "settings": {

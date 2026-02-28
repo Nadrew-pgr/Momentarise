@@ -13,6 +13,7 @@ from src.models.capture_action_suggestion import CaptureActionSuggestion
 from src.models.capture_artifact import CaptureArtifact
 from src.models.capture_asset import CaptureAsset
 from src.models.capture_job import CaptureJob
+from src.models.capture_tag import CaptureTag, CaptureTagLink
 from src.models.entity_link import EntityLink
 from src.models.enums import WorkspaceRole
 from src.models.event import Event
@@ -53,4 +54,6 @@ __all__ = [
     "CaptureArtifact",
     "CaptureJob",
     "CaptureActionSuggestion",
+    "CaptureTag",
+    "CaptureTagLink",
 ]

@@ -8,8 +8,11 @@ class EventOut(BaseModel):
     id: uuid.UUID
     item_id: uuid.UUID
     title: str
+    description: str | None
     start_at: datetime
     end_at: datetime
+    all_day: bool
+    location: str | None
     estimated_time_seconds: int
     actual_time_acc_seconds: int
     is_tracking: bool

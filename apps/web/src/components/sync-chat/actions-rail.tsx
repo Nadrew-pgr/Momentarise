@@ -100,9 +100,6 @@ export function ActionsRail({
     <aside className={cn("flex h-full min-h-0 flex-col", className)} aria-label={labels.title}>
       <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
         <p className="text-sm font-semibold">{labels.title}</p>
-        <span className="sync-chat-status-pill text-xs">
-          {isStreaming ? labels.statusStreaming : labels.statusReady}
-        </span>
       </div>
 
       <div className="sync-chat-rail-scroll min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-8">

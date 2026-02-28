@@ -4,10 +4,17 @@ import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Bot, Calendar, Camera, FileText, Link2, Mic } from "lucide-react-native";
-import type { CaptureType } from "@momentarise/shared";
-import { useCreateCapture } from "@/hooks/use-inbox";
+import { useCreateCapture, useUploadCapture } from "@/hooks/use-inbox";
 import { useCreateItem } from "@/hooks/use-item";
-import { useCreateSheet, useEventSheet } from "@/lib/store";
+import { Input } from "@/components/ui/input";
+import { useAppToast, useCreateSheet, useEventSheet } from "@/lib/store";
+
+type PickedAsset = {
+  uri: string;
+  name: string;
+  mimeType?: string;
+  size?: number;
+};
 
 function defaultDraftEvent() {
   const start = new Date();
@@ -23,6 +30,14 @@ function defaultDraftEvent() {
     allDay: false,
     color: "sky" as const,
   };
+}
+
+function isPermissionGranted(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const obj = value as Record<string, unknown>;
+  if (obj.granted === true) return true;
+  if (obj.status === "granted") return true;
+  return false;
 }
 
 function CaptureOption({
@@ -67,20 +82,134 @@ export function BottomSheetCreate() {
   const { isOpen, openNonce, close } = useCreateSheet();
   const openEventSheet = useEventSheet((s) => s.open);
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["50%"], []);
+  const snapPoints = useMemo(() => ["56%"], []);
   const createCapture = useCreateCapture();
+  const uploadCapture = useUploadCapture();
   const createItem = useCreateItem();
   const [actionError, setActionError] = useState<string | null>(null);
-  const isBusy = createCapture.isPending || createItem.isPending;
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkValue, setLinkValue] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const voiceStopRef = useRef<null | (() => Promise<string | null>)>(null);
+  const isBusy = createCapture.isPending || uploadCapture.isPending || createItem.isPending;
+  const showToast = useAppToast((s) => s.show);
+
+  const setUserError = useCallback(
+    (message: string) => {
+      setActionError(message);
+      showToast({ message });
+    },
+    [showToast]
+  );
+
+  const uploadSelectedAsset = useCallback(
+    (
+      asset: PickedAsset,
+      captureType: "voice" | "photo" | "file",
+      channel: string
+    ) => {
+      uploadCapture.mutate(
+        {
+          uri: asset.uri,
+          name: asset.name,
+          type: asset.mimeType ?? "application/octet-stream",
+          captureType,
+          source: "manual",
+          metadata: {
+            source: "mobile_plus",
+            channel,
+            file_name: asset.name,
+            file_size: asset.size,
+            mime_type: asset.mimeType,
+          },
+        },
+        {
+          onSuccess: () => {
+            close();
+            router.push("/inbox");
+          },
+          onError: (error) => {
+            setUserError(error instanceof Error ? error.message : t("create.error"));
+          },
+        }
+      );
+    },
+    [close, router, setUserError, t, uploadCapture]
+  );
+
+  const pickDocument = useCallback(async (mimeType: string): Promise<PickedAsset | null> => {
+    const moduleName = "expo-document-picker";
+    const DocumentPicker = (await import(moduleName)) as {
+      getDocumentAsync?: (options?: Record<string, unknown>) => Promise<unknown>;
+    };
+    if (typeof DocumentPicker.getDocumentAsync !== "function") {
+      throw new Error("Document picker unavailable");
+    }
+    const result = (await DocumentPicker.getDocumentAsync({
+      type: mimeType,
+      multiple: false,
+      copyToCacheDirectory: true,
+    })) as {
+      canceled?: boolean;
+      assets?: Array<Record<string, unknown>>;
+    };
+    if (result?.canceled || !Array.isArray(result?.assets) || !result.assets.length) {
+      return null;
+    }
+    const first = result.assets[0];
+    const uri = typeof first.uri === "string" ? first.uri : null;
+    if (!uri) return null;
+    const name =
+      typeof first.name === "string" && first.name.trim().length
+        ? first.name
+        : `capture-${Date.now()}`;
+    return {
+      uri,
+      name,
+      mimeType: typeof first.mimeType === "string" ? first.mimeType : undefined,
+      size: typeof first.size === "number" ? first.size : undefined,
+    };
+  }, []);
+
+  const stopVoiceCapture = useCallback(async () => {
+    const stopper = voiceStopRef.current;
+    voiceStopRef.current = null;
+    setIsRecording(false);
+    if (!stopper) return;
+
+    try {
+      const uri = await stopper();
+      if (!uri) {
+        setUserError("Voice recording completed but no audio file was returned.");
+        return;
+      }
+      uploadSelectedAsset(
+        {
+          uri,
+          name: `voice-${Date.now()}.m4a`,
+          mimeType: "audio/m4a",
+        },
+        "voice",
+        "voice_recording"
+      );
+    } catch (error) {
+      setUserError(error instanceof Error ? error.message : t("create.error"));
+    }
+  }, [setUserError, t, uploadSelectedAsset]);
 
   useEffect(() => {
     if (isOpen) {
       setActionError(null);
+      setShowLinkInput(false);
+      setLinkValue("");
       bottomSheetRef.current?.snapToIndex(0);
     } else {
       bottomSheetRef.current?.close();
+      if (isRecording) {
+        void stopVoiceCapture();
+      }
     }
-  }, [isOpen, openNonce]);
+  }, [isOpen, openNonce, isRecording, stopVoiceCapture]);
 
   const handleSheetChanges = useCallback(
     (index: number) => {
@@ -105,40 +234,11 @@ export function BottomSheetCreate() {
           router.push(`/items/${item.id}`);
         },
         onError: (error) => {
-          setActionError(
-            error instanceof Error ? error.message : t("create.error")
-          );
+          setUserError(error instanceof Error ? error.message : t("create.error"));
         },
       }
     );
-  }, [close, createItem, router, t]);
-
-  const openCapture = useCallback(
-    (captureType: CaptureType) => {
-      setActionError(null);
-      createCapture.mutate(
-        {
-          raw_content: "",
-          source: "manual",
-          capture_type: captureType,
-          status: "captured",
-          metadata: { source: "mobile_plus", channel: captureType },
-        },
-        {
-          onSuccess: () => {
-            close();
-            router.push("/inbox");
-          },
-          onError: (error) => {
-            setActionError(
-              error instanceof Error ? error.message : t("create.error")
-            );
-          },
-        }
-      );
-    },
-    [close, createCapture, router, t]
-  );
+  }, [close, createItem, router, setUserError, t]);
 
   const openSync = useCallback(() => {
     close();
@@ -150,6 +250,268 @@ export function BottomSheetCreate() {
     openEventSheet(defaultDraftEvent());
     router.push("/(tabs)/timeline");
   }, [close, openEventSheet, router]);
+
+  const openFileCapture = useCallback(async () => {
+    setActionError(null);
+    try {
+      const picked = await pickDocument("*/*");
+      if (!picked) return;
+      uploadSelectedAsset(picked, "file", "file_picker");
+    } catch (error) {
+      setUserError(error instanceof Error ? error.message : t("create.error"));
+    }
+  }, [pickDocument, setUserError, t, uploadSelectedAsset]);
+
+  const openPhotoCapture = useCallback(async () => {
+    setActionError(null);
+    try {
+      const moduleName = "expo-image-picker";
+      const ImagePicker = (await import(moduleName)) as {
+        requestCameraPermissionsAsync?: () => Promise<unknown>;
+        launchCameraAsync?: (options?: Record<string, unknown>) => Promise<unknown>;
+      };
+      if (typeof ImagePicker.requestCameraPermissionsAsync === "function") {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!isPermissionGranted(permission)) {
+          setUserError("Camera permission is required to capture a photo.");
+          return;
+        }
+      }
+      if (typeof ImagePicker.launchCameraAsync !== "function") {
+        throw new Error("Camera capture unavailable");
+      }
+      const result = (await ImagePicker.launchCameraAsync({
+        quality: 0.9,
+      })) as {
+        canceled?: boolean;
+        assets?: Array<Record<string, unknown>>;
+      };
+      if (result?.canceled || !Array.isArray(result?.assets) || !result.assets.length) {
+        return;
+      }
+      const first = result.assets[0];
+      const uri = typeof first.uri === "string" ? first.uri : null;
+      if (!uri) {
+        setUserError("Invalid image capture.");
+        return;
+      }
+      uploadSelectedAsset(
+        {
+          uri,
+          name:
+            typeof first.fileName === "string" && first.fileName.length
+              ? first.fileName
+              : `photo-${Date.now()}.jpg`,
+          mimeType: typeof first.mimeType === "string" ? first.mimeType : "image/jpeg",
+          size: typeof first.fileSize === "number" ? first.fileSize : undefined,
+        },
+        "photo",
+        "camera"
+      );
+    } catch (error) {
+      setUserError(error instanceof Error ? error.message : t("create.error"));
+    }
+  }, [setUserError, t, uploadSelectedAsset]);
+
+  const openVoiceFileFallback = useCallback(async () => {
+    try {
+      const picked = await pickDocument("audio/*");
+      if (!picked) return;
+      uploadSelectedAsset(picked, "voice", "voice_file_fallback");
+    } catch (error) {
+      setUserError(error instanceof Error ? error.message : t("create.error"));
+    }
+  }, [pickDocument, setUserError, t, uploadSelectedAsset]);
+
+  const startVoiceCapture = useCallback(async () => {
+    setActionError(null);
+
+    const tryExpoAudio = async (): Promise<(() => Promise<string | null>)> => {
+      const moduleName = "expo-audio";
+      const audioModule = (await import(moduleName)) as Record<string, unknown>;
+      const requestPermission =
+        (audioModule.requestRecordingPermissionsAsync as (() => Promise<unknown>) | undefined) ??
+        ((audioModule.AudioModule as Record<string, unknown> | undefined)
+          ?.requestRecordingPermissionsAsync as (() => Promise<unknown>) | undefined);
+      if (typeof requestPermission !== "function") {
+        throw new Error("expo-audio permission API unavailable");
+      }
+      const permission = await requestPermission();
+      if (!isPermissionGranted(permission)) {
+        throw new Error("Microphone permission denied");
+      }
+
+      const setAudioMode =
+        (audioModule.setAudioModeAsync as ((config: Record<string, unknown>) => Promise<void>) | undefined) ??
+        ((audioModule.AudioModule as Record<string, unknown> | undefined)
+          ?.setAudioModeAsync as ((config: Record<string, unknown>) => Promise<void>) | undefined);
+      if (typeof setAudioMode === "function") {
+        await setAudioMode({
+          allowsRecording: true,
+          playsInSilentMode: true,
+          playsInSilentModeIOS: true,
+        });
+      }
+
+      let recorder: Record<string, unknown> | null = null;
+      const moduleCreate = audioModule.createAudioRecorder as
+        | ((config?: Record<string, unknown>) => Promise<Record<string, unknown>>)
+        | undefined;
+      const audioModuleCreate = (audioModule.AudioModule as Record<string, unknown> | undefined)
+        ?.createAudioRecorder as
+        | ((config?: Record<string, unknown>) => Promise<Record<string, unknown>>)
+        | undefined;
+      if (typeof moduleCreate === "function") {
+        recorder = await moduleCreate();
+      } else if (typeof audioModuleCreate === "function") {
+        recorder = await audioModuleCreate();
+      } else {
+        const AudioRecorderCtor = audioModule.AudioRecorder as
+          | (new (...args: unknown[]) => Record<string, unknown>)
+          | undefined;
+        if (AudioRecorderCtor) {
+          recorder = new AudioRecorderCtor();
+        }
+      }
+      if (!recorder) throw new Error("expo-audio recorder unavailable");
+
+      const prepare =
+        (recorder.prepareToRecordAsync as (() => Promise<void>) | undefined) ??
+        (recorder.prepareAsync as (() => Promise<void>) | undefined);
+      if (typeof prepare === "function") {
+        await prepare.call(recorder);
+      }
+
+      const start =
+        (recorder.record as (() => Promise<void> | void) | undefined) ??
+        (recorder.startAsync as (() => Promise<void>) | undefined) ??
+        (recorder.start as (() => Promise<void> | void) | undefined);
+      if (typeof start !== "function") {
+        throw new Error("expo-audio record API unavailable");
+      }
+      await start.call(recorder);
+
+      return async () => {
+        const stop =
+          (recorder?.stop as (() => Promise<void> | void) | undefined) ??
+          (recorder?.stopAsync as (() => Promise<void>) | undefined) ??
+          (recorder?.stopAndUnloadAsync as (() => Promise<void>) | undefined);
+        if (typeof stop === "function") {
+          await stop.call(recorder);
+        }
+        const uri =
+          (recorder?.uri as string | undefined) ??
+          (typeof recorder?.getURI === "function" ? (recorder.getURI as () => string | null)() : null);
+        return typeof uri === "string" ? uri : null;
+      };
+    };
+
+    const tryExpoAv = async (): Promise<(() => Promise<string | null>)> => {
+      const moduleName = "expo-av";
+      const avModule = (await import(moduleName)) as {
+        Audio?: {
+          requestPermissionsAsync?: () => Promise<unknown>;
+          setAudioModeAsync?: (config: Record<string, unknown>) => Promise<void>;
+          Recording?: new () => {
+            prepareToRecordAsync: (options: Record<string, unknown>) => Promise<void>;
+            startAsync: () => Promise<void>;
+            stopAndUnloadAsync: () => Promise<void>;
+            getURI: () => string | null;
+          };
+          RecordingOptionsPresets?: {
+            HIGH_QUALITY?: Record<string, unknown>;
+          };
+        };
+      };
+      const Audio = avModule.Audio;
+      if (!Audio?.requestPermissionsAsync || !Audio.Recording) {
+        throw new Error("expo-av recording API unavailable");
+      }
+      const permission = await Audio.requestPermissionsAsync();
+      if (!isPermissionGranted(permission)) {
+        throw new Error("Microphone permission denied");
+      }
+      if (Audio.setAudioModeAsync) {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
+      }
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets?.HIGH_QUALITY ?? {});
+      await recording.startAsync();
+      return async () => {
+        await recording.stopAndUnloadAsync();
+        return recording.getURI();
+      };
+    };
+
+    try {
+      voiceStopRef.current = await tryExpoAudio();
+      setIsRecording(true);
+      return;
+    } catch {
+      // Fallback below.
+    }
+
+    try {
+      voiceStopRef.current = await tryExpoAv();
+      setIsRecording(true);
+      return;
+    } catch {
+      await openVoiceFileFallback();
+    }
+  }, [openVoiceFileFallback]);
+
+  const handleVoiceCapture = useCallback(() => {
+    if (isRecording) {
+      void stopVoiceCapture();
+      return;
+    }
+    void startVoiceCapture();
+  }, [isRecording, startVoiceCapture, stopVoiceCapture]);
+
+  const submitLinkCapture = useCallback(() => {
+    setActionError(null);
+    let value = linkValue.trim();
+    if (!value) return;
+    if (!value.includes("://")) {
+      value = `https://${value}`;
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      setUserError("Invalid URL format.");
+      return;
+    }
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      setUserError("Only http(s) links are supported.");
+      return;
+    }
+
+    createCapture.mutate(
+      {
+        raw_content: parsed.toString(),
+        source: "manual",
+        capture_type: "link",
+        status: "captured",
+        metadata: { source: "mobile_plus", channel: "link" },
+      },
+      {
+        onSuccess: () => {
+          setShowLinkInput(false);
+          setLinkValue("");
+          close();
+          router.push("/inbox");
+        },
+        onError: (error) => {
+          setUserError(error instanceof Error ? error.message : t("create.error"));
+        },
+      }
+    );
+  }, [close, createCapture, linkValue, router, setUserError, t]);
 
   return (
     <BottomSheet
@@ -175,9 +537,43 @@ export function BottomSheetCreate() {
             <Text className="text-xs text-muted-foreground">{t("create.working")}</Text>
           ) : null}
         </View>
+
         {actionError ? (
           <View className="mb-3 rounded-lg border border-destructive bg-destructive/10 px-3 py-2">
             <Text className="text-xs text-destructive">{actionError}</Text>
+          </View>
+        ) : null}
+
+        {showLinkInput ? (
+          <View className="mb-3 rounded-xl border border-border bg-card p-3">
+            <Input
+              value={linkValue}
+              onChangeText={setLinkValue}
+              placeholder="https://example.com"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View className="mt-2 flex-row gap-2">
+              <Pressable
+                onPress={submitLinkCapture}
+                disabled={!linkValue.trim() || isBusy || isRecording}
+                className={`rounded-md px-3 py-2 ${
+                  !linkValue.trim() || isBusy || isRecording ? "bg-primary/40" : "bg-primary"
+                }`}
+              >
+                <Text className="text-xs font-semibold text-primary-foreground">Capture Link</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setShowLinkInput(false);
+                  setLinkValue("");
+                }}
+                disabled={isBusy}
+                className="rounded-md border border-border px-3 py-2"
+              >
+                <Text className="text-xs text-foreground">{t("pages.inbox.cancel")}</Text>
+              </Pressable>
+            </View>
           </View>
         ) : null}
 
@@ -187,39 +583,47 @@ export function BottomSheetCreate() {
             subtitle={t("create.options.note.subtitle")}
             icon={<FileText size={18} color="#171717" />}
             onPress={openNoteCapture}
-            disabled={isBusy}
+            disabled={isBusy || isRecording}
           />
           <CaptureOption
-            label={t("create.options.voice.title")}
-            subtitle={t("create.options.voice.subtitle")}
+            label={isRecording ? "Stop recording" : t("create.options.voice.title")}
+            subtitle={
+              isRecording
+                ? "Tap to stop and upload."
+                : "Record now (fallback to audio file picker)."
+            }
             icon={<Mic size={18} color="#171717" />}
-            onPress={() => openCapture("voice")}
+            onPress={handleVoiceCapture}
             translucent
             disabled={isBusy}
           />
           <CaptureOption
             label={t("create.options.photo.title")}
-            subtitle={t("create.options.photo.subtitle")}
+            subtitle="Take a real photo capture."
             icon={<Camera size={18} color="#171717" />}
-            onPress={() => openCapture("photo")}
+            onPress={() => {
+              void openPhotoCapture();
+            }}
             translucent
-            disabled={isBusy}
+            disabled={isBusy || isRecording}
           />
           <CaptureOption
             label={t("create.options.link.title")}
-            subtitle={t("create.options.link.subtitle")}
+            subtitle="Paste a URL and process it in Inbox."
             icon={<Link2 size={18} color="#171717" />}
-            onPress={() => openCapture("link")}
+            onPress={() => setShowLinkInput(true)}
             translucent
-            disabled={isBusy}
+            disabled={isBusy || isRecording}
           />
           <CaptureOption
             label={t("create.options.file.title")}
-            subtitle={t("create.options.file.subtitle")}
+            subtitle="Upload a real document."
             icon={<FileText size={18} color="#171717" />}
-            onPress={() => openCapture("file")}
+            onPress={() => {
+              void openFileCapture();
+            }}
             translucent
-            disabled={isBusy}
+            disabled={isBusy || isRecording}
           />
           <CaptureOption
             label={t("create.options.event.title")}
@@ -227,7 +631,7 @@ export function BottomSheetCreate() {
             icon={<Calendar size={18} color="#171717" />}
             onPress={openEvent}
             translucent
-            disabled={isBusy}
+            disabled={isBusy || isRecording}
           />
           <CaptureOption
             label={t("create.options.sync.title")}
@@ -235,7 +639,7 @@ export function BottomSheetCreate() {
             icon={<Bot size={18} color="#171717" />}
             onPress={openSync}
             translucent
-            disabled={isBusy}
+            disabled={isBusy || isRecording}
           />
         </View>
       </BottomSheetView>

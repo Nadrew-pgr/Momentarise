@@ -25,6 +25,20 @@ import {
   shiftCalendarDate,
   type CalendarViewKind,
 } from "../../core/view-types";
+
+const CALENDAR_VIEW_STORAGE_KEY = "momentarise-calendar-view";
+
+function getStoredCalendarView(): CalendarViewKind {
+  if (typeof window === "undefined") return "month";
+  try {
+    const stored = window.localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY);
+    if (stored === "month" || stored === "week" || stored === "day" || stored === "agenda")
+      return stored;
+  } catch {
+    /* ignore */
+  }
+  return "month";
+}
 import { CalendarEventDialog } from "../../ui/CalendarEventDialog";
 import { CalendarToolbar } from "../../ui/CalendarToolbar";
 import type {
@@ -36,8 +50,8 @@ import type {
 interface FullCalendarAdapterProps {
   events: EventOut[];
   onRangeChange: (range: CalendarRangeChange) => void;
-  onCreate: (input: CalendarCreateInput) => Promise<void>;
-  onUpdate: (input: CalendarUpdateInput) => Promise<void>;
+  onCreate: (input: CalendarCreateInput) => Promise<EventOut>;
+  onUpdate: (input: CalendarUpdateInput) => Promise<EventOut>;
   onDelete: (eventId: string) => Promise<void>;
   onStartTracking: (eventId: string) => Promise<void>;
   onStopTracking: (eventId: string) => Promise<void>;
@@ -54,10 +68,14 @@ function fallbackEnd(start: Date): Date {
 function toCalendarEvent(source: EventOut): CalendarEvent {
   return {
     id: source.id,
+    itemId: source.item_id,
+    updatedAt: source.updated_at,
     title: source.title,
+    description: source.description ?? undefined,
     start: new Date(source.start_at),
     end: new Date(source.end_at),
-    allDay: false,
+    allDay: source.all_day,
+    location: source.location ?? undefined,
     color: source.color,
     isTracking: source.is_tracking,
   };
@@ -77,10 +95,13 @@ export function FullCalendarAdapter({
   isMutating,
 }: FullCalendarAdapterProps) {
   const calendarRef = useRef<FullCalendar | null>(null);
-  const [view, setView] = useState<CalendarViewKind>("month");
+  const [view, setView] = useState<CalendarViewKind>(getStoredCalendarView);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const lastEmittedRangeRef = useRef<{ from: string; to: string } | null>(null);
+
+  const hasAllDayEvents = useMemo(() => events.some((e) => e.all_day), [events]);
 
   const eventsById = useMemo(() => {
     return new Map(events.map((event) => [event.id, event]));
@@ -92,7 +113,7 @@ export function FullCalendarAdapter({
       title: event.title,
       start: event.start_at,
       end: event.end_at,
-      allDay: false,
+      allDay: event.all_day,
       classNames: [
         `event-color-${event.color}`,
         event.is_tracking ? "is-tracking" : "is-standard",
@@ -100,6 +121,11 @@ export function FullCalendarAdapter({
       extendedProps: {
         updatedAt: event.updated_at,
         color: event.color,
+        description: event.description,
+        location: event.location,
+        itemId: event.item_id,
+        allDay: event.all_day,
+        is_tracking: event.is_tracking,
       },
     }));
   }, [events]);
@@ -123,9 +149,22 @@ export function FullCalendarAdapter({
   const handleDatesSet = (arg: DatesSetArg) => {
     if (view === "agenda") return;
 
+    const fromKey = format(arg.start, "yyyy-MM-dd");
+    const endExclusive = arg.end;
+    const toDate = new Date(endExclusive.getTime() - 24 * 60 * 60 * 1000);
+    const toKey = format(toDate, "yyyy-MM-dd");
+
+    if (
+      lastEmittedRangeRef.current?.from === fromKey &&
+      lastEmittedRangeRef.current?.to === toKey
+    ) {
+      return;
+    }
+    lastEmittedRangeRef.current = { from: fromKey, to: toKey };
+
     onRangeChange({
       from: arg.start,
-      to: new Date(arg.end.getTime() - 24 * 60 * 60 * 1000),
+      to: toDate,
       view,
       currentDate,
     });
@@ -163,6 +202,11 @@ export function FullCalendarAdapter({
 
   const handleViewChange = (nextView: CalendarViewKind) => {
     setView(nextView);
+    try {
+      window.localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, nextView);
+    } catch {
+      /* ignore */
+    }
 
     if (nextView === "agenda") {
       syncRangeForAgenda(currentDate);
@@ -195,7 +239,7 @@ export function FullCalendarAdapter({
       title: "",
       start: arg.start,
       end: arg.end,
-      allDay: false,
+      allDay: arg.allDay,
       color: "sky",
       isTracking: false,
     });
@@ -222,13 +266,16 @@ export function FullCalendarAdapter({
     void onUpdate({
       eventId: arg.event.id,
       title: arg.event.title,
+      description: source?.description ?? null,
       start,
       end,
       lastKnownUpdatedAt: source?.updated_at,
+      allDay: source?.all_day ?? arg.event.allDay,
+      location: source?.location ?? null,
       color: source?.color,
     }).catch((err) => {
       arg.revert();
-      toast.error(err instanceof Error ? err.message : "Failed to update event");
+      toast.error(err instanceof Error ? err.message : "Failed to update moment");
     });
   };
 
@@ -240,61 +287,65 @@ export function FullCalendarAdapter({
     void onUpdate({
       eventId: arg.event.id,
       title: arg.event.title,
+      description: source?.description ?? null,
       start,
       end,
       lastKnownUpdatedAt: source?.updated_at,
+      allDay: source?.all_day ?? arg.event.allDay,
+      location: source?.location ?? null,
       color: source?.color,
     }).catch((err) => {
       arg.revert();
-      toast.error(err instanceof Error ? err.message : "Failed to update event");
+      toast.error(err instanceof Error ? err.message : "Failed to update moment");
     });
   };
 
-  const handleDialogSave = (event: CalendarEvent) => {
+  const handleDialogSave = async (event: CalendarEvent): Promise<CalendarEvent> => {
     if (!event.id) {
-      void onCreate({
-        title: event.title,
-        start: event.start,
-        end: event.end,
-        color: event.color,
-      })
-        .then(() => {
-          setIsDialogOpen(false);
-          setSelectedEvent(null);
-        })
-        .catch((err) => {
-          toast.error(err instanceof Error ? err.message : "Failed to create event");
+      try {
+        const created = await onCreate({
+          title: event.title,
+          description: event.description,
+          start: event.start,
+          end: event.end,
+          allDay: event.allDay,
+          location: event.location,
+          color: event.color,
         });
-      return;
+        return toCalendarEvent(created);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to create moment");
+        throw err;
+      }
     }
 
     const source = eventsById.get(event.id);
-    void onUpdate({
-      eventId: event.id,
-      title: event.title,
-      start: event.start,
-      end: event.end,
-      lastKnownUpdatedAt: source?.updated_at,
-      color: event.color,
-    })
-      .then(() => {
-        setIsDialogOpen(false);
-        setSelectedEvent(null);
-      })
-      .catch((err) => {
-        toast.error(err instanceof Error ? err.message : "Failed to update event");
+    try {
+      const updated = await onUpdate({
+        eventId: event.id,
+        title: event.title,
+        description: event.description,
+        start: event.start,
+        end: event.end,
+        lastKnownUpdatedAt: source?.updated_at,
+        allDay: event.allDay,
+        location: event.location,
+        color: event.color,
       });
+      return toCalendarEvent(updated);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update moment");
+      throw err;
+    }
   };
 
-  const handleDialogDelete = (eventId: string) => {
-    void onDelete(eventId)
-      .then(() => {
-        setIsDialogOpen(false);
-        setSelectedEvent(null);
-      })
-      .catch((err) => {
-        toast.error(err instanceof Error ? err.message : "Failed to delete event");
-      });
+  const handleDialogDelete = async (eventId: string) => {
+    try {
+      await onDelete(eventId);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete moment");
+      throw err;
+    }
   };
 
   const handleToggleTracking = (eventId: string) => {
@@ -350,6 +401,7 @@ export function FullCalendarAdapter({
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView={fullCalendarViewFrom(view)}
+            initialDate={currentDate}
             headerToolbar={false}
             events={fullCalendarEvents}
             datesSet={handleDatesSet}
@@ -364,13 +416,25 @@ export function FullCalendarAdapter({
             scrollTime={`${String(startHour).padStart(2, "0")}:00:00`}
             slotDuration="00:15:00"
             slotLabelInterval="01:00:00"
+            slotLabelFormat={{ hour: "numeric", meridiem: "short", omitZeroMinute: true }}
+            slotLabelContent={(arg) => {
+              const h = arg.date.getHours();
+              const suffix = h >= 12 ? "PM" : "AM";
+              const hour = h % 12 || 12;
+              return `${hour} ${suffix}`;
+            }}
+            dayMaxEvents={4}
+            dayMaxEventRows={4}
+            allDaySlot={hasAllDayEvents}
             select={handleSelect}
             eventClick={handleEventClick}
             eventDrop={handleDrop}
             eventResize={handleResize}
             dayHeaderContent={(arg) => (
               <span className="fc-day-header-label">
-                {view === "month" ? format(arg.date, "EEE") : format(arg.date, "EEE dd")}
+                {view === "month"
+                  ? format(arg.date, "EEE")
+                  : `${format(arg.date, "E")} ${format(arg.date, "d")}`}
               </span>
             )}
             eventClassNames={(arg) => {
@@ -380,11 +444,14 @@ export function FullCalendarAdapter({
             }}
             eventContent={(arg) => {
               const eventEnd = arg.event.end ?? arg.event.start;
+              const isPast = !!eventEnd && eventEnd < new Date();
+              const isTracking = arg.event.extendedProps?.is_tracking === true;
               return (
                 <CalendarEventChip
                   title={arg.event.title}
                   timeText={arg.timeText}
-                  isPast={!!eventEnd && eventEnd < new Date()}
+                  isPast={isPast}
+                  isTracking={isTracking}
                 />
               );
             }}

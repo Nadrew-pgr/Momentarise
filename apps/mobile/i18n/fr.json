@@ -107,12 +107,24 @@
       "noteFallbackTitle": "Note",
       "kindCapture": "Capture",
       "kindItem": "Élément",
+      "openCapture": "Ouvrir la capture",
+      "aiSummary": "Résumé IA",
+      "suggestedActions": "Actions suggérées",
+      "applySelected": "Appliquer l'action",
+      "sourceFile": "Fichier source",
+      "voiceTitle": "Titre vocal",
+      "voiceDescription": "Description vocale",
+      "voiceDescriptionPlaceholder": "Ajoutez du contexte pour améliorer les actions proposées.",
       "process": "Structurer",
       "processTitle": "Titre de l'élément",
       "processSubmit": "Créer l'élément",
       "preview": "Prévisualiser",
       "apply": "Appliquer",
       "reprocess": "Relancer",
+      "restore": "Restaurer",
+      "badgeApplied": "Appliqué",
+      "badgeDeleted": "Supprimé",
+      "loadError": "Impossible de charger l'inbox.",
       "emptyList": "Aucune capture.",
       "emptyCapture": "Capture sans contenu texte.",
       "recentItems": "Éléments récents",
@@ -172,7 +184,8 @@
       "toolbar": {
         "today": "Aujourd'hui",
         "prev": "Préc.",
-        "next": "Suiv."
+        "next": "Suiv.",
+        "switchView": "Changer de vue (actuelle : {{view}})"
       },
       "eventErrors": {
         "endBeforeStart": "La date de fin ne peut pas être avant la date de début.",
@@ -201,6 +214,25 @@
         "rose": "Rose",
         "emerald": "Émeraude",
         "orange": "Orange"
+      }
+    },
+    "onboarding": {
+      "skip": "Passer",
+      "next": "Suivant",
+      "getStarted": "Commencer avec Momentarise",
+      "steps": {
+        "capture": {
+          "title": "Capture d'abord, organise ensuite",
+          "description": "Utilise le bouton + central pour enregistrer rapidement notes, liens, fichiers, photos et audio."
+        },
+        "timeline": {
+          "title": "Garde la main sur ton planning",
+          "description": "Bascule entre Jour, Semaine et Mois, puis ajuste tes horaires dans les Réglages."
+        },
+        "sync": {
+          "title": "Sync aide à décider",
+          "description": "Utilise Sync pour revoir les suggestions, prévisualiser les changements, puis appliquer seulement ce que tu confirmes."
+        }
       }
     },
   "settings": {

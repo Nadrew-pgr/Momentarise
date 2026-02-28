@@ -10,16 +10,22 @@ export interface CalendarRangeChange {
 
 export interface CalendarCreateInput {
   title?: string;
+  description?: string | null;
   start: Date;
   end: Date;
+  allDay?: boolean;
+  location?: string | null;
   color?: EventColor;
 }
 
 export interface CalendarUpdateInput {
   eventId: string;
   title?: string;
+  description?: string | null;
   start: Date;
   end: Date;
+  allDay?: boolean;
+  location?: string | null;
   lastKnownUpdatedAt?: string;
   color?: EventColor;
 }
@@ -36,8 +42,8 @@ export interface CalendarController {
   refetch: () => Promise<unknown>;
   onRangeChange: (range: CalendarRangeChange) => void;
   updateCalendarPreferences: (startHour: number, endHour: number) => Promise<void>;
-  createEvent: (input: CalendarCreateInput) => Promise<void>;
-  updateEvent: (input: CalendarUpdateInput) => Promise<void>;
+  createEvent: (input: CalendarCreateInput) => Promise<EventOut>;
+  updateEvent: (input: CalendarUpdateInput) => Promise<EventOut>;
   deleteEvent: (eventId: string) => Promise<void>;
   startTracking: (eventId: string) => Promise<void>;
   stopTracking: (eventId: string) => Promise<void>;

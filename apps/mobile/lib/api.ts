@@ -9,6 +9,17 @@ function extractErrorMessage(payload: unknown): string | null {
     const obj = payload as Record<string, unknown>;
     const detail = obj.detail;
     if (typeof detail === "string" && detail.trim().length > 0) return detail;
+    if (detail && typeof detail === "object") {
+      const detailObj = detail as Record<string, unknown>;
+      const detailMessage = detailObj.message;
+      if (typeof detailMessage === "string" && detailMessage.trim().length > 0) {
+        return detailMessage;
+      }
+      const detailCode = detailObj.code;
+      if (typeof detailCode === "string" && detailCode.trim().length > 0) {
+        return detailCode;
+      }
+    }
     const message = obj.message;
     if (typeof message === "string" && message.trim().length > 0) return message;
     const error = obj.error;
@@ -27,7 +38,15 @@ export async function readApiError(
     if (contentType.includes("application/json")) {
       const json = await res.json();
       const msg = extractErrorMessage(json);
-      return msg ? `${base}: ${msg}` : base;
+      const requestId =
+        json &&
+        typeof json === "object" &&
+        typeof (json as Record<string, unknown>).request_id === "string"
+          ? ((json as Record<string, unknown>).request_id as string)
+          : null;
+      const suffix = requestId ? ` [request_id=${requestId}]` : "";
+      if (msg) return `${base}: ${msg}${suffix}`;
+      return `${base}${suffix}`;
     }
     const text = (await res.text()).trim();
     return text ? `${base}: ${text.slice(0, 200)}` : base;

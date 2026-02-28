@@ -1,5 +1,6 @@
 "use client";
 
+import { endOfMonth, endOfWeek, startOfMonth, startOfWeek } from "date-fns";
 import { differenceInSeconds } from "date-fns";
 import { useMemo, useState } from "react";
 import type { EventOut } from "@momentarise/shared";
@@ -20,6 +21,19 @@ function toLocalYYYYMMDD(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Initial visible range = current month grid (same as getRangeForCalendarView(today, "month")) to avoid day→month transition jump. */
+function getInitialMonthRange(): { from: string; to: string } {
+  const now = new Date();
+  const monthStart = startOfMonth(now);
+  const monthEnd = endOfMonth(monthStart);
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  return {
+    from: toLocalYYYYMMDD(gridStart),
+    to: toLocalYYYYMMDD(gridEnd),
+  };
+}
+
 function toEstimatedSeconds(start: Date, end: Date): number {
   return Math.max(0, differenceInSeconds(end, start));
 }
@@ -33,11 +47,7 @@ const DEFAULT_START_HOUR = 8;
 const DEFAULT_END_HOUR = 24;
 
 export function useCalendarController(): CalendarController {
-  const todayKey = toLocalYYYYMMDD(new Date());
-  const [visibleRange, setVisibleRange] = useState<{ from: string; to: string }>({
-    from: todayKey,
-    to: todayKey,
-  });
+  const [visibleRange, setVisibleRange] = useState<{ from: string; to: string }>(getInitialMonthRange);
 
   const { data, error, isFetching, isLoading, refetch } = useEventsRange(
     visibleRange.from,
@@ -72,11 +82,22 @@ export function useCalendarController(): CalendarController {
     );
   };
 
-  const createEvent = async ({ title, start, end, color }: CalendarCreateInput) => {
-    await createMutation.mutateAsync({
-      title: resolveTitle(title, "Untitled event"),
+  const createEvent = async ({
+    title,
+    description,
+    start,
+    end,
+    allDay,
+    location,
+    color,
+  }: CalendarCreateInput) => {
+    return createMutation.mutateAsync({
+      title: resolveTitle(title, "Untitled moment"),
+      description: description ?? null,
       start_at: start.toISOString(),
       end_at: end.toISOString(),
+      all_day: allDay ?? false,
+      location: location ?? null,
       estimated_time_seconds: toEstimatedSeconds(start, end),
       color,
     });
@@ -85,20 +106,26 @@ export function useCalendarController(): CalendarController {
   const updateEvent = async ({
     eventId,
     title,
+    description,
     start,
     end,
+    allDay,
+    location,
     lastKnownUpdatedAt,
     color,
   }: CalendarUpdateInput) => {
     const source = eventById.get(eventId);
 
     try {
-      await updateMutation.mutateAsync({
+      return await updateMutation.mutateAsync({
         eventId,
         payload: {
-          title: resolveTitle(title, source?.title ?? "Untitled event"),
+          title: resolveTitle(title, source?.title ?? "Untitled moment"),
+          description: description ?? source?.description ?? null,
           start_at: start.toISOString(),
           end_at: end.toISOString(),
+          all_day: allDay ?? source?.all_day ?? false,
+          location: location ?? source?.location ?? null,
           estimated_time_seconds: toEstimatedSeconds(start, end),
           last_known_updated_at: lastKnownUpdatedAt ?? source?.updated_at,
           color,

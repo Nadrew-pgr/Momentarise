@@ -80,3 +80,28 @@ export async function proxyStreamWithAuth(
     headers,
   });
 }
+
+/** Proxy GET to API and return binary response (pass-through body, forward Content-Type, Content-Length, ETag). */
+export async function proxyBinaryWithAuth(path: string): Promise<Response> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+  if (!token) {
+    return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+  }
+  const url = `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const headers = new Headers();
+  const contentType = res.headers.get("content-type");
+  if (contentType) headers.set("Content-Type", contentType);
+  const contentLength = res.headers.get("content-length");
+  if (contentLength) headers.set("Content-Length", contentLength);
+  const etag = res.headers.get("etag");
+  if (etag) headers.set("ETag", etag);
+  return new Response(res.body, {
+    status: res.status,
+    headers,
+  });
+}

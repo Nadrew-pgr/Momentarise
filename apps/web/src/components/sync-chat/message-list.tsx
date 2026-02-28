@@ -8,6 +8,7 @@ import type { SyncChatMessage, SyncNotice } from "./types";
 
 interface MessageListProps {
   messages: SyncChatMessage[];
+  pendingMessages: SyncChatMessage[];
   streamingBuffer: string;
   isStreaming: boolean;
   notices: SyncNotice[];
@@ -21,13 +22,17 @@ interface MessageListProps {
   emptySubtitle: string;
   errorTitle: string;
   warningTitle: string;
+  pendingLabel: string;
+  failedLabel: string;
   retryLabel: string;
+  scrollToBottomLabel: string;
   logAriaLabel: string;
   onRetry: () => void;
 }
 
 export function MessageList({
   messages,
+  pendingMessages,
   streamingBuffer,
   isStreaming,
   notices,
@@ -41,7 +46,10 @@ export function MessageList({
   emptySubtitle,
   errorTitle,
   warningTitle,
+  pendingLabel,
+  failedLabel,
   retryLabel,
+  scrollToBottomLabel,
   logAriaLabel,
   onRetry,
 }: MessageListProps) {
@@ -49,7 +57,8 @@ export function MessageList({
   const [autoScroll, setAutoScroll] = useState(true);
 
   const displayMessages = useMemo(() => {
-    if (!isStreaming || !streamingBuffer.trim()) return messages;
+    const withPending = [...messages, ...pendingMessages];
+    if (!isStreaming || !streamingBuffer.trim()) return withPending;
     const transientMessage: SyncChatMessage = {
       id: "sync-streaming-assistant",
       seq: Number.MAX_SAFE_INTEGER,
@@ -57,8 +66,8 @@ export function MessageList({
       content: streamingBuffer,
       createdAt: new Date(),
     };
-    return [...messages, transientMessage];
-  }, [messages, isStreaming, streamingBuffer]);
+    return [...withPending, transientMessage];
+  }, [messages, pendingMessages, isStreaming, streamingBuffer]);
 
   const displayNotices = useMemo(() => notices.slice(0, 3), [notices]);
 
@@ -80,12 +89,12 @@ export function MessageList({
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="sync-chat-scroll-area absolute inset-0 overflow-y-auto px-6 pb-36 pt-6"
+      className="sync-chat-scroll-area absolute inset-0 overflow-y-auto px-6 pb-56 pt-6"
       role="log"
       aria-label={logAriaLabel}
       aria-live="polite"
     >
-      {messages.length === 0 && !isStreaming && !error && displayNotices.length === 0 ? (
+      {displayMessages.length === 0 && !isStreaming && !error && displayNotices.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center text-center">
           <AnimatedOrb size={124} className="mb-4 sync-chat-orb-intro" />
           <p className="sync-chat-empty-title text-lg font-medium">{emptyTitle}</p>
@@ -103,6 +112,8 @@ export function MessageList({
             toolLabel={toolLabel}
             systemLabel={systemLabel}
             imageAlt={imageAlt}
+            pendingLabel={pendingLabel}
+            failedLabel={failedLabel}
             isStreaming={message.id === "sync-streaming-assistant"}
           />
         ))}
@@ -154,6 +165,27 @@ export function MessageList({
       </div>
 
       <div aria-hidden="true" className="h-16" />
+
+      {!autoScroll && displayMessages.length > 0 ? (
+        <div className="pointer-events-none sticky bottom-4 flex justify-end pr-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="pointer-events-auto"
+            onClick={() => {
+              if (!containerRef.current) return;
+              containerRef.current.scrollTo({
+                top: containerRef.current.scrollHeight,
+                behavior: "smooth",
+              });
+              setAutoScroll(true);
+            }}
+          >
+            {scrollToBottomLabel}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

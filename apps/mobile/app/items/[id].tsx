@@ -82,12 +82,7 @@ export default function ItemDetailPage() {
   );
 
   const handleBackToInbox = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-    }
-    setTimeout(() => {
-      router.replace("/(tabs)/inbox");
-    }, 0);
+    router.replace("/(tabs)/inbox");
   }, [router]);
 
   const handleDelete = useCallback(() => {

@@ -9,6 +9,7 @@ import {
   TimelineList,
 } from "react-native-calendars";
 import type {
+  TimelineListProps,
   TimelineListRenderItemInfo,
   TimelineProps,
   TimelinePackedEventProps,
@@ -21,10 +22,10 @@ import { eventsListToCalendarFormat } from "@/lib/adapters/calendarAdapter";
 import { useEventSheet } from "@/lib/store";
 import { Text as UiText } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Icon } from "@/components/ui/icon";
 
 type TimelineView = "day" | "week" | "month";
+const TIMELINE_VIEW_ORDER: TimelineView[] = ["day", "week", "month"];
 
 function formatYMD(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -156,7 +157,7 @@ export default function TimelineScreen() {
     return map;
   }, [baseEventsByDate, currentDate, view]);
 
-  const timelineProps: TimelineProps = {
+  const timelineProps: NonNullable<TimelineListProps["timelineProps"]> = {
     format24h: true,
     start: startHour,
     end: endHour,
@@ -212,32 +213,43 @@ export default function TimelineScreen() {
     });
   }, [currentDate]);
 
+  const currentViewMeta = useMemo(() => {
+    if (view === "week") {
+      return { label: t("pages.timeline.view.week"), icon: CalendarRange };
+    }
+    if (view === "month") {
+      return { label: t("pages.timeline.view.month"), icon: CalendarIcon };
+    }
+    return { label: t("pages.timeline.view.day"), icon: CalendarDays };
+  }, [t, view]);
+
+  const cycleView = useCallback(() => {
+    setView((previous) => {
+      const index = TIMELINE_VIEW_ORDER.indexOf(previous);
+      const nextIndex = (index + 1) % TIMELINE_VIEW_ORDER.length;
+      return TIMELINE_VIEW_ORDER[nextIndex];
+    });
+  }, []);
+
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <View className="border-border border-b bg-background px-4 py-3">
+      <View className="border-border border-b bg-background px-4 py-2">
         <View className="flex-row items-center justify-between gap-3">
-          <UiText className="font-semibold text-foreground text-lg" numberOfLines={1}>
+          <UiText className="font-semibold text-foreground text-base flex-1" numberOfLines={1}>
             {headerTitle}
           </UiText>
           <View className="flex-row items-center gap-2">
-            <ToggleGroup
-              value={view}
-              onValueChange={(value) => {
-                if (value) setView(value as TimelineView);
-              }}
-              type="single"
+            <Button
               variant="outline"
+              size="sm"
+              onPress={cycleView}
+              accessibilityLabel={t("pages.timeline.toolbar.switchView", {
+                view: currentViewMeta.label,
+              })}
             >
-              <ToggleGroupItem value="day" isFirst>
-                <Icon as={CalendarDays} size={16} />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="week">
-                <Icon as={CalendarRange} size={16} />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="month" isLast>
-                <Icon as={CalendarIcon} size={16} />
-              </ToggleGroupItem>
-            </ToggleGroup>
+              <Icon as={currentViewMeta.icon} size={16} />
+              <UiText>{currentViewMeta.label}</UiText>
+            </Button>
             <Button variant="outline" size="sm" onPress={() => setCurrentDate(new Date())}>
               <UiText>{t("pages.timeline.toolbar.today")}</UiText>
             </Button>
@@ -334,7 +346,6 @@ export default function TimelineScreen() {
                 showNowIndicator
                 scrollToFirst
                 scrollToNow
-                onEventPress={handleEventPress}
                 renderItem={(props: TimelineProps, info: TimelineListRenderItemInfo) => {
                   const timelineKey =
                     (props as TimelineProps & { key?: string }).key ?? info.item;

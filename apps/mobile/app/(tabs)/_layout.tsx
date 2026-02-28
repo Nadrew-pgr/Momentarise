@@ -1,8 +1,9 @@
 import { View } from "react-native";
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Sun, Inbox, Plus, Calendar, User } from "lucide-react-native";
+import { Sun, Inbox, Calendar, User } from "lucide-react-native";
 import { useCreateSheet } from "@/lib/store";
+import { CreateTabIcon } from "@/components/CreateTabIcon";
 
 export default function TabLayout() {
   const { t } = useTranslation();
@@ -34,21 +35,7 @@ export default function TabLayout() {
         name="create"
         options={{
           title: "",
-          tabBarIcon: ({ size }) => (
-            <View
-              style={{
-                width: size + 16,
-                height: size + 16,
-                borderRadius: (size + 16) / 2,
-                backgroundColor: "#171717",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: 4,
-              }}
-            >
-              <Plus size={size} color="#fff" strokeWidth={2.5} />
-            </View>
-          ),
+          tabBarIcon: () => <CreateTabIcon />,
         }}
         listeners={{
           tabPress: (e) => {

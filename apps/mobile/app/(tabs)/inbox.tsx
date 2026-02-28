@@ -16,12 +16,13 @@ import {
 import { useAppToast } from "@/lib/store";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Text as UiText } from "@/components/ui/text";
 
 type FilterKey = "all" | "action" | "read" | "waiting";
 type SectionKey = "today" | "yesterday" | "earlier";
+type ViewMode = "active" | "archived";
 
 function captureIcon(type: CaptureType) {
   switch (type) {
@@ -59,7 +60,19 @@ function resolveSectionKey(at: Date): SectionKey {
 }
 
 function relativeTime(now: Date, date: Date, locale: string): string {
-  const rtf = new Intl.RelativeTimeFormat(locale || "en-US", { numeric: "auto" });
+  const RelativeTimeFormatCtor =
+    typeof Intl !== "undefined" ? Intl.RelativeTimeFormat : undefined;
+  if (typeof RelativeTimeFormatCtor !== "function") {
+    const deltaMs = date.getTime() - now.getTime();
+    const absSeconds = Math.abs(deltaMs) / 1000;
+    if (absSeconds < 60) return "just now";
+    const absMinutes = absSeconds / 60;
+    if (absMinutes < 60) return `${Math.round(absMinutes)}m ago`;
+    const absHours = absMinutes / 60;
+    if (absHours < 24) return `${Math.round(absHours)}h ago`;
+    return `${Math.round(absHours / 24)}d ago`;
+  }
+  const rtf = new RelativeTimeFormatCtor(locale || "en-US", { numeric: "auto" });
   const deltaMs = date.getTime() - now.getTime();
   const absSeconds = Math.abs(deltaMs) / 1000;
   if (absSeconds < 60) return rtf.format(Math.round(deltaMs / 1000), "second");
@@ -81,10 +94,13 @@ export default function InboxScreen() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("active");
   const [reviewCaptureId, setReviewCaptureId] = useState<string | null>(null);
   const [reviewTitle, setReviewTitle] = useState("");
 
-  const { data: inboxData, isLoading } = useInbox();
+  const { data: inboxData, isLoading, isError, error, refetch } = useInbox({
+    includeArchived: viewMode === "archived",
+  });
   const applyCapture = useApplyCapture();
   const processCapture = useProcessCapture();
   const reprocessCapture = useReprocessCapture();
@@ -97,6 +113,8 @@ export default function InboxScreen() {
   const filteredCaptures = useMemo(() => {
     const query = search.trim().toLowerCase();
     const list = captures.filter((capture) => {
+      if (viewMode === "archived" && !capture.archived) return false;
+      if (viewMode === "active" && capture.archived) return false;
       const suggestions = capture.suggested_actions ?? [];
       const waiting =
         capture.status === "queued" ||
@@ -115,7 +133,7 @@ export default function InboxScreen() {
     });
     list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     return list;
-  }, [activeFilter, captures, search]);
+  }, [activeFilter, captures, search, viewMode]);
 
   const grouped = useMemo(() => {
     const bySection: Record<SectionKey, typeof filteredCaptures> = {
@@ -174,6 +192,8 @@ export default function InboxScreen() {
     reprocessCapture.isPending ||
     deleteCapture.isPending ||
     restoreCapture.isPending;
+  const inboxErrorMessage =
+    error instanceof Error ? error.message : t("pages.inbox.loadError");
 
   const now = new Date();
 
@@ -213,6 +233,34 @@ export default function InboxScreen() {
           className="mt-3 max-h-10"
           contentContainerClassName="gap-2"
         >
+          <Pressable
+            onPress={() => setViewMode("active")}
+            className={`rounded-full border px-3 py-1.5 ${
+              viewMode === "active" ? "border-primary bg-primary" : "border-border bg-card"
+            }`}
+          >
+            <UiText
+              className={`text-xs font-medium ${
+                viewMode === "active" ? "text-primary-foreground" : "text-foreground"
+              }`}
+            >
+              Active
+            </UiText>
+          </Pressable>
+          <Pressable
+            onPress={() => setViewMode("archived")}
+            className={`rounded-full border px-3 py-1.5 ${
+              viewMode === "archived" ? "border-primary bg-primary" : "border-border bg-card"
+            }`}
+          >
+            <UiText
+              className={`text-xs font-medium ${
+                viewMode === "archived" ? "text-primary-foreground" : "text-foreground"
+              }`}
+            >
+              Archived
+            </UiText>
+          </Pressable>
           {filters.map((filter) => (
             <Pressable
               key={filter}
@@ -233,7 +281,21 @@ export default function InboxScreen() {
         </ScrollView>
 
         <ScrollView className="mt-4 flex-1" showsVerticalScrollIndicator={false}>
-          {filteredCaptures.length === 0 ? (
+          {isError ? (
+            <Card className="rounded-2xl border border-destructive/30 bg-destructive/5 p-3">
+              <CardContent className="gap-2 p-0">
+                <UiText className="text-sm font-medium text-foreground">
+                  {t("pages.inbox.loadError")}
+                </UiText>
+                <UiText className="text-xs text-muted-foreground">{inboxErrorMessage}</UiText>
+                <View className="mt-1">
+                  <Button size="sm" variant="outline" onPress={() => refetch()} disabled={isBusy}>
+                    <UiText>{t("common.retry")}</UiText>
+                  </Button>
+                </View>
+              </CardContent>
+            </Card>
+          ) : filteredCaptures.length === 0 ? (
             <UiText className="py-8 text-center text-sm text-muted-foreground">
               {t("pages.inbox.emptyList")}
             </UiText>
@@ -253,6 +315,7 @@ export default function InboxScreen() {
                         t("pages.inbox.captureFallbackTitle", { type: capture.capture_type });
                       const subtitle = previewText(capture.raw_content) || t("pages.inbox.emptyCapture");
                       const suggestions = capture.suggested_actions.slice(0, 3);
+                      const canActOnCapture = !capture.archived && viewMode === "active";
                       return (
                         <Card key={capture.id} className="rounded-2xl border border-border bg-card p-3">
                           <CardContent className="p-0">
@@ -267,12 +330,35 @@ export default function InboxScreen() {
                                 <UiText className="mt-0.5 text-xs text-muted-foreground" numberOfLines={2}>
                                   {subtitle}
                                 </UiText>
+                                <View className="mt-2 flex-row flex-wrap gap-1">
+                                  {capture.badges.map((badge) => (
+                                    <Badge
+                                      key={`${capture.id}-${badge.key}`}
+                                      variant={
+                                        badge.tone === "default"
+                                          ? "default"
+                                          : badge.tone === "secondary"
+                                            ? "secondary"
+                                            : "outline"
+                                      }
+                                    >
+                                      <UiText>{badge.label}</UiText>
+                                    </Badge>
+                                  ))}
+                                  {capture.archived_reason ? (
+                                    <Badge variant="outline">
+                                      <UiText>
+                                        {capture.archived_reason === "applied" ? "Applied" : "Deleted"}
+                                      </UiText>
+                                    </Badge>
+                                  ) : null}
+                                </View>
                               </View>
-                              <Badge variant="secondary">
-                                <UiText variant="small">
+                              <View className="rounded-full border border-transparent bg-secondary px-2 py-0.5">
+                                <UiText className="text-xs font-medium text-secondary-foreground">
                                   {relativeTime(now, new Date(capture.created_at), i18n.language || "en-US")}
                                 </UiText>
-                              </Badge>
+                              </View>
                             </View>
 
                             {reviewCaptureId === capture.id ? (
@@ -305,19 +391,29 @@ export default function InboxScreen() {
                             ) : null}
 
                             <View className="flex-row flex-wrap gap-2">
-                              {suggestions.map((action) => (
-                                <Button
-                                  key={action.key}
-                                  size="sm"
-                                  variant={action.is_primary ? "default" : "outline"}
-                                  onPress={() => handleAction(capture.id, action, title)}
-                                  disabled={isBusy}
-                                >
-                                  <UiText>{action.label}</UiText>
-                                </Button>
-                              ))}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onPress={() => router.push(`/inbox/${capture.id}`)}
+                                disabled={isBusy}
+                              >
+                                <UiText>{t("pages.inbox.openCapture")}</UiText>
+                              </Button>
+                              {canActOnCapture
+                                ? suggestions.map((action) => (
+                                    <Button
+                                      key={action.key}
+                                      size="sm"
+                                      variant={action.is_primary ? "default" : "outline"}
+                                      onPress={() => handleAction(capture.id, action, title)}
+                                      disabled={isBusy}
+                                    >
+                                      <UiText>{action.label}</UiText>
+                                    </Button>
+                                  ))
+                                : null}
 
-                              {capture.status === "failed" ? (
+                              {canActOnCapture && capture.status === "failed" ? (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -329,29 +425,41 @@ export default function InboxScreen() {
                                 </Button>
                               ) : null}
 
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onPress={() =>
-                                  deleteCapture.mutate(
-                                    { captureId: capture.id },
-                                    {
-                                      onSuccess: () => {
-                                        showToast({
-                                          message: t("pages.item.deleted"),
-                                          actionLabel: t("pages.item.undoDelete"),
-                                          onAction: () =>
-                                            restoreCapture.mutate({ captureId: capture.id }),
-                                        });
-                                      },
-                                    }
-                                  )
-                                }
-                                disabled={isBusy}
-                              >
-                                <Trash2 size={12} color="#171717" />
-                                <UiText> {t("pages.item.delete")}</UiText>
-                              </Button>
+                              {canActOnCapture ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onPress={() =>
+                                    deleteCapture.mutate(
+                                      { captureId: capture.id },
+                                      {
+                                        onSuccess: () => {
+                                          showToast({
+                                            message: t("pages.item.deleted"),
+                                            actionLabel: t("pages.item.undoDelete"),
+                                            onAction: () =>
+                                              restoreCapture.mutate({ captureId: capture.id }),
+                                          });
+                                        },
+                                      }
+                                    )
+                                  }
+                                  disabled={isBusy}
+                                >
+                                  <Trash2 size={12} color="#171717" />
+                                  <UiText> {t("pages.item.delete")}</UiText>
+                                </Button>
+                              ) : null}
+                              {viewMode === "archived" && capture.archived_reason === "deleted" ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onPress={() => restoreCapture.mutate({ captureId: capture.id })}
+                                  disabled={isBusy}
+                                >
+                                  <UiText>{t("pages.item.undoDelete")}</UiText>
+                                </Button>
+                              ) : null}
                             </View>
                           </CardContent>
                         </Card>

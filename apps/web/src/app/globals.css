@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "tw-animate-css";
+@import "../../node_modules/tw-animate-css/dist/tw-animate.css";
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
@@ -143,6 +143,12 @@
   z-index: 80;
 }
 
+/* ============================================================
+   .calendar-parity — FullCalendar overrides for Coss parity
+   Theme vars are oklch so we use color-mix() for alpha, and
+   var(--xxx) directly for opaque colors (NOT hsl()).
+   ============================================================ */
+
 .calendar-parity {
   min-height: 0;
   height: 100%;
@@ -151,59 +157,223 @@
 .calendar-parity .calendar-full {
   min-height: 0;
   height: 100%;
+  --week-cells-height: 64px;
 }
 
+/* --- Font: same Geist as the rest of the app --- */
+.calendar-parity .fc,
+.calendar-parity .fc * {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* --- FC CSS custom properties (theme-aware) --- */
 .calendar-parity .fc {
   height: 100%;
-  --fc-border-color: hsl(var(--border));
-  --fc-page-bg-color: hsl(var(--background));
-  --fc-neutral-bg-color: hsl(var(--background));
-  --fc-list-event-hover-bg-color: hsl(var(--muted));
+  --fc-border-color: color-mix(in oklch, var(--border) 70%, transparent);
+  --fc-page-bg-color: var(--background);
+  --fc-neutral-bg-color: var(--background);
+  --fc-today-bg-color: var(--background);
+  --fc-list-event-hover-bg-color: var(--muted);
 }
 
-.calendar-parity .fc .fc-view-harness {
-  border-top: 1px solid hsl(var(--border));
+/* --- Grid: solid 1px lines, no dotted, no doubles --- */
+.calendar-parity .fc .fc-scrollgrid,
+.calendar-parity .fc .fc-scrollgrid table {
+  border-collapse: collapse;
 }
 
 .calendar-parity .fc .fc-scrollgrid,
-.calendar-parity .fc .fc-daygrid-body,
-.calendar-parity .fc .fc-timegrid-body {
-  border-color: hsl(var(--border));
+.calendar-parity .fc .fc-scrollgrid *,
+.calendar-parity .fc table,
+.calendar-parity .fc td,
+.calendar-parity .fc th {
+  border-style: solid;
+  border-color: color-mix(in oklch, var(--border) 70%, transparent);
 }
 
-.calendar-parity .fc .fc-col-header-cell-cushion {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 8px 6px;
-  opacity: 0.72;
-  text-transform: none;
+.calendar-parity .fc .fc-scrollgrid-section-body td,
+.calendar-parity .fc .fc-scrollgrid-section-body th {
+  border-width: 0 1px 1px 0;
 }
 
-.calendar-parity .fc .fc-timegrid-axis-cushion {
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
-  opacity: 0.72;
+/* Timegrid: no bottom border on slot cells so no line at h15 (only line at h00) */
+.calendar-parity .fc .fc-scrollgrid-section-body td.fc-timegrid-slot {
+  border-bottom-width: 0 !important;
 }
 
-.calendar-parity .fc .fc-daygrid-day-number {
-  font-size: 12px;
-  color: hsl(var(--foreground));
-  padding: 6px;
+.calendar-parity .fc .fc-scrollgrid-section-header th {
+  border-width: 0 1px 1px 0;
 }
 
 .calendar-parity .fc .fc-timegrid-slot {
-  height: 2.75rem;
+  border-width: 0;
 }
 
+.calendar-parity .fc .fc-timegrid-slot:not(.fc-timegrid-slot-minor) {
+  border-top: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+}
+
+.calendar-parity .fc .fc-view-harness {
+  border-top: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+}
+
+/* --- Backgrounds --- */
+.calendar-parity .fc .fc-scrollgrid,
+.calendar-parity .fc .fc-daygrid-body,
+.calendar-parity .fc .fc-timegrid-body {
+  background: var(--background);
+}
+
+.calendar-parity .fc .fc-scrollgrid-section-body table,
+.calendar-parity .fc .fc-timegrid-axis,
+.calendar-parity .fc td.fc-timegrid-slot {
+  background: var(--background);
+}
+
+.calendar-parity .fc .fc-timegrid-slot {
+  height: calc(var(--week-cells-height, 64px) / 4) !important;
+  min-height: 0 !important;
+  background: var(--background);
+}
+
+/* Hide 15/30/45-min lines: only full-hour lines visible (like Coss) */
+.calendar-parity .fc .fc-timegrid-slot-minor {
+  border-top: none !important;
+  border-bottom: none !important;
+}
+
+/* Axis column: no right/bottom borders so horaires aren't in a box and no h15 line (like Coss) */
+.calendar-parity .fc .fc-timegrid-axis,
+.calendar-parity .fc .fc-timegrid-slot-label {
+  border-right-width: 0 !important;
+  border-bottom-width: 0 !important;
+}
+
+/* No yellow/cream on today — white grid like Coss */
+.calendar-parity .fc .fc-day-today,
+.calendar-parity .fc .fc-col-header-cell.fc-day-today,
+.calendar-parity .fc .fc-timegrid-col.fc-day-today {
+  background: var(--background);
+}
+
+/* --- Day column headers: py-2 text-sm text-muted-foreground/70 font-semibold --- */
+.calendar-parity .fc .fc-scrollgrid-section-header th {
+  background: color-mix(in oklch, var(--background) 80%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.calendar-parity .fc .fc-col-header-cell-cushion {
+  font-size: 0.875rem;
+  font-weight: normal;
+  padding: 0.5rem 6px;
+  color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Today header: bolder, foreground color */
+.calendar-parity .fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+/* --- Day view: hide "Sat 28" header row (Coss has none) --- */
+.calendar-parity .fc .fc-timeGridDay-view .fc-col-header {
+  display: none;
+}
+
+/* --- Time axis labels: text-[10px] sm:text-xs text-muted-foreground/70 --- */
+.calendar-parity .fc .fc-timegrid-axis-cushion,
+.calendar-parity .fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.625rem;
+  color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+  font-weight: normal;
+  text-align: right;
+  padding-right: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .calendar-parity .fc .fc-timegrid-axis-cushion,
+  .calendar-parity .fc .fc-timegrid-slot-label-cushion {
+    font-size: 0.75rem;
+    padding-right: 1rem;
+  }
+}
+
+/* --- Month view: day numbers --- */
+.calendar-parity .fc .fc-daygrid-day-number {
+  font-size: 0.875rem;
+  color: var(--foreground);
+  padding: 4px 6px;
+  font-weight: normal;
+}
+
+/* Today = circle badge (size-6 rounded-full bg-primary) like Coss */
+.calendar-parity .fc .fc-day-today .fc-daygrid-day-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  border-radius: 9999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.875rem;
+  font-weight: normal;
+  padding: 0;
+  margin: 4px;
+}
+
+/* Outside-month cells: bg-muted/25 text-muted-foreground/70 */
+.calendar-parity .fc .fc-day-other {
+  background: color-mix(in oklch, var(--muted) 25%, transparent);
+}
+
+.calendar-parity .fc .fc-day-other .fc-daygrid-day-number {
+  color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+}
+
+/* --- +N more link --- */
+.calendar-parity .fc .fc-more-link {
+  font-size: 10px;
+  padding: 2px 4px;
+  color: var(--muted-foreground);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.calendar-parity .fc .fc-more-link:hover {
+  background: color-mix(in oklch, var(--muted) 50%, transparent);
+  color: var(--foreground);
+}
+
+@media (min-width: 640px) {
+  .calendar-parity .fc .fc-more-link {
+    font-size: 12px;
+    padding: 2px 8px;
+  }
+}
+
+/* --- Events --- */
 .calendar-parity .fc .fc-event {
   border-radius: calc(var(--radius) - 4px);
   border: 1px solid transparent;
   box-shadow: none;
   padding: 0 2px;
+  overflow: hidden;
+  min-height: 0;
+  height: 100%;
 }
 
 .calendar-parity .fc .fc-event-main {
-  color: hsl(var(--foreground));
+  color: var(--foreground);
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  width: 100%;
+  display: flex;
 }
 
 .calendar-parity .fc .fc-event.event-color-sky {
@@ -250,14 +420,11 @@
   text-decoration: line-through;
 }
 
+/* --- Now indicator --- */
 .calendar-parity .fc .fc-timegrid-now-indicator-line {
-  border-color: hsl(var(--primary));
+  border-color: var(--primary);
 }
 
 .calendar-parity .fc .fc-timegrid-now-indicator-arrow {
-  border-color: hsl(var(--primary));
-}
-
-.calendar-parity .fc .fc-scrollgrid-section-header th {
-  background: hsl(var(--background));
+  border-color: var(--primary);
 }

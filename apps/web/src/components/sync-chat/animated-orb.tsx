@@ -2,7 +2,7 @@ import type React from "react";
 
 interface AnimatedOrbProps {
   className?: string;
-  variant?: "default" | "danger";
+  variant?: "default" | "danger" | "stop";
   size?: number;
 }
 
@@ -17,14 +17,23 @@ export function AnimatedOrb({ className, variant = "default", size = 34 }: Anima
           four: "#fca5a5",
           five: "#dc2626",
         }
-      : {
-          background: "#dbeafe",
-          one: "#60a5fa",
-          two: "#34d399",
-          three: "#818cf8",
-          four: "#22d3ee",
-          five: "#f59e0b",
-        };
+      : variant === "stop"
+        ? {
+            background: "#fff7ed",
+            one: "#ea580c",
+            two: "#f97316",
+            three: "#fb923c",
+            four: "#fdba74",
+            five: "#c2410c",
+          }
+        : {
+            background: "#dbeafe",
+            one: "#60a5fa",
+            two: "#34d399",
+            three: "#818cf8",
+            four: "#22d3ee",
+            five: "#f59e0b",
+          };
 
   const blurAmount = Math.max(6, Math.round(size * 0.2));
 

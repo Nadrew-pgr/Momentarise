@@ -2,6 +2,9 @@
   "name": "momentarise",
   "private": true,
   "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "lane:check": "node scripts/check-lane-boundary.mjs"
+  },
   "devDependencies": {
     "tailwindcss": "^4"
   }
