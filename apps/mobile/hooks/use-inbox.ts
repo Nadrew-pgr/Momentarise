@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ApplyCaptureRequest,
   ApplyCaptureResponse,
+  CaptureActionResponse,
   CapturePreviewResponse,
   CreateCaptureRequest,
   InboxListResponse,
@@ -9,6 +10,7 @@ import type {
 } from "@momentarise/shared";
 import {
   applyCaptureResponseSchema,
+  captureActionResponseSchema,
   capturePreviewResponseSchema,
   createCaptureRequestSchema,
   inboxListResponseSchema,
@@ -102,6 +104,42 @@ export function useProcessCapture() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inbox"] });
       queryClient.invalidateQueries({ queryKey: ["item"] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+    },
+  });
+}
+
+export function useDeleteCapture() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ captureId }: { captureId: string }) => {
+      const res = await apiFetch(`/api/v1/inbox/${captureId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete capture");
+      const data = await res.json();
+      return captureActionResponseSchema.parse(data) as CaptureActionResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+    },
+  });
+}
+
+export function useRestoreCapture() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ captureId }: { captureId: string }) => {
+      const res = await apiFetch(`/api/v1/inbox/${captureId}/restore`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to restore capture");
+      const data = await res.json();
+      return captureActionResponseSchema.parse(data) as CaptureActionResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
     },
   });

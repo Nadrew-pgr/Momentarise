@@ -137,6 +137,8 @@ NativeWind utilise les couleurs du `tailwind.config.js` via `className="bg-backg
 - **Theme ready** : toujours utiliser les tokens (bg-background, text-foreground, bg-card, text-muted-foreground, etc.). Ne jamais hardcoder de couleurs (hex) pour fonds ou textes afin que l’app reste prête pour un futur sélecteur de thème (light/dark/palettes). Voir règle projet « Theme ready ».
 - Pour changer le thème actuel : modifier les valeurs hex dans `tailwind.config.js` (ou plus tard brancher un ThemeProvider).
 
+**UI — react-native-reusables obligatoire** : pour tout nouvel écran ou refonte UI (Today, Me, Settings, etc.), utiliser les composants depuis `@/components/ui/` (Card, CardContent, Button, Text, Avatar, Skeleton, Separator, etc.) plutôt que des `View`/`Text`/`Pressable` seuls. Importer par exemple : `import { Card, CardContent } from "@/components/ui/card"`, `import { Text } from "@/components/ui/text"`, `import { Button } from "@/components/ui/button"`. Les écrans doivent avoir la même base visuelle (cartes rounded-xl, bordures, labels de section) en s'appuyant sur ces composants.
+
 **ATTENTION** : le web utilise des variables CSS OKLCH dans `globals.css` ; le mobile utilise des hex dans `tailwind.config.js`. Ce sont deux mécanismes différents — ne PAS essayer de les unifier.
 
 ## i18n mobile

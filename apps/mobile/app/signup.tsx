@@ -1,8 +1,6 @@
 import { useState } from "react";
 import {
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -15,6 +13,10 @@ import { useTranslation } from "react-i18next";
 import { signupSchema } from "@momentarise/shared";
 import { signup } from "@/lib/auth";
 import { useAuthStore } from "@/lib/store";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Text as UiText } from "@/components/ui/text";
 
 export default function SignupScreen() {
   const { t } = useTranslation();
@@ -62,17 +64,16 @@ export default function SignupScreen() {
         >
           <View className="mx-auto w-full max-w-md gap-6">
             <View className="items-center">
-              <Text className="text-3xl font-bold text-foreground">{t("auth.signUpTitle")}</Text>
-              <Text className="mt-2 text-muted-foreground">{t("auth.signUpDescription")}</Text>
+              <UiText className="text-3xl font-bold text-foreground">{t("auth.signUpTitle")}</UiText>
+              <UiText className="mt-2 text-muted-foreground">{t("auth.signUpDescription")}</UiText>
             </View>
 
-            <View className="gap-4">
+            <Card className="rounded-2xl border border-border bg-card">
+              <CardContent className="gap-4 p-5">
               <View>
-                <Text className="mb-1 text-sm font-medium text-foreground">{t("auth.email")}</Text>
-                <TextInput
-                  className="rounded-lg border border-input bg-background px-4 py-3 text-foreground"
+                <UiText className="mb-1 text-sm font-medium text-foreground">{t("auth.email")}</UiText>
+                <Input
                   placeholder="you@example.com"
-                  placeholderTextColor="#9ca3af"
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -83,11 +84,9 @@ export default function SignupScreen() {
               </View>
 
               <View>
-                <Text className="mb-1 text-sm font-medium text-foreground">{t("auth.password")}</Text>
-                <TextInput
-                  className="rounded-lg border border-input bg-background px-4 py-3 text-foreground"
+                <UiText className="mb-1 text-sm font-medium text-foreground">{t("auth.password")}</UiText>
+                <Input
                   placeholder="••••••••"
-                  placeholderTextColor="#9ca3af"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
@@ -97,29 +96,26 @@ export default function SignupScreen() {
               </View>
 
               {error ? (
-                <Text className="text-center text-sm text-destructive">{error}</Text>
+                <UiText className="text-center text-sm text-destructive">{error}</UiText>
               ) : null}
 
-              <TouchableOpacity
-                className="items-center rounded-lg bg-primary py-3"
+              <Button
                 onPress={handleSubmit}
                 disabled={loading}
-                activeOpacity={0.7}
               >
-                {loading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text className="font-semibold text-primary-foreground">{t("auth.signUpSubmit")}</Text>
-                )}
-              </TouchableOpacity>
+                {loading ? <ActivityIndicator color="white" /> : <UiText>{t("auth.signUpSubmit")}</UiText>}
+              </Button>
 
               <View className="mt-4 flex-row justify-center">
-                <Text className="text-sm text-muted-foreground">{t("auth.hasAccount")} </Text>
+                <UiText className="text-sm text-muted-foreground">{t("auth.hasAccount")} </UiText>
                 <TouchableOpacity onPress={() => router.back()}>
-                  <Text className="text-sm font-medium text-foreground underline">{t("auth.signIn")}</Text>
+                  <UiText className="text-sm font-medium text-foreground underline">
+                    {t("auth.signIn")}
+                  </UiText>
                 </TouchableOpacity>
               </View>
-            </View>
+              </CardContent>
+            </Card>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

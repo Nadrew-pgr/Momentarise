@@ -5,3 +5,4 @@ export * from "./events";
 export * from "./inbox";
 export * from "./item";
 export * from "./preferences";
+export * from "./sync";

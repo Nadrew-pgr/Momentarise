@@ -47,12 +47,16 @@ export const itemOutSchema = z.object({
   title: z.string(),
   kind: itemKindSchema,
   status: lifecycleStatusSchema,
-  metadata: z.record(z.string(), z.unknown()),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
   source_capture_id: z.string().uuid().nullable(),
   blocks: itemBlocksSchema,
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
-});
+}).transform(({ meta, metadata, ...rest }) => ({
+  ...rest,
+  metadata: metadata ?? meta ?? {},
+}));
 
 export const itemCreateRequestSchema = z.object({
   title: z.string().min(1),
@@ -95,9 +99,13 @@ export const entityLinkSchema = z.object({
   to_entity_type: entityTypeSchema,
   to_entity_id: z.string().uuid(),
   relation_type: linkRelationTypeSchema,
-  metadata: z.record(z.string(), z.unknown()),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
   created_at: z.string().datetime(),
-});
+}).transform(({ meta, metadata, ...rest }) => ({
+  ...rest,
+  metadata: metadata ?? meta ?? {},
+}));
 
 export const itemLinksResponseSchema = z.object({
   links: z.array(entityLinkSchema),

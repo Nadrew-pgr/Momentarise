@@ -67,6 +67,25 @@ export function eventsToCalendarFormat(
   return byDate;
 }
 
+export function eventsListToCalendarFormat(
+  events: EventOut[],
+  defaultDate?: string
+): EventsByDate {
+  const byDate: EventsByDate = defaultDate ? { [defaultDate]: [] } : {};
+  for (const ev of events) {
+    const dateKey = toLocalDateKey(ev.start_at);
+    if (!byDate[dateKey]) byDate[dateKey] = [];
+    byDate[dateKey].push({
+      id: ev.id,
+      start: toCalendarTime(ev.start_at),
+      end: toCalendarTime(ev.end_at),
+      title: ev.title,
+      color: EVENT_COLOR_MAP[ev.color],
+    });
+  }
+  return byDate;
+}
+
 /**
  * Convert a single API EventOut to CalendarEvent (e.g. for custom list rendering).
  */

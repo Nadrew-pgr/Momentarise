@@ -56,11 +56,40 @@
     },
     "inbox": {
       "title": "Inbox",
+      "subtitle": "Capture quickly, structure later.",
       "placeholder": "This section is coming in Slice 2.",
       "add": "Add capture",
       "createNote": "Create note",
       "addPlaceholder": "Enter raw text…",
-      "process": "Process to item",
+      "searchPlaceholder": "Search captures and items…",
+      "sectionToday": "Today",
+      "sectionYesterday": "Yesterday",
+      "sectionEarlier": "Earlier",
+      "captureFallbackTitle": "{{type}} capture",
+      "noteFallbackTitle": "Note",
+      "kindCapture": "Capture",
+      "kindItem": "Item",
+      "openItem": "Open item",
+      "quickCreateTitle": "Quick capture",
+      "quickCreateDescription": "Use one entry point and decide later how to process it.",
+      "quickInputLabel": "Raw content (optional)",
+      "quickInputPlaceholder": "Write something quick…",
+      "quickCreateNote": "Create note",
+      "quickCreateText": "Add text capture",
+      "quickCreateVoice": "Add voice capture",
+      "quickCreatePhoto": "Add photo capture",
+      "quickCreateFile": "Add file capture",
+      "quickCreateLink": "Add link capture",
+      "openSync": "Open Sync",
+      "filter": {
+        "all": "All",
+        "notes": "Notes",
+        "voice": "Voice",
+        "photo": "Photo",
+        "file": "File",
+        "link": "Link"
+      },
+      "process": "Structure",
       "processTitle": "Item title",
       "processSubmit": "Create item",
       "preview": "Preview",
@@ -76,6 +105,8 @@
       "blocks": "Content",
       "title": "Title",
       "backToInbox": "Back to Inbox",
+      "loading": "Loading item...",
+      "loadError": "Unable to open this item.",
       "saving": "Saving…",
       "saved": "Saved",
       "saveError": "Save error",
@@ -84,11 +115,76 @@
       "undoDelete": "Undo",
       "linkedTo": "Linked to",
       "emptyLinks": "No links for this item.",
+      "noLinksBadge": "No links",
       "noItemSelected": "Select a capture to process or an item."
     },
     "sync": {
       "title": "Sync",
-      "placeholder": "Sync page ready for next iterations (chat, preview/apply, AI tools)."
+      "newChat": "New chat",
+      "retry": "Retry",
+      "empty": {
+        "title": "Sync is ready",
+        "subtitle": "Tell Sync what to organize, update, or draft."
+      },
+      "composer": {
+        "placeholder": "Ask Sync to plan, change, or organize something...",
+        "send": "Send message",
+        "stop": "Stop generation",
+        "model": "Select model",
+        "voiceSoon": "Voice input coming soon",
+        "attachSoon": "Attachments coming soon"
+      },
+      "actions": {
+        "title": "Actions",
+        "open": "Open actions",
+        "pending": "Pending action",
+        "preview": "Preview",
+        "apply": "Apply",
+        "undo": "Undo",
+        "changelog": "Changelog",
+        "question": "Question",
+        "draft": "Draft",
+        "debug": "Tool debug",
+        "noPending": "No pending action.",
+        "noChanges": "No recent changes yet.",
+        "noToolEvents": "No tool calls yet.",
+        "appliedSuccess": "Change applied.",
+        "undoneSuccess": "Change undone.",
+        "noTime": "Now"
+      },
+      "status": {
+        "streaming": "Sync is thinking...",
+        "ready": "Sync is ready",
+        "run": {
+          "pending": "Pending",
+          "streaming": "Streaming",
+          "waiting_answer": "Waiting for answer",
+          "ready_to_apply": "Ready to apply",
+          "applied": "Applied",
+          "done": "Done",
+          "failed": "Failed",
+          "cancelled": "Cancelled"
+        }
+      },
+      "warning": {
+        "title": "Warning"
+      },
+      "error": {
+        "title": "Error",
+        "generic": "Something went wrong. Please try again."
+      },
+      "roles": {
+        "assistant": "Sync",
+        "user": "You",
+        "tool": "Tool",
+        "system": "System"
+      },
+      "aria": {
+        "log": "Sync conversation"
+      },
+      "message": {
+        "imageAlt": "Uploaded image"
+      }
     },
     "timeline": {
       "title": "Timeline",

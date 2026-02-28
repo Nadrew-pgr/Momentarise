@@ -15,7 +15,10 @@ class InboxCaptureOut(BaseModel):
     source: str | None = None
     capture_type: CaptureType
     status: CaptureStatus
-    metadata: dict[str, Any] = Field(alias="meta")
+    metadata: dict[str, Any] = Field(
+        alias="meta",
+        serialization_alias="metadata",
+    )
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
@@ -58,3 +61,8 @@ class ApplyCaptureRequest(BaseModel):
 class ApplyCaptureResponse(BaseModel):
     capture_id: uuid.UUID
     item_id: uuid.UUID
+
+
+class CaptureActionResponse(BaseModel):
+    capture_id: uuid.UUID
+    status: str

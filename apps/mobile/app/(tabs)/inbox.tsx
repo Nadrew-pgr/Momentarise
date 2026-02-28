@@ -1,80 +1,180 @@
 import { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
+import { Camera, FileText, Link2, Mic, Search } from "lucide-react-native";
+import type { CaptureType } from "@momentarise/shared";
 import {
   useApplyCapture,
-  useCreateCapture,
+  useDeleteCapture,
   useInbox,
   usePreviewCapture,
   useProcessCapture,
+  useRestoreCapture,
 } from "@/hooks/use-inbox";
-import { useItems } from "@/hooks/use-item";
+import { useDeleteItemById, useItems, useRestoreItemById } from "@/hooks/use-item";
+import { useAppToast } from "@/lib/store";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Text as UiText } from "@/components/ui/text";
+
+type FilterKey = "all" | "notes" | "voice" | "photo" | "file" | "link";
+type SectionKey = "today" | "yesterday" | "earlier";
+
+type FeedEntry =
+  | {
+      type: "capture";
+      id: string;
+      at: Date;
+      title: string;
+      subtitle: string;
+      status: string;
+      captureType: CaptureType;
+      channel: string | null;
+    }
+  | {
+      type: "item";
+      id: string;
+      at: Date;
+      title: string;
+      subtitle: string;
+      itemKind: string;
+    };
+
+const filters: FilterKey[] = ["all", "notes", "voice", "photo", "file", "link"];
+
+function captureIcon(type: CaptureType) {
+  switch (type) {
+    case "voice":
+      return <Mic size={14} color="#737373" />;
+    case "photo":
+      return <Camera size={14} color="#737373" />;
+    case "link":
+      return <Link2 size={14} color="#737373" />;
+    default:
+      return <FileText size={14} color="#737373" />;
+  }
+}
+
+function firstLine(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.split("\n")[0]?.trim() ?? "";
+}
+
+function previewText(value: string): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return "";
+  return compact.length > 120 ? `${compact.slice(0, 120)}...` : compact;
+}
+
+function resolveSectionKey(at: Date): SectionKey {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (at >= today) return "today";
+  if (at >= yesterday) return "yesterday";
+  return "earlier";
+}
 
 export default function InboxScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const [newCaptureText, setNewCaptureText] = useState("");
+  const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [processingCaptureId, setProcessingCaptureId] = useState<string | null>(null);
   const [processingTitle, setProcessingTitle] = useState("");
-
-  const { data: inboxData, isLoading } = useInbox();
-  const { data: itemsData, isLoading: itemsLoading } = useItems();
-  const createCapture = useCreateCapture();
-  const processCapture = useProcessCapture();
-  const previewCapture = usePreviewCapture();
-  const applyCapture = useApplyCapture();
   const [previewByCaptureId, setPreviewByCaptureId] = useState<
     Record<string, { suggested_title: string; suggested_kind: string; reason: string }>
   >({});
 
-  const captures = inboxData?.captures ?? [];
-  const items = itemsData?.items ?? [];
+  const { data: inboxData, isLoading: inboxLoading } = useInbox();
+  const { data: itemsData, isLoading: itemsLoading } = useItems();
+  const processCapture = useProcessCapture();
+  const previewCapture = usePreviewCapture();
+  const applyCapture = useApplyCapture();
+  const deleteCapture = useDeleteCapture();
+  const restoreCapture = useRestoreCapture();
+  const deleteItemById = useDeleteItemById();
+  const restoreItemById = useRestoreItemById();
+  const showToast = useAppToast((s) => s.show);
 
-  const handleAddCapture = useCallback(() => {
-    const text = newCaptureText.trim();
-    if (!text) return;
-    createCapture.mutate(
-      {
-        raw_content: text,
-        capture_type: "text",
-        status: "captured",
-        source: "manual",
-        metadata: { source: "mobile_inbox_text" },
-      },
-      { onSuccess: () => setNewCaptureText("") }
-    );
-  }, [createCapture, newCaptureText]);
+  const captures = inboxData?.captures;
+  const items = itemsData?.items;
 
-  const handleStartProcess = useCallback((captureId: string) => {
-    setProcessingCaptureId(captureId);
-    setProcessingTitle("");
-  }, []);
+  const feed = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const allEntries: FeedEntry[] = [];
+    const captureList = captures ?? [];
+    const itemList = items ?? [];
 
-  const handleSubmitProcess = useCallback(() => {
-    if (!processingCaptureId || !processingTitle.trim()) return;
-    processCapture.mutate(
-      { captureId: processingCaptureId, title: processingTitle.trim() },
-      {
-        onSuccess: (res) => {
-          setProcessingCaptureId(null);
-          setProcessingTitle("");
-          router.push(`/items/${res.item_id}`);
-        },
+    for (const capture of captureList) {
+      const title =
+        firstLine(capture.raw_content) ||
+        t("pages.inbox.captureFallbackTitle", { type: capture.capture_type });
+      const subtitle = previewText(capture.raw_content) || t("pages.inbox.emptyCapture");
+      allEntries.push({
+        type: "capture",
+        id: capture.id,
+        at: new Date(capture.created_at),
+        title,
+        subtitle,
+        status: capture.status,
+        captureType: capture.capture_type,
+        channel:
+          capture.metadata && typeof capture.metadata.channel === "string"
+            ? capture.metadata.channel
+            : null,
+      });
+    }
+
+    for (const item of itemList) {
+      allEntries.push({
+        type: "item",
+        id: item.id,
+        at: new Date(item.updated_at),
+        title: item.title,
+        subtitle: item.kind,
+        itemKind: item.kind,
+      });
+    }
+
+    const filtered = allEntries.filter((entry) => {
+      if (activeFilter === "notes") {
+        if (entry.type === "item") return entry.itemKind === "note";
+        return entry.captureType === "text" || entry.channel === "note";
       }
-    );
-  }, [processCapture, processingCaptureId, processingTitle, router]);
+      if (activeFilter === "file") {
+        if (entry.type !== "capture") return false;
+        return entry.channel === "file";
+      }
+      if (activeFilter !== "all") {
+        if (entry.type !== "capture") return false;
+        if (entry.captureType !== activeFilter) return false;
+      }
+      if (!query) return true;
+      return `${entry.title} ${entry.subtitle}`.toLowerCase().includes(query);
+    });
+
+    filtered.sort((a, b) => b.at.getTime() - a.at.getTime());
+    return filtered;
+  }, [activeFilter, captures, items, search, t]);
+
+  const grouped = useMemo(() => {
+    const bySection: Record<SectionKey, FeedEntry[]> = {
+      today: [],
+      yesterday: [],
+      earlier: [],
+    };
+    for (const entry of feed) {
+      bySection[resolveSectionKey(entry.at)].push(entry);
+    }
+    return bySection;
+  }, [feed]);
 
   const handlePreview = useCallback(
     (captureId: string) => {
@@ -117,37 +217,29 @@ export default function InboxScreen() {
     [applyCapture, previewByCaptureId, router]
   );
 
-  const listFooter = useMemo(() => {
-    return (
-      <View className="mt-4 border-t border-border pt-4">
-        <Text className="mb-2 text-sm font-semibold text-foreground">
-          {t("pages.inbox.recentItems")}
-        </Text>
-        {itemsLoading ? (
-          <Text className="text-muted-foreground text-sm">{t("pages.inbox.placeholder")}</Text>
-        ) : items.length === 0 ? (
-          <Text className="text-muted-foreground text-sm">{t("pages.inbox.emptyItems")}</Text>
-        ) : (
-          <View className="gap-2">
-            {items.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => router.push(`/items/${item.id}`)}
-                className="rounded-lg border border-border bg-card px-3 py-2"
-              >
-                <Text className="text-foreground text-sm font-medium" numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text className="text-muted-foreground mt-0.5 text-xs">
-                  {new Date(item.updated_at).toLocaleString()}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </View>
+  const handleSubmitProcess = useCallback(() => {
+    if (!processingCaptureId || !processingTitle.trim()) return;
+    processCapture.mutate(
+      { captureId: processingCaptureId, title: processingTitle.trim() },
+      {
+        onSuccess: (res) => {
+          setProcessingCaptureId(null);
+          setProcessingTitle("");
+          router.push(`/items/${res.item_id}`);
+        },
+      }
     );
-  }, [items, itemsLoading, router, t]);
+  }, [processCapture, processingCaptureId, processingTitle, router]);
+
+  const isLoading = inboxLoading || itemsLoading;
+  const isBusy =
+    previewCapture.isPending ||
+    applyCapture.isPending ||
+    processCapture.isPending ||
+    deleteCapture.isPending ||
+    deleteItemById.isPending ||
+    restoreCapture.isPending ||
+    restoreItemById.isPending;
 
   if (isLoading) {
     return (
@@ -161,128 +253,243 @@ export default function InboxScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
-        className="flex-1"
-      >
-        <Pressable className="flex-1" onPress={Keyboard.dismiss}>
-          <View className="flex-1 gap-4 p-4">
-            <Text className="text-xl font-bold text-foreground">{t("pages.inbox.title")}</Text>
+      <View className="flex-1 px-4 pt-2">
+        <UiText className="text-2xl font-semibold text-foreground">
+          {t("pages.inbox.title")}
+        </UiText>
+        <UiText className="mt-1 text-sm text-muted-foreground">
+          {t("pages.inbox.subtitle")}
+        </UiText>
 
-            <View className="flex-row gap-2">
-              <TextInput
-                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-foreground"
-                placeholder={t("pages.inbox.addPlaceholder")}
-                placeholderTextColor="#71717a"
-                value={newCaptureText}
-                onChangeText={setNewCaptureText}
-                onSubmitEditing={handleAddCapture}
-              />
-              <Pressable
-                onPress={handleAddCapture}
-                disabled={!newCaptureText.trim() || createCapture.isPending}
-                className="justify-center rounded-lg bg-primary px-4"
-              >
-                <Text className="font-medium text-primary-foreground">{t("pages.inbox.add")}</Text>
-              </Pressable>
+        <View className="mt-3">
+          <View className="relative">
+            <View className="absolute left-3 top-1/2 -translate-y-1/2">
+              <Search size={16} color="#737373" />
             </View>
-
-            <FlatList
-              data={captures}
-              keyExtractor={(capture) => capture.id}
-              keyboardDismissMode="on-drag"
-              keyboardShouldPersistTaps="handled"
-              ListEmptyComponent={
-                <Text className="py-8 text-center text-sm text-muted-foreground">
-                  {t("pages.inbox.emptyList")}
-                </Text>
-              }
-              ListFooterComponent={listFooter}
-              renderItem={({ item: capture }) => (
-                <View className="mb-3 rounded-lg border border-border bg-card p-3">
-                  <View className="mb-1 flex-row items-center justify-between">
-                    <Text className="text-xs uppercase text-muted-foreground">{capture.capture_type}</Text>
-                    <Text className="text-xs text-muted-foreground">{capture.status}</Text>
-                  </View>
-                  <Text className="text-sm text-foreground" numberOfLines={3}>
-                    {capture.raw_content || t("pages.inbox.emptyCapture")}
-                  </Text>
-                  {previewByCaptureId[capture.id] ? (
-                    <View className="mt-2 rounded border border-border bg-background p-2">
-                      <Text className="text-xs font-medium text-foreground">
-                        {previewByCaptureId[capture.id].suggested_title} (
-                        {previewByCaptureId[capture.id].suggested_kind})
-                      </Text>
-                      <Text className="text-xs text-muted-foreground">
-                        {previewByCaptureId[capture.id].reason}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {processingCaptureId === capture.id ? (
-                    <View className="mt-2 gap-2">
-                      <TextInput
-                        className="rounded border border-input bg-background px-2 py-1.5 text-sm text-foreground"
-                        placeholder={t("pages.inbox.processTitle")}
-                        placeholderTextColor="#71717a"
-                        value={processingTitle}
-                        onChangeText={setProcessingTitle}
-                      />
-                      <View className="flex-row gap-2">
-                        <Pressable
-                          onPress={handleSubmitProcess}
-                          disabled={!processingTitle.trim() || processCapture.isPending}
-                          className="rounded bg-primary px-3 py-1.5"
-                        >
-                          <Text className="text-sm font-medium text-primary-foreground">
-                            {t("pages.inbox.processSubmit")}
-                          </Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => {
-                            setProcessingCaptureId(null);
-                            setProcessingTitle("");
-                          }}
-                          className="rounded border border-input px-3 py-1.5"
-                        >
-                          <Text className="text-sm text-muted-foreground">{t("pages.inbox.cancel")}</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : (
-                    <View className="mt-2 flex-row flex-wrap gap-2">
-                      <Pressable
-                        onPress={() => handlePreview(capture.id)}
-                        className="rounded border border-input px-2.5 py-1.5"
-                      >
-                        <Text className="text-xs font-medium text-foreground">
-                          {t("pages.inbox.preview")}
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => handleApply(capture.id)}
-                        className="rounded bg-primary px-2.5 py-1.5"
-                      >
-                        <Text className="text-xs font-medium text-primary-foreground">
-                          {t("pages.inbox.apply")}
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => handleStartProcess(capture.id)}
-                        className="rounded border border-input px-2.5 py-1.5"
-                      >
-                        <Text className="text-xs font-medium text-foreground">
-                          {t("pages.inbox.process")}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  )}
-                </View>
-              )}
+            <Input
+              value={search}
+              onChangeText={setSearch}
+              placeholder={t("pages.inbox.searchPlaceholder")}
+              className="pl-9"
             />
           </View>
-        </Pressable>
-      </KeyboardAvoidingView>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="mt-3 max-h-10"
+          contentContainerClassName="gap-2"
+        >
+          {filters.map((filter) => (
+            <Pressable
+              key={filter}
+              onPress={() => setActiveFilter(filter)}
+              className={`rounded-full border px-3 py-1.5 ${
+                activeFilter === filter
+                  ? "border-primary bg-primary"
+                  : "border-border bg-card"
+              }`}
+            >
+              <UiText
+                className={`text-xs font-medium ${
+                  activeFilter === filter ? "text-primary-foreground" : "text-foreground"
+                }`}
+              >
+                {t(`pages.inbox.filter.${filter}`)}
+              </UiText>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <ScrollView className="mt-4 flex-1" showsVerticalScrollIndicator={false}>
+          {feed.length === 0 ? (
+            <UiText className="py-8 text-center text-sm text-muted-foreground">
+              {t("pages.inbox.emptyList")}
+            </UiText>
+          ) : (
+            (["today", "yesterday", "earlier"] as SectionKey[]).map((section) => {
+              const entries = grouped[section];
+              if (!entries.length) return null;
+              return (
+                <View key={section} className="mb-5">
+                  <UiText className="mb-2 text-[11px] font-semibold uppercase text-muted-foreground">
+                    {t(`pages.inbox.section${section[0].toUpperCase()}${section.slice(1)}`)}
+                  </UiText>
+                  <View className="gap-3">
+                    {entries.map((entry) => {
+                      if (entry.type === "capture") {
+                        const preview = previewByCaptureId[entry.id];
+                        return (
+                          <Card key={`capture-${entry.id}`} className="rounded-2xl border border-border bg-card p-3">
+                            <CardContent className="p-0">
+                              <View className="mb-2 flex-row items-start justify-between">
+                                <View className="mr-2 flex-1">
+                                  <View className="flex-row items-center gap-2">
+                                    {captureIcon(entry.captureType)}
+                                    <UiText className="text-sm font-semibold text-foreground" numberOfLines={1}>
+                                      {entry.title}
+                                    </UiText>
+                                  </View>
+                                  <UiText className="mt-0.5 text-xs text-muted-foreground" numberOfLines={2}>
+                                    {entry.subtitle}
+                                  </UiText>
+                                </View>
+                                <Badge variant="secondary">
+                                  <UiText variant="small" className="uppercase">
+                                    {entry.status}
+                                  </UiText>
+                                </Badge>
+                              </View>
+
+                              {preview ? (
+                                <View className="mb-2 rounded-lg border border-border bg-background px-2 py-1.5">
+                                  <UiText className="text-xs font-medium text-foreground">
+                                    {preview.suggested_title} ({preview.suggested_kind})
+                                  </UiText>
+                                  <UiText className="text-xs text-muted-foreground">{preview.reason}</UiText>
+                                </View>
+                              ) : null}
+
+                              {processingCaptureId === entry.id ? (
+                                <View className="gap-2">
+                                  <Input
+                                    placeholder={t("pages.inbox.processTitle")}
+                                    value={processingTitle}
+                                    onChangeText={setProcessingTitle}
+                                  />
+                                  <View className="flex-row gap-2">
+                                    <Button
+                                      size="sm"
+                                      onPress={handleSubmitProcess}
+                                      disabled={!processingTitle.trim() || processCapture.isPending}
+                                    >
+                                      <UiText>{t("pages.inbox.processSubmit")}</UiText>
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onPress={() => {
+                                        setProcessingCaptureId(null);
+                                        setProcessingTitle("");
+                                      }}
+                                    >
+                                      <UiText>{t("pages.inbox.cancel")}</UiText>
+                                    </Button>
+                                  </View>
+                                </View>
+                              ) : (
+                                <View className="flex-row flex-wrap gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onPress={() => handlePreview(entry.id)}
+                                    disabled={isBusy}
+                                  >
+                                    <UiText>{t("pages.inbox.preview")}</UiText>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onPress={() => handleApply(entry.id)}
+                                    disabled={isBusy}
+                                  >
+                                    <UiText>{t("pages.inbox.apply")}</UiText>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onPress={() => {
+                                      setProcessingCaptureId(entry.id);
+                                      setProcessingTitle(preview?.suggested_title ?? entry.title);
+                                    }}
+                                    disabled={isBusy}
+                                  >
+                                    <UiText>{t("pages.inbox.process")}</UiText>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onPress={() =>
+                                      deleteCapture.mutate(
+                                        { captureId: entry.id },
+                                        {
+                                          onSuccess: () => {
+                                            showToast({
+                                              message: t("pages.item.deleted"),
+                                              actionLabel: t("pages.item.undoDelete"),
+                                              onAction: () =>
+                                                restoreCapture.mutate({ captureId: entry.id }),
+                                            });
+                                          },
+                                        }
+                                      )
+                                    }
+                                    disabled={isBusy}
+                                  >
+                                    <UiText>{t("pages.item.delete")}</UiText>
+                                  </Button>
+                                </View>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      }
+
+                      return (
+                        <Pressable
+                          key={`item-${entry.id}`}
+                          onPress={() => router.push(`/items/${entry.id}`)}
+                          className="rounded-2xl border border-border bg-card p-3"
+                        >
+                          <View className="mb-2 flex-row items-start justify-between">
+                            <View className="mr-2 flex-1">
+                              <UiText className="text-sm font-semibold text-foreground" numberOfLines={1}>
+                                {entry.title}
+                              </UiText>
+                              <UiText className="mt-0.5 text-xs uppercase text-muted-foreground">
+                                {entry.subtitle}
+                              </UiText>
+                            </View>
+                            <Badge variant="secondary">
+                              <UiText variant="small">{t("pages.inbox.kindItem")}</UiText>
+                            </Badge>
+                          </View>
+                          <View className="flex-row flex-wrap gap-2">
+                            <Pressable
+                              onPress={(event) => {
+                                event.stopPropagation();
+                                deleteItemById.mutate(
+                                  { itemId: entry.id },
+                                  {
+                                    onSuccess: () => {
+                                      showToast({
+                                        message: t("pages.item.deleted"),
+                                        actionLabel: t("pages.item.undoDelete"),
+                                        onAction: () =>
+                                          restoreItemById.mutate({ itemId: entry.id }),
+                                      });
+                                    },
+                                  }
+                                );
+                              }}
+                              className="rounded border border-input px-2.5 py-1.5"
+                              disabled={isBusy}
+                            >
+                              <UiText className="text-xs font-medium text-foreground">
+                                {t("pages.item.delete")}
+                              </UiText>
+                            </Pressable>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }

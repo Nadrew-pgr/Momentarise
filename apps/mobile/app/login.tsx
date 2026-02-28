@@ -1,8 +1,6 @@
 import { useState } from "react";
 import {
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,6 +14,9 @@ import { loginSchema } from "@momentarise/shared";
 import { login } from "@/lib/auth";
 import { useAuthStore } from "@/lib/store";
 import { GoogleIcon, AppleIcon, GitHubIcon } from "@/components/icons/BrandIcons";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Text as UiText } from "@/components/ui/text";
 
 export default function LoginScreen() {
   const { t } = useTranslation();
@@ -58,17 +59,17 @@ export default function LoginScreen() {
         >
           <View className="mx-auto w-full max-w-md gap-6">
             <View className="items-center">
-              <Text className="text-3xl font-bold text-foreground">{t("common.appName")}</Text>
-              <Text className="mt-2 text-muted-foreground">{t("auth.loginDescription")}</Text>
+              <UiText className="text-3xl font-bold text-foreground">{t("common.appName")}</UiText>
+              <UiText className="mt-2 text-muted-foreground">{t("auth.loginDescription")}</UiText>
             </View>
 
             <View className="gap-4">
               <View>
-                <Text className="mb-1 text-sm font-medium text-foreground">{t("auth.email")}</Text>
-                <TextInput
-                  className="rounded-lg border border-input bg-background px-4 py-3 text-foreground"
+                <UiText className="mb-1 text-sm font-medium text-foreground">
+                  {t("auth.email")}
+                </UiText>
+                <Input
                   placeholder="you@example.com"
-                  placeholderTextColor="#9ca3af"
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -79,11 +80,11 @@ export default function LoginScreen() {
               </View>
 
               <View>
-                <Text className="mb-1 text-sm font-medium text-foreground">{t("auth.password")}</Text>
-                <TextInput
-                  className="rounded-lg border border-input bg-background px-4 py-3 text-foreground"
+                <UiText className="mb-1 text-sm font-medium text-foreground">
+                  {t("auth.password")}
+                </UiText>
+                <Input
                   placeholder="••••••••"
-                  placeholderTextColor="#9ca3af"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
@@ -93,25 +94,22 @@ export default function LoginScreen() {
               </View>
 
               {error ? (
-                <Text className="text-center text-sm text-destructive">{error}</Text>
+                <UiText className="text-center text-sm text-destructive">{error}</UiText>
               ) : null}
 
-              <TouchableOpacity
-                className="items-center rounded-lg bg-primary py-3"
-                onPress={handleSubmit}
-                disabled={loading}
-                activeOpacity={0.7}
-              >
+              <Button onPress={handleSubmit} disabled={loading}>
                 {loading ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text className="font-semibold text-primary-foreground">{t("auth.submit")}</Text>
+                  <UiText>{t("auth.submit")}</UiText>
                 )}
-              </TouchableOpacity>
+              </Button>
 
               <View className="my-4 flex-row items-center">
                 <View className="flex-1 border-t border-border" />
-                <Text className="mx-4 text-sm text-muted-foreground">{t("auth.continueWith")}</Text>
+                <UiText className="mx-4 text-sm text-muted-foreground">
+                  {t("auth.continueWith")}
+                </UiText>
                 <View className="flex-1 border-t border-border" />
               </View>
 
@@ -128,14 +126,20 @@ export default function LoginScreen() {
                   disabled
                 >
                   {icon}
-                  <Text className="text-sm text-muted-foreground">{t(`auth.continueWith${key}`)}</Text>
+                  <UiText className="text-sm text-muted-foreground">
+                    {t(`auth.continueWith${key}`)}
+                  </UiText>
                 </TouchableOpacity>
               ))}
 
               <View className="mt-4 flex-row justify-center">
-                <Text className="text-sm text-muted-foreground">{t("auth.noAccount")} </Text>
+                <UiText className="text-sm text-muted-foreground">
+                  {t("auth.noAccount")}{" "}
+                </UiText>
                 <TouchableOpacity onPress={() => router.push("/signup")}>
-                  <Text className="text-sm font-medium text-foreground underline">{t("auth.signUp")}</Text>
+                  <UiText className="text-sm font-medium text-foreground underline">
+                    {t("auth.signUp")}
+                  </UiText>
                 </TouchableOpacity>
               </View>
             </View>

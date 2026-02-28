@@ -19,6 +19,7 @@ import {
   useRestoreItem,
   useUpdateItem,
 } from "@/hooks/use-item";
+import { useAppToast } from "@/lib/store";
 
 type TabKey = "details" | "blocks" | "coach";
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -29,27 +30,24 @@ export default function ItemDetailPage() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const itemId = typeof params.id === "string" ? params.id : null;
 
-  const { data: item, isLoading } = useItem(itemId);
+  const { data: item, isLoading, isError, isFetching, error, refetch } = useItem(itemId);
   const { data: linksData } = useItemLinks(itemId);
+  const links = linksData?.links ?? [];
+  const hasLinks = links.length > 0;
   const updateItem = useUpdateItem(itemId);
   const deleteItem = useDeleteItem(itemId);
   const restoreItem = useRestoreItem(itemId);
+  const showToast = useAppToast((s) => s.show);
 
   const [activeTab, setActiveTab] = useState<TabKey>("blocks");
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [showUndoDelete, setShowUndoDelete] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
-      }
-      if (deleteTimerRef.current) {
-        clearTimeout(deleteTimerRef.current);
-        deleteTimerRef.current = null;
       }
     };
   }, []);
@@ -88,36 +86,30 @@ export default function ItemDetailPage() {
       router.back();
     }
     setTimeout(() => {
-      router.replace("/inbox");
+      router.replace("/(tabs)/inbox");
     }, 0);
   }, [router]);
 
   const handleDelete = useCallback(() => {
     deleteItem.mutate(undefined, {
       onSuccess: () => {
-        setShowUndoDelete(true);
-        if (deleteTimerRef.current) {
-          clearTimeout(deleteTimerRef.current);
-        }
-        deleteTimerRef.current = setTimeout(() => {
-          setShowUndoDelete(false);
-          router.replace("/inbox");
-        }, 7000);
+        router.replace("/(tabs)/inbox");
+        showToast({
+          message: t("pages.item.deleted"),
+          actionLabel: t("pages.item.undoDelete"),
+          onAction: () => {
+            restoreItem.mutate(undefined, {
+              onSuccess: () => {
+                if (itemId) {
+                  router.push(`/items/${itemId}`);
+                }
+              },
+            });
+          },
+        });
       },
     });
-  }, [deleteItem, router]);
-
-  const handleUndoDelete = useCallback(() => {
-    restoreItem.mutate(undefined, {
-      onSuccess: () => {
-        setShowUndoDelete(false);
-        if (deleteTimerRef.current) {
-          clearTimeout(deleteTimerRef.current);
-          deleteTimerRef.current = null;
-        }
-      },
-    });
-  }, [restoreItem]);
+  }, [deleteItem, itemId, restoreItem, router, showToast, t]);
 
   if (!itemId) {
     return (
@@ -129,12 +121,41 @@ export default function ItemDetailPage() {
     );
   }
 
-  if (isLoading || !item) {
+  if (isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
         <View className="flex-1 items-center justify-center px-4">
           <ActivityIndicator size="large" />
-          <Text className="mt-2 text-sm text-muted-foreground">{t("pages.inbox.placeholder")}</Text>
+          <Text className="mt-2 text-sm text-muted-foreground">{t("pages.item.loading")}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isError || !item) {
+    return (
+      <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
+        <View className="flex-1 items-center justify-center px-4">
+          <Text className="text-center text-sm text-destructive">
+            {error instanceof Error ? error.message : t("pages.item.loadError")}
+          </Text>
+          <View className="mt-4 flex-row items-center gap-2">
+            <Pressable
+              onPress={() => {
+                void refetch();
+              }}
+              className="rounded border border-input px-3 py-1.5"
+              disabled={isFetching}
+            >
+              <Text className="text-sm text-foreground">{t("common.retry")}</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleBackToInbox}
+              className="rounded border border-input px-3 py-1.5"
+            >
+              <Text className="text-sm text-foreground">{t("pages.item.backToInbox")}</Text>
+            </Pressable>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -163,19 +184,6 @@ export default function ItemDetailPage() {
             </View>
           </View>
 
-          {showUndoDelete ? (
-            <View className="flex-row items-center justify-between border-b border-border bg-muted/40 px-4 py-2">
-              <Text className="text-sm text-foreground">{t("pages.item.deleted")}</Text>
-              <Pressable
-                onPress={handleUndoDelete}
-                className="rounded border border-input px-3 py-1.5"
-                disabled={restoreItem.isPending}
-              >
-                <Text className="text-sm text-foreground">{t("pages.item.undoDelete")}</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
           <View className="flex-row border-b border-border">
             {([
               { key: "details", label: t("pages.item.details") },
@@ -202,20 +210,24 @@ export default function ItemDetailPage() {
             <ScrollView className="flex-1 px-4 py-4" keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
               <Text className="text-base font-semibold text-foreground">{item.title}</Text>
               <Text className="mt-1 text-xs text-muted-foreground">ID: {item.id}</Text>
-              <View className="mt-4 gap-2">
-                <Text className="text-sm font-semibold text-foreground">{t("pages.item.linkedTo")}</Text>
-                {linksData == null || linksData.links.length === 0 ? (
-                  <Text className="text-xs text-muted-foreground">{t("pages.item.emptyLinks")}</Text>
-                ) : (
-                  linksData.links.map((link) => (
+              {hasLinks ? (
+                <View className="mt-4 gap-2">
+                  <Text className="text-sm font-semibold text-foreground">{t("pages.item.linkedTo")}</Text>
+                  {links.map((link) => (
                     <View key={link.id} className="rounded border border-border bg-card px-3 py-2">
                       <Text className="text-xs font-medium text-foreground">
                         {link.relation_type} {link.to_entity_type}:{link.to_entity_id}
                       </Text>
                     </View>
-                  ))
-                )}
-              </View>
+                  ))}
+                </View>
+              ) : (
+                <View className="mt-4 self-start rounded-full border border-border bg-muted/40 px-2 py-1">
+                  <Text className="text-[11px] text-muted-foreground">
+                    {t("pages.item.noLinksBadge")}
+                  </Text>
+                </View>
+              )}
             </ScrollView>
           ) : null}
 

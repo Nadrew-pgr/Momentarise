@@ -8,6 +8,8 @@ import { queryClient } from "@/lib/query-client";
 import { useAuthStore } from "@/lib/store";
 import { getToken } from "@/lib/auth";
 import { BottomSheetCreate } from "@/components/BottomSheetCreate";
+import { EventSheet } from "@/components/EventSheet";
+import { AppToast } from "@/components/AppToast";
 import "@/i18n/config";
 import "../global.css";
 
@@ -28,7 +30,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
     const inProtectedGroup =
-      segments[0] === "(tabs)" || segments[0] === "items" || segments[0] === "sync";
+      segments[0] === "(tabs)" ||
+      segments[0] === "items" ||
+      segments[0] === "sync" ||
+      segments[0] === "profile" ||
+      segments[0] === "settings" ||
+      segments[0] === "help";
     if (isAuthenticated && !inProtectedGroup) {
       router.replace("/(tabs)/today");
     } else if (!isAuthenticated && inProtectedGroup) {
@@ -55,6 +62,8 @@ export default function RootLayout() {
           <AuthGate>
             <Slot />
             <BottomSheetCreate />
+            <EventSheet />
+            <AppToast />
           </AuthGate>
         </QueryClientProvider>
       </SafeAreaProvider>

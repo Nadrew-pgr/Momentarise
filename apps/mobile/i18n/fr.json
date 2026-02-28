@@ -58,6 +58,10 @@
         "title": "Lien",
         "subtitle": "Capture brute (placeholder)"
       },
+      "event": {
+        "title": "Événement",
+        "subtitle": "Créer un événement calendrier"
+      },
       "sync": {
         "title": "Sync",
         "subtitle": "Ouvrir la page Sync"
@@ -73,14 +77,33 @@
       "nextEvent": "Prochain événement",
       "emptyNextEvent": "Aucun événement prévu.",
       "nextAction": "Prochaine action",
-      "emptyNextAction": "Aucune action planifiée."
+      "emptyNextAction": "Aucune action planifiée.",
+      "dailyDigest": "Résumé du jour",
+      "dailyDigestPlaceholder": "Votre focus aujourd'hui…",
+      "prioritiesDone": "{{total}} priorités",
+      "focusMode": "MODE FOCUS",
+      "inboxPreview": "Aperçu boîte de réception",
+      "viewAll": "Voir tout",
+      "priorityHigh": "Haute",
+      "priorityMedium": "Moyenne",
+      "priorityLow": "Basse",
+      "now": "Maintenant"
     },
     "inbox": {
       "title": "Boîte de réception",
+      "subtitle": "Capturez vite, structurez ensuite.",
       "placeholder": "Cette section arrive dans la Slice 2.",
       "add": "Ajouter une capture",
       "addPlaceholder": "Saisir du texte brut…",
-      "process": "Transformer en élément",
+      "searchPlaceholder": "Rechercher captures et éléments…",
+      "sectionToday": "Aujourd'hui",
+      "sectionYesterday": "Hier",
+      "sectionEarlier": "Plus ancien",
+      "captureFallbackTitle": "Capture {{type}}",
+      "noteFallbackTitle": "Note",
+      "kindCapture": "Capture",
+      "kindItem": "Élément",
+      "process": "Structurer",
       "processTitle": "Titre de l'élément",
       "processSubmit": "Créer l'élément",
       "preview": "Prévisualiser",
@@ -89,6 +112,14 @@
       "emptyCapture": "Capture sans contenu texte.",
       "recentItems": "Éléments récents",
       "emptyItems": "Aucun élément récent.",
+      "filter": {
+        "all": "Tout",
+        "notes": "Notes",
+        "voice": "Voix",
+        "photo": "Photo",
+        "file": "Fichier",
+        "link": "Lien"
+      },
       "cancel": "Annuler"
     },
     "item": {
@@ -98,6 +129,8 @@
       "coachPlaceholder": "Le coach arrive dans une prochaine version.",
       "title": "Titre",
       "backToInbox": "Retour Inbox",
+      "loading": "Chargement de l'élément...",
+      "loadError": "Impossible d'ouvrir cet élément.",
       "saving": "Enregistrement…",
       "saved": "Enregistré",
       "saveError": "Erreur d'enregistrement",
@@ -106,6 +139,7 @@
       "undoDelete": "Annuler",
       "linkedTo": "Lié à",
       "emptyLinks": "Aucun lien pour cet élément.",
+      "noLinksBadge": "Aucun lien",
       "noItemSelected": "Sélectionnez une capture à transformer ou un élément."
     },
     "timeline": {
@@ -118,7 +152,53 @@
       "startHour": "Heure de début",
       "endHour": "Heure de fin",
       "start": "Démarrer",
-      "stop": "Arrêter"
+      "stop": "Arrêter",
+      "eventDetail": "Événement",
+      "startTime": "Début",
+      "endTime": "Fin",
+      "view": {
+        "day": "Jour",
+        "week": "Semaine",
+        "month": "Mois"
+      },
+      "toolbar": {
+        "today": "Aujourd'hui",
+        "prev": "Préc.",
+        "next": "Suiv."
+      },
+      "eventErrors": {
+        "endBeforeStart": "La date de fin ne peut pas être avant la date de début.",
+        "timeRange": "L'heure doit être comprise entre 00:00 et 24:00."
+      },
+      "eventSheet": {
+        "createTitle": "Créer un événement",
+        "editTitle": "Modifier l'événement",
+        "title": "Titre",
+        "description": "Description",
+        "startDate": "Date de début",
+        "startTime": "Heure de début",
+        "endDate": "Date de fin",
+        "endTime": "Heure de fin",
+        "allDay": "Toute la journée",
+        "location": "Lieu",
+        "color": "Couleur",
+        "delete": "Supprimer l'événement",
+        "trackingOn": "Suivi actif",
+        "trackingOff": "Suivi inactif"
+      },
+      "color": {
+        "sky": "Bleu",
+        "amber": "Ambre",
+        "violet": "Violet",
+        "rose": "Rose",
+        "emerald": "Émeraude",
+        "orange": "Orange"
+      }
+    },
+    "settings": {
+      "calendarTitle": "Préférences calendrier",
+      "calendarStartHour": "Heure de début",
+      "calendarEndHour": "Heure de fin"
     },
     "sync": {
       "title": "Sync",
@@ -126,7 +206,23 @@
     },
     "me": {
       "title": "Moi",
-      "placeholder": "Profil et paramètres — bientôt disponible."
+      "placeholder": "Profil et paramètres — bientôt disponible.",
+      "workspace": "WORKSPACE",
+      "system": "SYSTÈME",
+      "settingsPrivacy": "Paramètres & confidentialité",
+      "helpSupport": "Aide & support",
+      "sync": "Sync",
+      "projects": "Projets",
+      "memory": "Mémoire",
+      "automation": "Automatisations",
+      "activityLog": "Journal d'activité",
+      "activityLogSubtitle": "Bientôt disponible",
+      "user": "Utilisateur"
+    },
+    "profile": {
+      "title": "Profil",
+      "email": "Email",
+      "name": "Nom"
     }
   }
 }

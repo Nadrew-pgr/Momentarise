@@ -3,11 +3,27 @@ import { Pressable, Text, View } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Bot, Camera, FileText, Link2, Mic } from "lucide-react-native";
+import { Bot, Calendar, Camera, FileText, Link2, Mic } from "lucide-react-native";
 import type { CaptureType } from "@momentarise/shared";
 import { useCreateCapture } from "@/hooks/use-inbox";
 import { useCreateItem } from "@/hooks/use-item";
-import { useCreateSheet } from "@/lib/store";
+import { useCreateSheet, useEventSheet } from "@/lib/store";
+
+function defaultDraftEvent() {
+  const start = new Date();
+  const minutes = Math.ceil(start.getMinutes() / 15) * 15;
+  start.setMinutes(minutes, 0, 0);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  return {
+    title: "",
+    description: "",
+    location: "",
+    start,
+    end,
+    allDay: false,
+    color: "sky" as const,
+  };
+}
 
 function CaptureOption({
   label,
@@ -49,6 +65,7 @@ export function BottomSheetCreate() {
   const { t } = useTranslation();
   const router = useRouter();
   const { isOpen, openNonce, close } = useCreateSheet();
+  const openEventSheet = useEventSheet((s) => s.open);
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["50%"], []);
   const createCapture = useCreateCapture();
@@ -128,6 +145,12 @@ export function BottomSheetCreate() {
     router.push("/sync");
   }, [close, router]);
 
+  const openEvent = useCallback(() => {
+    close();
+    openEventSheet(defaultDraftEvent());
+    router.push("/(tabs)/timeline");
+  }, [close, openEventSheet, router]);
+
   return (
     <BottomSheet
       ref={bottomSheetRef}
@@ -187,6 +210,14 @@ export function BottomSheetCreate() {
             subtitle={t("create.options.link.subtitle")}
             icon={<Link2 size={18} color="#171717" />}
             onPress={() => openCapture("link")}
+            translucent
+            disabled={isBusy}
+          />
+          <CaptureOption
+            label={t("create.options.event.title")}
+            subtitle={t("create.options.event.subtitle")}
+            icon={<Calendar size={18} color="#171717" />}
+            onPress={openEvent}
             translucent
             disabled={isBusy}
           />

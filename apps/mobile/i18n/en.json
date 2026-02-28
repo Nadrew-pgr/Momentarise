@@ -58,6 +58,10 @@
         "title": "Link",
         "subtitle": "Raw capture (placeholder)"
       },
+      "event": {
+        "title": "Event",
+        "subtitle": "Create a calendar event"
+      },
       "sync": {
         "title": "Sync",
         "subtitle": "Open Sync page"
@@ -73,14 +77,33 @@
       "nextEvent": "Next event",
       "emptyNextEvent": "No event scheduled.",
       "nextAction": "Next action",
-      "emptyNextAction": "No action planned."
+      "emptyNextAction": "No action planned.",
+      "dailyDigest": "Daily Digest",
+      "dailyDigestPlaceholder": "Your focus today is on…",
+      "prioritiesDone": "{{total}} priorities",
+      "focusMode": "FOCUS MODE",
+      "inboxPreview": "Inbox Preview",
+      "viewAll": "View All",
+      "priorityHigh": "High",
+      "priorityMedium": "Medium",
+      "priorityLow": "Low",
+      "now": "Now"
     },
     "inbox": {
       "title": "Inbox",
+      "subtitle": "Capture quickly, structure later.",
       "placeholder": "This section is coming in Slice 2.",
       "add": "Add capture",
       "addPlaceholder": "Enter raw text…",
-      "process": "Process to item",
+      "searchPlaceholder": "Search captures and items…",
+      "sectionToday": "Today",
+      "sectionYesterday": "Yesterday",
+      "sectionEarlier": "Earlier",
+      "captureFallbackTitle": "{{type}} capture",
+      "noteFallbackTitle": "Note",
+      "kindCapture": "Capture",
+      "kindItem": "Item",
+      "process": "Structure",
       "processTitle": "Item title",
       "processSubmit": "Create item",
       "preview": "Preview",
@@ -89,6 +112,14 @@
       "emptyCapture": "Capture without text content.",
       "recentItems": "Recent items",
       "emptyItems": "No recent items.",
+      "filter": {
+        "all": "All",
+        "notes": "Notes",
+        "voice": "Voice",
+        "photo": "Photo",
+        "file": "File",
+        "link": "Link"
+      },
       "cancel": "Cancel"
     },
     "item": {
@@ -98,6 +129,8 @@
       "coachPlaceholder": "Coach is coming in a future version.",
       "title": "Title",
       "backToInbox": "Back to Inbox",
+      "loading": "Loading item...",
+      "loadError": "Unable to open this item.",
       "saving": "Saving…",
       "saved": "Saved",
       "saveError": "Save error",
@@ -106,6 +139,7 @@
       "undoDelete": "Undo",
       "linkedTo": "Linked to",
       "emptyLinks": "No links for this item.",
+      "noLinksBadge": "No links",
       "noItemSelected": "Select a capture to process or an item."
     },
     "timeline": {
@@ -118,7 +152,53 @@
       "startHour": "Start hour",
       "endHour": "End hour",
       "start": "Start",
-      "stop": "Stop"
+      "stop": "Stop",
+      "eventDetail": "Event",
+      "startTime": "Start",
+      "endTime": "End",
+      "view": {
+        "day": "Day",
+        "week": "Week",
+        "month": "Month"
+      },
+      "toolbar": {
+        "today": "Today",
+        "prev": "Prev",
+        "next": "Next"
+      },
+      "eventErrors": {
+        "endBeforeStart": "End date cannot be before start date.",
+        "timeRange": "Selected time must be between 00:00 and 24:00."
+      },
+      "eventSheet": {
+        "createTitle": "Create Event",
+        "editTitle": "Edit Event",
+        "title": "Title",
+        "description": "Description",
+        "startDate": "Start date",
+        "startTime": "Start time",
+        "endDate": "End date",
+        "endTime": "End time",
+        "allDay": "All day",
+        "location": "Location",
+        "color": "Color",
+        "delete": "Delete event",
+        "trackingOn": "Tracking active",
+        "trackingOff": "Tracking inactive"
+      },
+      "color": {
+        "sky": "Sky",
+        "amber": "Amber",
+        "violet": "Violet",
+        "rose": "Rose",
+        "emerald": "Emerald",
+        "orange": "Orange"
+      }
+    },
+    "settings": {
+      "calendarTitle": "Calendar preferences",
+      "calendarStartHour": "Start hour",
+      "calendarEndHour": "End hour"
     },
     "sync": {
       "title": "Sync",
@@ -126,7 +206,23 @@
     },
     "me": {
       "title": "Me",
-      "placeholder": "Profile and settings — coming soon."
+      "placeholder": "Profile and settings — coming soon.",
+      "workspace": "WORKSPACE",
+      "system": "SYSTEM",
+      "settingsPrivacy": "Settings & Privacy",
+      "helpSupport": "Help & Support",
+      "sync": "Sync",
+      "projects": "Projects",
+      "memory": "Memory",
+      "automation": "Automations",
+      "activityLog": "Activity log",
+      "activityLogSubtitle": "Coming soon",
+      "user": "User"
+    },
+    "profile": {
+      "title": "Profile",
+      "email": "Email",
+      "name": "Name"
     }
   }
 }

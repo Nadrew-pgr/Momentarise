@@ -56,11 +56,40 @@
     },
     "inbox": {
       "title": "Boîte de réception",
+      "subtitle": "Capturez vite, structurez ensuite.",
       "placeholder": "Cette section arrive dans la Slice 2.",
       "add": "Ajouter une capture",
       "createNote": "Créer une note",
       "addPlaceholder": "Saisir du texte brut…",
-      "process": "Transformer en élément",
+      "searchPlaceholder": "Rechercher captures et éléments…",
+      "sectionToday": "Aujourd'hui",
+      "sectionYesterday": "Hier",
+      "sectionEarlier": "Plus ancien",
+      "captureFallbackTitle": "Capture {{type}}",
+      "noteFallbackTitle": "Note",
+      "kindCapture": "Capture",
+      "kindItem": "Élément",
+      "openItem": "Ouvrir l'élément",
+      "quickCreateTitle": "Capture rapide",
+      "quickCreateDescription": "Utilisez un point d’entrée unique et décidez ensuite du traitement.",
+      "quickInputLabel": "Contenu brut (optionnel)",
+      "quickInputPlaceholder": "Écrivez quelque chose rapidement…",
+      "quickCreateNote": "Créer une note",
+      "quickCreateText": "Ajouter une capture texte",
+      "quickCreateVoice": "Ajouter une capture vocale",
+      "quickCreatePhoto": "Ajouter une capture photo",
+      "quickCreateFile": "Ajouter une capture fichier",
+      "quickCreateLink": "Ajouter une capture lien",
+      "openSync": "Ouvrir Sync",
+      "filter": {
+        "all": "Tout",
+        "notes": "Notes",
+        "voice": "Voix",
+        "photo": "Photo",
+        "file": "Fichier",
+        "link": "Lien"
+      },
+      "process": "Structurer",
       "processTitle": "Titre de l'élément",
       "processSubmit": "Créer l'élément",
       "preview": "Prévisualiser",
@@ -76,6 +105,8 @@
       "blocks": "Contenu",
       "title": "Titre",
       "backToInbox": "Retour Inbox",
+      "loading": "Chargement de l'élément...",
+      "loadError": "Impossible d'ouvrir cet élément.",
       "saving": "Enregistrement…",
       "saved": "Enregistré",
       "saveError": "Erreur d'enregistrement",
@@ -84,11 +115,76 @@
       "undoDelete": "Annuler",
       "linkedTo": "Lié à",
       "emptyLinks": "Aucun lien pour cet élément.",
+      "noLinksBadge": "Aucun lien",
       "noItemSelected": "Sélectionnez une capture à transformer ou un élément."
     },
     "sync": {
       "title": "Sync",
-      "placeholder": "Page Sync prête pour les prochaines itérations (chat, preview/apply, outils IA)."
+      "newChat": "Nouveau chat",
+      "retry": "Réessayer",
+      "empty": {
+        "title": "Sync est prêt",
+        "subtitle": "Demandez à Sync d'organiser, modifier ou préparer quelque chose."
+      },
+      "composer": {
+        "placeholder": "Demandez à Sync de planifier, modifier ou organiser quelque chose...",
+        "send": "Envoyer le message",
+        "stop": "Arrêter la génération",
+        "model": "Choisir le modèle",
+        "voiceSoon": "Entrée vocale bientôt disponible",
+        "attachSoon": "Pièces jointes bientôt disponibles"
+      },
+      "actions": {
+        "title": "Actions",
+        "open": "Ouvrir les actions",
+        "pending": "Action en attente",
+        "preview": "Aperçu",
+        "apply": "Appliquer",
+        "undo": "Annuler",
+        "changelog": "Journal",
+        "question": "Question",
+        "draft": "Brouillon",
+        "debug": "Debug outils",
+        "noPending": "Aucune action en attente.",
+        "noChanges": "Aucun changement récent.",
+        "noToolEvents": "Aucun appel outil pour le moment.",
+        "appliedSuccess": "Changement appliqué.",
+        "undoneSuccess": "Changement annulé.",
+        "noTime": "Maintenant"
+      },
+      "status": {
+        "streaming": "Sync réfléchit...",
+        "ready": "Sync est prêt",
+        "run": {
+          "pending": "En attente",
+          "streaming": "Streaming",
+          "waiting_answer": "En attente d'une réponse",
+          "ready_to_apply": "Prêt à appliquer",
+          "applied": "Appliqué",
+          "done": "Terminé",
+          "failed": "Échoué",
+          "cancelled": "Annulé"
+        }
+      },
+      "warning": {
+        "title": "Avertissement"
+      },
+      "error": {
+        "title": "Erreur",
+        "generic": "Une erreur est survenue. Veuillez réessayer."
+      },
+      "roles": {
+        "assistant": "Sync",
+        "user": "Vous",
+        "tool": "Outil",
+        "system": "Système"
+      },
+      "aria": {
+        "log": "Conversation Sync"
+      },
+      "message": {
+        "imageAlt": "Image importée"
+      }
     },
     "timeline": {
       "title": "Timeline",

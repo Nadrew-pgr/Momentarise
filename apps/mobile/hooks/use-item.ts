@@ -17,7 +17,7 @@ import {
   itemListResponseSchema,
   itemOutSchema,
 } from "@momentarise/shared";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, readApiError } from "@/lib/api";
 
 export function useItems() {
   return useQuery<ItemListResponse>({
@@ -37,11 +37,14 @@ export function useItem(itemId: string | null) {
     queryFn: async () => {
       if (!itemId) return null;
       const res = await apiFetch(`/api/v1/items/${itemId}`);
-      if (!res.ok) throw new Error("Failed to fetch item");
+      if (!res.ok) {
+        throw new Error(await readApiError(res, "Failed to fetch item"));
+      }
       const data = await res.json();
       return itemOutSchema.parse(data) as ItemOut;
     },
     enabled: !!itemId,
+    retry: 1,
   });
 }
 
@@ -127,6 +130,44 @@ export function useDeleteItem(itemId: string | null) {
       return itemActionResponseSchema.parse(data) as ItemActionResponse;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    },
+  });
+}
+
+export function useDeleteItemById() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId }: { itemId: string }) => {
+      const res = await apiFetch(`/api/v1/items/${itemId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete item");
+      const data = await res.json();
+      return itemActionResponseSchema.parse(data) as ItemActionResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+      queryClient.invalidateQueries({ queryKey: ["item"] });
+    },
+  });
+}
+
+export function useRestoreItemById() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId }: { itemId: string }) => {
+      const res = await apiFetch(`/api/v1/items/${itemId}/restore`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to restore item");
+      const data = await res.json();
+      return itemActionResponseSchema.parse(data) as ItemActionResponse;
+    },
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["item", variables.itemId] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["inbox"] });
     },

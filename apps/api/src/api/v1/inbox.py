@@ -14,6 +14,7 @@ from src.models.workspace import WorkspaceMember
 from src.schemas.inbox import (
     ApplyCaptureRequest,
     ApplyCaptureResponse,
+    CaptureActionResponse,
     CapturePreviewResponse,
     CreateCaptureRequest,
     InboxCaptureOut,
@@ -29,14 +30,15 @@ async def _get_capture_or_404(
     db: AsyncSession,
     workspace_id: UUID,
     capture_id: UUID,
+    include_deleted: bool = False,
 ) -> InboxCapture:
-    result = await db.execute(
-        select(InboxCapture).where(
-            InboxCapture.id == capture_id,
-            InboxCapture.workspace_id == workspace_id,
-            InboxCapture.deleted_at.is_(None),
-        )
-    )
+    clauses = [
+        InboxCapture.id == capture_id,
+        InboxCapture.workspace_id == workspace_id,
+    ]
+    if not include_deleted:
+        clauses.append(InboxCapture.deleted_at.is_(None))
+    result = await db.execute(select(InboxCapture).where(*clauses))
     capture = result.scalar_one_or_none()
     if capture is None:
         raise HTTPException(
@@ -170,3 +172,34 @@ async def process_capture(
     await db.commit()
     await db.refresh(item)
     return ProcessCaptureResponse(item_id=item.id)
+
+
+@router.delete("/{capture_id}", response_model=CaptureActionResponse)
+async def delete_capture(
+    capture_id: UUID,
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> CaptureActionResponse:
+    capture = await _get_capture_or_404(db, workspace.workspace_id, capture_id)
+    capture.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    return CaptureActionResponse(capture_id=capture.id, status="deleted")
+
+
+@router.post("/{capture_id}/restore", response_model=CaptureActionResponse)
+async def restore_capture(
+    capture_id: UUID,
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> CaptureActionResponse:
+    capture = await _get_capture_or_404(
+        db,
+        workspace.workspace_id,
+        capture_id,
+        include_deleted=True,
+    )
+    if capture.deleted_at is None:
+        return CaptureActionResponse(capture_id=capture.id, status="active")
+    capture.deleted_at = None
+    await db.commit()
+    return CaptureActionResponse(capture_id=capture.id, status="restored")

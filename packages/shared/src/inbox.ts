@@ -23,9 +23,13 @@ export const inboxCaptureOutSchema = z.object({
   source: z.string().nullable().optional(),
   capture_type: captureTypeSchema,
   status: captureStatusSchema,
-  metadata: z.record(z.string(), z.unknown()),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
   created_at: z.string().datetime(),
-});
+}).transform(({ meta, metadata, ...rest }) => ({
+  ...rest,
+  metadata: metadata ?? meta ?? {},
+}));
 
 export const inboxListResponseSchema = z.object({
   captures: z.array(inboxCaptureOutSchema),
@@ -66,6 +70,11 @@ export const applyCaptureResponseSchema = z.object({
   item_id: z.string().uuid(),
 });
 
+export const captureActionResponseSchema = z.object({
+  capture_id: z.string().uuid(),
+  status: z.string(),
+});
+
 export type CaptureType = z.infer<typeof captureTypeSchema>;
 export type CaptureStatus = z.infer<typeof captureStatusSchema>;
 export type InboxCaptureOut = z.infer<typeof inboxCaptureOutSchema>;
@@ -76,3 +85,4 @@ export type ProcessCaptureResponse = z.infer<typeof processCaptureResponseSchema
 export type CapturePreviewResponse = z.infer<typeof capturePreviewResponseSchema>;
 export type ApplyCaptureRequest = z.input<typeof applyCaptureRequestSchema>;
 export type ApplyCaptureResponse = z.infer<typeof applyCaptureResponseSchema>;
+export type CaptureActionResponse = z.infer<typeof captureActionResponseSchema>;

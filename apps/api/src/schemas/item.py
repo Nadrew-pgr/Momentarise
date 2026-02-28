@@ -42,7 +42,10 @@ class ItemOut(BaseModel):
     title: str
     kind: ItemKind
     status: LifecycleStatus
-    metadata: dict[str, Any] = Field(alias="meta")
+    metadata: dict[str, Any] = Field(
+        alias="meta",
+        serialization_alias="metadata",
+    )
     source_capture_id: uuid.UUID | None = None
     blocks: list[ProseMirrorNode]
     created_at: datetime
@@ -94,7 +97,10 @@ class EntityLinkOut(BaseModel):
     to_entity_type: EntityType
     to_entity_id: uuid.UUID
     relation_type: LinkRelationType
-    metadata: dict[str, Any] = Field(alias="meta")
+    metadata: dict[str, Any] = Field(
+        alias="meta",
+        serialization_alias="metadata",
+    )
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)

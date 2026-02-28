@@ -2,7 +2,9 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { Menu } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -29,6 +31,15 @@ export function DashboardHeader() {
   const segment = pathname.split("/").filter(Boolean)[0] ?? "today";
   const labelKey = pathToLabelKey[segment] ?? "nav.today";
   const pageLabel = t(labelKey);
+  const isSyncPage = segment === "sync";
+
+  function triggerNewSyncChat() {
+    window.dispatchEvent(new Event("sync-chat:new-chat"));
+  }
+
+  function openSyncActions() {
+    window.dispatchEvent(new Event("sync-chat:open-actions"));
+  }
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
@@ -50,6 +61,24 @@ export function DashboardHeader() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
+
+      {isSyncPage ? (
+        <div className="ml-auto flex items-center gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={triggerNewSyncChat}>
+            {t("pages.sync.newChat")}
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            className="h-8 w-8 xl:hidden"
+            onClick={openSyncActions}
+            aria-label={t("pages.sync.actions.open")}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : null}
     </header>
   );
 }

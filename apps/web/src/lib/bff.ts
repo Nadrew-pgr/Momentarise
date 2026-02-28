@@ -23,6 +23,46 @@ export async function proxyWithAuth(
       ...init?.headers,
     },
   });
-  const data = await res.json().catch(() => ({}));
-  return NextResponse.json(data, { status: res.status });
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const data = await res.json().catch(() => ({}));
+    return NextResponse.json(data, { status: res.status });
+  }
+  const text = await res.text();
+  return new NextResponse(text, {
+    status: res.status,
+    headers: contentType ? { "Content-Type": contentType } : undefined,
+  });
+}
+
+export async function proxyStreamWithAuth(
+  path: string,
+  init?: RequestInit
+): Promise<Response> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+  if (!token) {
+    return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+  }
+
+  const url = `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...init?.headers,
+    },
+  });
+
+  const headers = new Headers();
+  headers.set(
+    "Content-Type",
+    res.headers.get("content-type") ?? "application/x-ndjson"
+  );
+  headers.set("Cache-Control", "no-store");
+  return new Response(res.body, {
+    status: res.status,
+    headers,
+  });
 }

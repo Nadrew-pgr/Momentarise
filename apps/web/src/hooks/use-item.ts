@@ -21,12 +21,33 @@ import {
 } from "@momentarise/shared";
 import { fetchWithAuth } from "@/lib/bff-client";
 
+async function readWebError(res: Response, fallback: string): Promise<string> {
+  const base = `${fallback} (${res.status})`;
+  const contentType = res.headers.get("content-type") ?? "";
+  try {
+    if (contentType.includes("application/json")) {
+      const payload = (await res.json()) as Record<string, unknown>;
+      const detail =
+        typeof payload.detail === "string"
+          ? payload.detail
+          : typeof payload.message === "string"
+            ? payload.message
+            : null;
+      return detail ? `${base}: ${detail}` : base;
+    }
+    const text = (await res.text()).trim();
+    return text ? `${base}: ${text.slice(0, 200)}` : base;
+  } catch {
+    return base;
+  }
+}
+
 export function useItems() {
   return useQuery<ItemListResponse>({
     queryKey: ["items"],
     queryFn: async () => {
       const res = await fetchWithAuth("/api/items");
-      if (!res.ok) throw new Error("Failed to fetch items");
+      if (!res.ok) throw new Error(await readWebError(res, "Failed to fetch items"));
       const data = await res.json();
       return itemListResponseSchema.parse(data) as ItemListResponse;
     },
@@ -39,7 +60,7 @@ export function useItem(itemId: string | null) {
     queryFn: async () => {
       if (!itemId) return null;
       const res = await fetchWithAuth(`/api/items/${itemId}`);
-      if (!res.ok) throw new Error("Failed to fetch item");
+      if (!res.ok) throw new Error(await readWebError(res, "Failed to fetch item"));
       const data = await res.json();
       return itemOutSchema.parse(data) as ItemOut;
     },
@@ -137,6 +158,25 @@ export function useDeleteItem(itemId: string | null) {
   });
 }
 
+export function useDeleteItemById() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId }: { itemId: string }) => {
+      const res = await fetchWithAuth(`/api/items/${itemId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete item");
+      const data = await res.json();
+      return itemActionResponseSchema.parse(data) as ItemActionResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+      queryClient.invalidateQueries({ queryKey: ["item"] });
+    },
+  });
+}
+
 export function useRestoreItem(itemId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -151,6 +191,25 @@ export function useRestoreItem(itemId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["item", itemId] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    },
+  });
+}
+
+export function useRestoreItemById() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId }: { itemId: string }) => {
+      const res = await fetchWithAuth(`/api/items/${itemId}/restore`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to restore item");
+      const data = await res.json();
+      return itemActionResponseSchema.parse(data) as ItemActionResponse;
+    },
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["item", variables.itemId] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["inbox"] });
     },
