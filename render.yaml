@@ -1,0 +1,30 @@
+services:
+  # Base de données PostgreSQL
+  - type: database
+    name: momentarise-db
+    plan: free
+    databaseName: momentarise
+    user: momentarise
+
+  # Service API FastAPI
+  - type: web
+    name: momentarise-api
+    env: docker
+    plan: free
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: apps/api
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: momentarise-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: http://localhost:3000,https://momentarise.vercel.app
+      - key: SYNC_LLM_PROVIDER
+        value: mistral
+      - key: MISTRAL_API_KEY
+        sync: false # À saisir manuellement dans le dashboard Render
+      - key: PORT
+        value: 10000
