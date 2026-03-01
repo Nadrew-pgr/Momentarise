@@ -7,6 +7,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Text as UiText } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAppToast } from "@/lib/store";
 import {
   useAiPreferences,
   useUpdateAiPreferences,
@@ -20,32 +23,35 @@ const PROVIDER_LABELS: Record<(typeof PROVIDER_KEYS)[number], string> = {
   vlm: "pages.settings.providerVlm",
 };
 
+const defaultProviderPrefs = {
+  transcription: {
+    provider: "mistral" as "mistral" | "openai" | "heuristic",
+    model: "voxtral-mini-latest",
+    language: "auto",
+    fallback_enabled: true,
+  },
+  ocr: {
+    provider: "mistral" as "mistral" | "openai" | "heuristic",
+    model: "mistral-ocr-latest",
+    fallback_enabled: true,
+  },
+  vlm: {
+    provider: "mistral" as "mistral" | "openai" | "heuristic",
+    model: "pixtral-12b-latest",
+    fallback_enabled: true,
+  },
+};
+
 export default function SettingsAiScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const showToast = useAppToast((s) => s.show);
   const aiPreferencesQuery = useAiPreferences();
   const updateAiPreferencesMutation = useUpdateAiPreferences();
   const [draftAiMode, setDraftAiMode] = useState<"proposal_only" | "auto_apply">("proposal_only");
   const [draftAutoApplyThreshold, setDraftAutoApplyThreshold] = useState(0.9);
   const [draftMaxActions, setDraftMaxActions] = useState(3);
-  const [draftProviderPrefs, setDraftProviderPrefs] = useState({
-    transcription: {
-      provider: "mistral" as "mistral" | "openai" | "heuristic",
-      model: "voxtral-mini-latest",
-      language: "auto",
-      fallback_enabled: true,
-    },
-    ocr: {
-      provider: "mistral" as "mistral" | "openai" | "heuristic",
-      model: "mistral-ocr-latest",
-      fallback_enabled: true,
-    },
-    vlm: {
-      provider: "mistral" as "mistral" | "openai" | "heuristic",
-      model: "pixtral-12b-latest",
-      fallback_enabled: true,
-    },
-  });
+  const [draftProviderPrefs, setDraftProviderPrefs] = useState(defaultProviderPrefs);
 
   useEffect(() => {
     if (aiPreferencesQuery.data) {
@@ -72,10 +78,32 @@ export default function SettingsAiScreen() {
         capture_provider_preferences: draftProviderPrefs,
         last_known_updated_at: aiPreferencesQuery.data?.updated_at,
       });
+      showToast({ message: t("pages.settings.saved") });
     } catch {
       await aiPreferencesQuery.refetch();
     }
   };
+
+  const isPending = updateAiPreferencesMutation.isPending;
+
+  if (aiPreferencesQuery.isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
+        <View className="flex-row items-center px-4 py-3 border-b border-border">
+          <Pressable onPress={() => router.back()} className="p-2 -ml-2">
+            <ChevronLeft size={24} color="#737373" />
+          </Pressable>
+          <UiText className="text-lg font-semibold text-foreground flex-1 ml-2">
+            {t("pages.settings.aiTitle")}
+          </UiText>
+        </View>
+        <View className="flex-1 px-4 pt-4 gap-4">
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
@@ -91,17 +119,21 @@ export default function SettingsAiScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
       >
+        {/* Carte 1 — Comportement IA */}
         <Card className="rounded-xl border border-border bg-card">
           <CardContent className="p-4">
-            <UiText className="text-sm font-semibold text-foreground">
-              {t("pages.settings.aiTitle")}
+            <UiText className="text-xs text-muted-foreground">
+              {t("pages.settings.aiBehaviorSubtitle")}
             </UiText>
 
-            <View className="mt-4 flex-row items-center justify-between">
-              <UiText className="text-foreground">
+            <View className="mt-4">
+              <UiText className="text-sm font-medium text-foreground">
                 {t("pages.settings.aiMode")}
               </UiText>
-              <View className="flex-row gap-2">
+              <UiText className="text-xs text-muted-foreground mt-0.5">
+                {t("pages.settings.aiModeHelp")}
+              </UiText>
+              <View className="mt-2 flex-row gap-2">
                 <Pressable
                   onPress={() => setDraftAiMode("proposal_only")}
                   className={`rounded border px-3 py-1.5 ${
@@ -125,10 +157,15 @@ export default function SettingsAiScreen() {
               </View>
             </View>
 
-            <View className="mt-3 flex-row items-center justify-between">
-              <UiText className="text-foreground">
-                {t("pages.settings.aiThreshold")}
-              </UiText>
+            <View className="mt-4 flex-row items-center justify-between">
+              <View>
+                <UiText className="text-sm font-medium text-foreground">
+                  {t("pages.settings.aiThreshold")}
+                </UiText>
+                <UiText className="text-xs text-muted-foreground mt-0.5">
+                  {t("pages.settings.aiThresholdHelp")}
+                </UiText>
+              </View>
               <View className="flex-row items-center gap-2">
                 <Pressable
                   disabled={!thresholdCanDecrement}
@@ -156,10 +193,15 @@ export default function SettingsAiScreen() {
               </View>
             </View>
 
-            <View className="mt-3 flex-row items-center justify-between">
-              <UiText className="text-foreground">
-                {t("pages.settings.aiMaxActions")}
-              </UiText>
+            <View className="mt-4 flex-row items-center justify-between">
+              <View>
+                <UiText className="text-sm font-medium text-foreground">
+                  {t("pages.settings.aiMaxActions")}
+                </UiText>
+                <UiText className="text-xs text-muted-foreground mt-0.5">
+                  {t("pages.settings.aiMaxActionsHelp")}
+                </UiText>
+              </View>
               <View className="flex-row items-center gap-2">
                 <Pressable
                   disabled={!maxActionsCanDecrement}
@@ -191,98 +233,91 @@ export default function SettingsAiScreen() {
               <Button
                 size="sm"
                 onPress={() => void saveSettings()}
-                disabled={updateAiPreferencesMutation.isPending}
+                disabled={isPending}
               >
                 <UiText>{t("common.save")}</UiText>
               </Button>
             </View>
+          </CardContent>
+        </Card>
 
-            <View className="mt-4 rounded-lg border border-border bg-background/40 p-3">
-              <UiText className="text-xs font-semibold uppercase text-muted-foreground">
-                {t("pages.settings.captureProviders")}
-              </UiText>
-              {PROVIDER_KEYS.map((key) => (
-                <View key={key} className="mt-3 rounded-md border border-border/70 p-3">
-                  <UiText className="mb-2 text-sm font-medium text-foreground">
-                    {t(PROVIDER_LABELS[key])}
+        {/* Carte 2 — Providers de capture */}
+        <Card className="mt-4 rounded-xl border border-border bg-card">
+          <CardContent className="p-4">
+            <UiText className="text-xs font-semibold uppercase text-muted-foreground">
+              {t("pages.settings.captureProviders")}
+            </UiText>
+            {PROVIDER_KEYS.map((key) => (
+              <View key={key} className="mt-4 rounded-lg border border-border/70 p-3">
+                <UiText className="mb-2 text-sm font-medium text-foreground">
+                  {t(PROVIDER_LABELS[key])}
+                </UiText>
+                <View className="flex-row flex-wrap gap-2">
+                  {(["mistral", "openai", "heuristic"] as const).map((provider) => (
+                    <Pressable
+                      key={`${key}-${provider}`}
+                      onPress={() =>
+                        setDraftProviderPrefs((prev) => ({
+                          ...prev,
+                          [key]: {
+                            ...prev[key],
+                            provider,
+                          },
+                        }))
+                      }
+                      className={`rounded border px-3 py-1.5 ${
+                        draftProviderPrefs[key].provider === provider
+                          ? "border-primary bg-primary/15"
+                          : "border-input"
+                      }`}
+                    >
+                      <UiText className="text-foreground">{provider}</UiText>
+                    </Pressable>
+                  ))}
+                </View>
+                <Input
+                  className="mt-2"
+                  value={draftProviderPrefs[key].model}
+                  onChangeText={(value) =>
+                    setDraftProviderPrefs((prev) => ({
+                      ...prev,
+                      [key]: {
+                        ...prev[key],
+                        model: value,
+                      },
+                    }))
+                  }
+                  placeholder={t("pages.settings.modelPlaceholder", {
+                    type: t(PROVIDER_LABELS[key]),
+                  })}
+                />
+                <View className="mt-2 flex-row items-center justify-between">
+                  <UiText className="text-sm text-foreground">
+                    {t("pages.settings.fallbackLabel")}
                   </UiText>
-                  <View className="flex-row flex-wrap gap-2">
-                    {(["mistral", "openai", "heuristic"] as const).map((provider) => (
-                      <Pressable
-                        key={`${key}-${provider}`}
-                        onPress={() =>
-                          setDraftProviderPrefs((prev) => ({
-                            ...prev,
-                            [key]: {
-                              ...prev[key],
-                              provider,
-                            },
-                          }))
-                        }
-                        className={`rounded border px-3 py-1.5 ${
-                          draftProviderPrefs[key].provider === provider
-                            ? "border-primary bg-primary/15"
-                            : "border-input"
-                        }`}
-                      >
-                        <UiText className="text-foreground">{provider}</UiText>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <Input
-                    className="mt-2"
-                    value={draftProviderPrefs[key].model}
-                    onChangeText={(value) =>
+                  <Switch
+                    checked={draftProviderPrefs[key].fallback_enabled}
+                    onCheckedChange={(checked) =>
                       setDraftProviderPrefs((prev) => ({
                         ...prev,
                         [key]: {
                           ...prev[key],
-                          model: value,
+                          fallback_enabled: checked,
                         },
                       }))
                     }
-                    placeholder={`${key} model`}
                   />
-                  <View className="mt-2 flex-row gap-2">
-                    <Pressable
-                      onPress={() =>
-                        setDraftProviderPrefs((prev) => ({
-                          ...prev,
-                          [key]: {
-                            ...prev[key],
-                            fallback_enabled: true,
-                          },
-                        }))
-                      }
-                      className={`rounded border px-3 py-1.5 ${
-                        draftProviderPrefs[key].fallback_enabled
-                          ? "border-primary bg-primary/15"
-                          : "border-input"
-                      }`}
-                    >
-                      <UiText className="text-foreground">{t("pages.settings.fallbackOn")}</UiText>
-                    </Pressable>
-                    <Pressable
-                      onPress={() =>
-                        setDraftProviderPrefs((prev) => ({
-                          ...prev,
-                          [key]: {
-                            ...prev[key],
-                            fallback_enabled: false,
-                          },
-                        }))
-                      }
-                      className={`rounded border px-3 py-1.5 ${
-                        !draftProviderPrefs[key].fallback_enabled
-                          ? "border-primary bg-primary/15"
-                          : "border-input"
-                      }`}
-                    >
-                      <UiText className="text-foreground">{t("pages.settings.fallbackOff")}</UiText>
-                    </Pressable>
-                  </View>
                 </View>
-              ))}
+              </View>
+            ))}
+            <View className="mt-4 flex-row justify-end">
+              <Button
+                size="sm"
+                onPress={() => void saveSettings()}
+                disabled={isPending}
+              >
+                <UiText>{t("common.save")}</UiText>
+              </Button>
             </View>
           </CardContent>
         </Card>
