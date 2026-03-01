@@ -244,7 +244,13 @@
     "aiModeProposalOnly": "Proposal only",
     "aiModeAutoApply": "Auto apply",
     "aiThreshold": "Auto apply threshold",
-    "aiMaxActions": "Max actions per capture"
+    "aiMaxActions": "Max actions per capture",
+    "captureProviders": "Capture providers",
+    "providerTranscription": "Transcription",
+    "providerOcr": "OCR",
+    "providerVlm": "VLM",
+    "fallbackOn": "Fallback on",
+    "fallbackOff": "Fallback off"
   },
     "sync": {
       "title": "Sync",

@@ -7,7 +7,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import { useAuthStore } from "@/lib/store";
 import { getOnboardingCompleted, getToken } from "@/lib/auth";
-import { BottomSheetCreate } from "@/components/BottomSheetCreate";
+import { CaptureFab } from "@/components/CaptureFab";
 import { EventSheet } from "@/components/EventSheet";
 import { AppToast } from "@/components/AppToast";
 import "@/i18n/config";
@@ -93,7 +93,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthGate>
             <Stack screenOptions={{ headerShown: false }} />
-            <BottomSheetCreate />
+            <CaptureFab />
             <EventSheet />
             <AppToast />
           </AuthGate>

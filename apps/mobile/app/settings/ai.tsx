@@ -1,4 +1,4 @@
-import { View, Pressable } from "react-native";
+import { View, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -8,24 +8,23 @@ import { Text as UiText } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  useCalendarPreferences,
-  useUpdateCalendarPreferences,
-} from "@/hooks/use-calendar-preferences";
-import {
   useAiPreferences,
   useUpdateAiPreferences,
 } from "@/hooks/use-ai-preferences";
 import { useEffect, useState } from "react";
 
-export default function SettingsScreen() {
+const PROVIDER_KEYS = ["transcription", "ocr", "vlm"] as const;
+const PROVIDER_LABELS: Record<(typeof PROVIDER_KEYS)[number], string> = {
+  transcription: "pages.settings.providerTranscription",
+  ocr: "pages.settings.providerOcr",
+  vlm: "pages.settings.providerVlm",
+};
+
+export default function SettingsAiScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const preferencesQuery = useCalendarPreferences();
-  const updatePreferencesMutation = useUpdateCalendarPreferences();
   const aiPreferencesQuery = useAiPreferences();
   const updateAiPreferencesMutation = useUpdateAiPreferences();
-  const [draftStartHour, setDraftStartHour] = useState(8);
-  const [draftEndHour, setDraftEndHour] = useState(24);
   const [draftAiMode, setDraftAiMode] = useState<"proposal_only" | "auto_apply">("proposal_only");
   const [draftAutoApplyThreshold, setDraftAutoApplyThreshold] = useState(0.9);
   const [draftMaxActions, setDraftMaxActions] = useState(3);
@@ -49,13 +48,6 @@ export default function SettingsScreen() {
   });
 
   useEffect(() => {
-    if (preferencesQuery.data) {
-      setDraftStartHour(preferencesQuery.data.start_hour ?? 8);
-      setDraftEndHour(preferencesQuery.data.end_hour ?? 24);
-    }
-  }, [preferencesQuery.data]);
-
-  useEffect(() => {
     if (aiPreferencesQuery.data) {
       setDraftAiMode(aiPreferencesQuery.data.mode);
       setDraftAutoApplyThreshold(aiPreferencesQuery.data.auto_apply_threshold ?? 0.9);
@@ -66,23 +58,13 @@ export default function SettingsScreen() {
     }
   }, [aiPreferencesQuery.data]);
 
-  const startCanDecrement = draftStartHour > 0;
-  const startCanIncrement = draftStartHour < 23 && draftStartHour + 1 < draftEndHour;
-  const endCanDecrement = draftEndHour - 1 > draftStartHour;
-  const endCanIncrement = draftEndHour < 24;
   const thresholdCanDecrement = draftAutoApplyThreshold > 0;
   const thresholdCanIncrement = draftAutoApplyThreshold < 1;
   const maxActionsCanDecrement = draftMaxActions > 1;
   const maxActionsCanIncrement = draftMaxActions < 3;
 
   const saveSettings = async () => {
-    if (draftEndHour <= draftStartHour) return;
     try {
-      await updatePreferencesMutation.mutateAsync({
-        start_hour: draftStartHour,
-        end_hour: draftEndHour,
-        last_known_updated_at: preferencesQuery.data?.updated_at,
-      });
       await updateAiPreferencesMutation.mutateAsync({
         mode: draftAiMode,
         auto_apply_threshold: Number(draftAutoApplyThreshold.toFixed(2)),
@@ -91,10 +73,10 @@ export default function SettingsScreen() {
         last_known_updated_at: aiPreferencesQuery.data?.updated_at,
       });
     } catch {
-      await preferencesQuery.refetch();
       await aiPreferencesQuery.refetch();
     }
   };
+
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       <View className="flex-row items-center px-4 py-3 border-b border-border">
@@ -102,75 +84,14 @@ export default function SettingsScreen() {
           <ChevronLeft size={24} color="#737373" />
         </Pressable>
         <UiText className="text-lg font-semibold text-foreground flex-1 ml-2">
-          {t("pages.me.settingsPrivacy")}
+          {t("pages.settings.aiTitle")}
         </UiText>
       </View>
-      <View className="flex-1 px-6 pt-4">
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
+      >
         <Card className="rounded-xl border border-border bg-card">
-          <CardContent className="p-4">
-            <UiText className="text-sm font-semibold text-foreground">
-              {t("pages.settings.calendarTitle")}
-            </UiText>
-
-            <View className="mt-4 flex-row items-center justify-between">
-              <UiText className="text-foreground">
-                {t("pages.settings.calendarStartHour")}
-              </UiText>
-              <View className="flex-row items-center gap-2">
-                <Pressable
-                  disabled={!startCanDecrement}
-                  onPress={() => startCanDecrement && setDraftStartHour((v) => v - 1)}
-                  className="rounded border border-input px-3 py-1.5"
-                >
-                  <UiText className="text-foreground">-</UiText>
-                </Pressable>
-                <UiText className="w-16 text-center text-foreground">
-                  {String(draftStartHour).padStart(2, "0")}:00
-                </UiText>
-                <Pressable
-                  disabled={!startCanIncrement}
-                  onPress={() => startCanIncrement && setDraftStartHour((v) => v + 1)}
-                  className="rounded border border-input px-3 py-1.5"
-                >
-                  <UiText className="text-foreground">+</UiText>
-                </Pressable>
-              </View>
-            </View>
-
-            <View className="mt-3 flex-row items-center justify-between">
-              <UiText className="text-foreground">
-                {t("pages.settings.calendarEndHour")}
-              </UiText>
-              <View className="flex-row items-center gap-2">
-                <Pressable
-                  disabled={!endCanDecrement}
-                  onPress={() => endCanDecrement && setDraftEndHour((v) => v - 1)}
-                  className="rounded border border-input px-3 py-1.5"
-                >
-                  <UiText className="text-foreground">-</UiText>
-                </Pressable>
-                <UiText className="w-16 text-center text-foreground">
-                  {String(draftEndHour).padStart(2, "0")}:00
-                </UiText>
-                <Pressable
-                  disabled={!endCanIncrement}
-                  onPress={() => endCanIncrement && setDraftEndHour((v) => v + 1)}
-                  className="rounded border border-input px-3 py-1.5"
-                >
-                  <UiText className="text-foreground">+</UiText>
-                </Pressable>
-              </View>
-            </View>
-
-            {updatePreferencesMutation.error instanceof Error ? (
-              <UiText className="mt-3 text-destructive text-xs">
-                {updatePreferencesMutation.error.message}
-              </UiText>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <Card className="mt-3 rounded-xl border border-border bg-card">
           <CardContent className="p-4">
             <UiText className="text-sm font-semibold text-foreground">
               {t("pages.settings.aiTitle")}
@@ -270,11 +191,7 @@ export default function SettingsScreen() {
               <Button
                 size="sm"
                 onPress={() => void saveSettings()}
-                disabled={
-                  updatePreferencesMutation.isPending ||
-                  updateAiPreferencesMutation.isPending ||
-                  draftEndHour <= draftStartHour
-                }
+                disabled={updateAiPreferencesMutation.isPending}
               >
                 <UiText>{t("common.save")}</UiText>
               </Button>
@@ -282,12 +199,12 @@ export default function SettingsScreen() {
 
             <View className="mt-4 rounded-lg border border-border bg-background/40 p-3">
               <UiText className="text-xs font-semibold uppercase text-muted-foreground">
-                Capture Providers
+                {t("pages.settings.captureProviders")}
               </UiText>
-              {(["transcription", "ocr", "vlm"] as const).map((key) => (
+              {PROVIDER_KEYS.map((key) => (
                 <View key={key} className="mt-3 rounded-md border border-border/70 p-3">
-                  <UiText className="mb-2 text-sm font-medium capitalize text-foreground">
-                    {key}
+                  <UiText className="mb-2 text-sm font-medium text-foreground">
+                    {t(PROVIDER_LABELS[key])}
                   </UiText>
                   <View className="flex-row flex-wrap gap-2">
                     {(["mistral", "openai", "heuristic"] as const).map((provider) => (
@@ -343,7 +260,7 @@ export default function SettingsScreen() {
                           : "border-input"
                       }`}
                     >
-                      <UiText className="text-foreground">Fallback on</UiText>
+                      <UiText className="text-foreground">{t("pages.settings.fallbackOn")}</UiText>
                     </Pressable>
                     <Pressable
                       onPress={() =>
@@ -361,7 +278,7 @@ export default function SettingsScreen() {
                           : "border-input"
                       }`}
                     >
-                      <UiText className="text-foreground">Fallback off</UiText>
+                      <UiText className="text-foreground">{t("pages.settings.fallbackOff")}</UiText>
                     </Pressable>
                   </View>
                 </View>
@@ -369,7 +286,7 @@ export default function SettingsScreen() {
             </View>
           </CardContent>
         </Card>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

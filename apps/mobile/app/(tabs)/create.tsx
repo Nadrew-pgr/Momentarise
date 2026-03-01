@@ -1,28 +1,20 @@
 import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useCreateSheet } from "@/lib/store";
 
 /**
- * Fallback route for the center tab.
- * Normal flow intercepts tab press and opens BottomSheetCreate directly.
- * If navigation still reaches this route, redirect to Inbox and open the sheet.
+ * Route (tabs)/create is hidden from tab bar (href: null).
+ * If reached (e.g. deep link), redirect to today and open the FAB overlay.
  */
-export default function CreateScreenFallback() {
+export default function CreateScreenRedirect() {
   const router = useRouter();
   const openCreateSheet = useCreateSheet((s) => s.open);
 
   useEffect(() => {
     openCreateSheet();
-    router.replace("/(tabs)/inbox");
+    router.replace("/(tabs)/today");
   }, [openCreateSheet, router]);
 
-  return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="small" />
-      </View>
-    </SafeAreaView>
-  );
+  return <View />;
 }

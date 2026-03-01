@@ -5,6 +5,30 @@ Voir `project/docs/self-improvement.md` pour le détail des champs et la promoti
 
 ---
 
+## [LRN-20260228-005] knowledge_gap — Barre d’onglets custom (Expo Router + bottom-tabs) : screenOptions.tabBar ignoré
+
+**Logged**: 2026-02-28
+**Priority**: high
+**Status**: resolved
+**Area**: mobile / navigation
+
+### Summary
+Avec Expo Router et `@react-navigation/bottom-tabs`, l’option `screenOptions.tabBar` (fonction qui renvoie un composant de barre personnalisé) n’est pas transmise à la vue : la barre par défaut est toujours affichée.
+
+### Details
+- Le Navigator (createBottomTabNavigator) ne transmet pas `screenOptions` à `BottomTabView` ; il ne passe que `...rest`, `state`, `navigation`, `descriptors`. La prop `tabBar` provient donc uniquement du défaut (`renderTabBarDefault`).
+- Conséquence : une barre d’onglets entièrement custom via `tabBar: (props) => <CustomTabBar ... />` dans `screenOptions` ne s’affiche jamais ; l’utilisateur voit la barre native avec les options par écran (tabBarIcon, tabBarButton, etc.).
+- Pour un bouton central type « créer » (ex. +) : le rendre via l’onglet "create" avec `tabBarIcon` (cercle + icône) et `tabBarButton` (onPress → ouvrir l’overlay au lieu de naviguer). Optionnel : `tabBarItemStyle: { minWidth: 88 }` et padding horizontal autour de l’icône pour un peu plus d’espace.
+
+### Suggested Action
+Ne pas tenter de remplacer toute la barre par un composant custom via `screenOptions.tabBar`. Utiliser la barre par défaut et personnaliser l’onglet create avec `tabBarIcon` + `tabBarButton`. Voir `apps/mobile/app/(tabs)/_layout.tsx`.
+
+### Metadata
+- Related Files: `apps/mobile/app/(tabs)/_layout.tsx`, `@react-navigation/bottom-tabs` (createBottomTabNavigator.js, BottomTabView.js)
+- See also: `project/docs/mobile-navigation-diagnostic.md`
+
+---
+
 ## [LRN-20260228-004] best_practice — Scroll page chat / dashboard (Next.js flex chain)
 
 **Logged**: 2026-02-28

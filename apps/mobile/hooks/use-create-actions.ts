@@ -1,15 +1,13 @@
-import { useCallback, useMemo, useRef, useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+"use client";
+
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Bot, Calendar, Camera, FileText, Link2, Mic } from "lucide-react-native";
 import { useCreateCapture, useUploadCapture } from "@/hooks/use-inbox";
 import { useCreateItem } from "@/hooks/use-item";
-import { Input } from "@/components/ui/input";
-import { useAppToast, useCreateSheet, useEventSheet } from "@/lib/store";
+import { useAppToast, useEventSheet } from "@/lib/store";
 
-type PickedAsset = {
+export type PickedAsset = {
   uri: string;
   name: string;
   mimeType?: string;
@@ -40,74 +38,28 @@ function isPermissionGranted(value: unknown): boolean {
   return false;
 }
 
-function CaptureOption({
-  label,
-  subtitle,
-  icon,
-  onPress,
-  translucent,
-  disabled,
-}: {
-  label: string;
-  subtitle: string;
-  icon: React.ReactNode;
-  onPress?: () => void;
-  translucent?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      className={`rounded-xl border px-3 py-3 ${
-        translucent ? "border-border/60 bg-card/60" : "border-border bg-card"
-      } ${disabled ? "opacity-60" : ""}`}
-    >
-      <View className="flex-row items-center gap-3">
-        <View className="h-9 w-9 items-center justify-center rounded-lg bg-background">
-          {icon}
-        </View>
-        <View className="flex-1">
-          <Text className="text-sm font-semibold text-foreground">{label}</Text>
-          <Text className="text-xs text-muted-foreground">{subtitle}</Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-export function BottomSheetCreate() {
+export function useCreateActions(onClose: () => void) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { isOpen, openNonce, close } = useCreateSheet();
   const openEventSheet = useEventSheet((s) => s.open);
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["56%"], []);
   const createCapture = useCreateCapture();
   const uploadCapture = useUploadCapture();
   const createItem = useCreateItem();
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [showLinkInput, setShowLinkInput] = useState(false);
-  const [linkValue, setLinkValue] = useState("");
+  const showToast = useAppToast((s) => s.show);
   const [isRecording, setIsRecording] = useState(false);
   const voiceStopRef = useRef<null | (() => Promise<string | null>)>(null);
+
   const isBusy = createCapture.isPending || uploadCapture.isPending || createItem.isPending;
-  const showToast = useAppToast((s) => s.show);
 
   const setUserError = useCallback(
     (message: string) => {
-      setActionError(message);
       showToast({ message });
     },
     [showToast]
   );
 
   const uploadSelectedAsset = useCallback(
-    (
-      asset: PickedAsset,
-      captureType: "voice" | "photo" | "file",
-      channel: string
-    ) => {
+    (asset: PickedAsset, captureType: "voice" | "photo" | "file", channel: string) => {
       uploadCapture.mutate(
         {
           uri: asset.uri,
@@ -116,7 +68,7 @@ export function BottomSheetCreate() {
           captureType,
           source: "manual",
           metadata: {
-            source: "mobile_plus",
+            source: "mobile_fab",
             channel,
             file_name: asset.name,
             file_size: asset.size,
@@ -125,7 +77,7 @@ export function BottomSheetCreate() {
         },
         {
           onSuccess: () => {
-            close();
+            onClose();
             router.push("/inbox");
           },
           onError: (error) => {
@@ -134,7 +86,7 @@ export function BottomSheetCreate() {
         }
       );
     },
-    [close, router, setUserError, t, uploadCapture]
+    [onClose, router, setUserError, t, uploadCapture]
   );
 
   const pickDocument = useCallback(async (mimeType: string): Promise<PickedAsset | null> => {
@@ -176,7 +128,6 @@ export function BottomSheetCreate() {
     voiceStopRef.current = null;
     setIsRecording(false);
     if (!stopper) return;
-
     try {
       const uri = await stopper();
       if (!uri) {
@@ -184,11 +135,7 @@ export function BottomSheetCreate() {
         return;
       }
       uploadSelectedAsset(
-        {
-          uri,
-          name: `voice-${Date.now()}.m4a`,
-          mimeType: "audio/m4a",
-        },
+        { uri, name: `voice-${Date.now()}.m4a`, mimeType: "audio/m4a" },
         "voice",
         "voice_recording"
       );
@@ -197,40 +144,18 @@ export function BottomSheetCreate() {
     }
   }, [setUserError, t, uploadSelectedAsset]);
 
-  useEffect(() => {
-    if (isOpen) {
-      setActionError(null);
-      setShowLinkInput(false);
-      setLinkValue("");
-      bottomSheetRef.current?.snapToIndex(0);
-    } else {
-      bottomSheetRef.current?.close();
-      if (isRecording) {
-        void stopVoiceCapture();
-      }
-    }
-  }, [isOpen, openNonce, isRecording, stopVoiceCapture]);
-
-  const handleSheetChanges = useCallback(
-    (index: number) => {
-      if (index === -1) close();
-    },
-    [close]
-  );
-
   const openNoteCapture = useCallback(() => {
-    setActionError(null);
     createItem.mutate(
       {
         title: t("create.defaultNoteTitle"),
         kind: "note",
         status: "draft",
-        metadata: { source: "mobile_plus", channel: "note" },
+        metadata: { source: "mobile_fab", channel: "note" },
         blocks: [],
       },
       {
         onSuccess: (item) => {
-          close();
+          onClose();
           router.push(`/items/${item.id}`);
         },
         onError: (error) => {
@@ -238,21 +163,20 @@ export function BottomSheetCreate() {
         },
       }
     );
-  }, [close, createItem, router, setUserError, t]);
+  }, [createItem, onClose, router, setUserError, t]);
 
   const openSync = useCallback(() => {
-    close();
+    onClose();
     router.push("/sync");
-  }, [close, router]);
+  }, [onClose, router]);
 
   const openEvent = useCallback(() => {
-    close();
+    onClose();
     openEventSheet(defaultDraftEvent());
     router.push("/(tabs)/timeline");
-  }, [close, openEventSheet, router]);
+  }, [onClose, openEventSheet, router]);
 
   const openFileCapture = useCallback(async () => {
-    setActionError(null);
     try {
       const picked = await pickDocument("*/*");
       if (!picked) return;
@@ -263,7 +187,6 @@ export function BottomSheetCreate() {
   }, [pickDocument, setUserError, t, uploadSelectedAsset]);
 
   const openPhotoCapture = useCallback(async () => {
-    setActionError(null);
     try {
       const moduleName = "expo-image-picker";
       const ImagePicker = (await import(moduleName)) as {
@@ -280,15 +203,11 @@ export function BottomSheetCreate() {
       if (typeof ImagePicker.launchCameraAsync !== "function") {
         throw new Error("Camera capture unavailable");
       }
-      const result = (await ImagePicker.launchCameraAsync({
-        quality: 0.9,
-      })) as {
+      const result = (await ImagePicker.launchCameraAsync({ quality: 0.9 })) as {
         canceled?: boolean;
         assets?: Array<Record<string, unknown>>;
       };
-      if (result?.canceled || !Array.isArray(result?.assets) || !result.assets.length) {
-        return;
-      }
+      if (result?.canceled || !Array.isArray(result?.assets) || !result.assets.length) return;
       const first = result.assets[0];
       const uri = typeof first.uri === "string" ? first.uri : null;
       if (!uri) {
@@ -324,8 +243,6 @@ export function BottomSheetCreate() {
   }, [pickDocument, setUserError, t, uploadSelectedAsset]);
 
   const startVoiceCapture = useCallback(async () => {
-    setActionError(null);
-
     const tryExpoAudio = async (): Promise<(() => Promise<string | null>)> => {
       const moduleName = "expo-audio";
       const audioModule = (await import(moduleName)) as Record<string, unknown>;
@@ -337,10 +254,7 @@ export function BottomSheetCreate() {
         throw new Error("expo-audio permission API unavailable");
       }
       const permission = await requestPermission();
-      if (!isPermissionGranted(permission)) {
-        throw new Error("Microphone permission denied");
-      }
-
+      if (!isPermissionGranted(permission)) throw new Error("Microphone permission denied");
       const setAudioMode =
         (audioModule.setAudioModeAsync as ((config: Record<string, unknown>) => Promise<void>) | undefined) ??
         ((audioModule.AudioModule as Record<string, unknown> | undefined)
@@ -352,7 +266,6 @@ export function BottomSheetCreate() {
           playsInSilentModeIOS: true,
         });
       }
-
       let recorder: Record<string, unknown> | null = null;
       const moduleCreate = audioModule.createAudioRecorder as
         | ((config?: Record<string, unknown>) => Promise<Record<string, unknown>>)
@@ -369,36 +282,25 @@ export function BottomSheetCreate() {
         const AudioRecorderCtor = audioModule.AudioRecorder as
           | (new (...args: unknown[]) => Record<string, unknown>)
           | undefined;
-        if (AudioRecorderCtor) {
-          recorder = new AudioRecorderCtor();
-        }
+        if (AudioRecorderCtor) recorder = new AudioRecorderCtor();
       }
       if (!recorder) throw new Error("expo-audio recorder unavailable");
-
       const prepare =
         (recorder.prepareToRecordAsync as (() => Promise<void>) | undefined) ??
         (recorder.prepareAsync as (() => Promise<void>) | undefined);
-      if (typeof prepare === "function") {
-        await prepare.call(recorder);
-      }
-
+      if (typeof prepare === "function") await prepare.call(recorder);
       const start =
         (recorder.record as (() => Promise<void> | void) | undefined) ??
         (recorder.startAsync as (() => Promise<void>) | undefined) ??
         (recorder.start as (() => Promise<void> | void) | undefined);
-      if (typeof start !== "function") {
-        throw new Error("expo-audio record API unavailable");
-      }
+      if (typeof start !== "function") throw new Error("expo-audio record API unavailable");
       await start.call(recorder);
-
       return async () => {
         const stop =
           (recorder?.stop as (() => Promise<void> | void) | undefined) ??
           (recorder?.stopAsync as (() => Promise<void>) | undefined) ??
           (recorder?.stopAndUnloadAsync as (() => Promise<void>) | undefined);
-        if (typeof stop === "function") {
-          await stop.call(recorder);
-        }
+        if (typeof stop === "function") await stop.call(recorder);
         const uri =
           (recorder?.uri as string | undefined) ??
           (typeof recorder?.getURI === "function" ? (recorder.getURI as () => string | null)() : null);
@@ -418,9 +320,7 @@ export function BottomSheetCreate() {
             stopAndUnloadAsync: () => Promise<void>;
             getURI: () => string | null;
           };
-          RecordingOptionsPresets?: {
-            HIGH_QUALITY?: Record<string, unknown>;
-          };
+          RecordingOptionsPresets?: { HIGH_QUALITY?: Record<string, unknown> };
         };
       };
       const Audio = avModule.Audio;
@@ -428,9 +328,7 @@ export function BottomSheetCreate() {
         throw new Error("expo-av recording API unavailable");
       }
       const permission = await Audio.requestPermissionsAsync();
-      if (!isPermissionGranted(permission)) {
-        throw new Error("Microphone permission denied");
-      }
+      if (!isPermissionGranted(permission)) throw new Error("Microphone permission denied");
       if (Audio.setAudioModeAsync) {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
@@ -451,13 +349,11 @@ export function BottomSheetCreate() {
       setIsRecording(true);
       return;
     } catch {
-      // Fallback below.
+      // fallback
     }
-
     try {
       voiceStopRef.current = await tryExpoAv();
       setIsRecording(true);
-      return;
     } catch {
       await openVoiceFileFallback();
     }
@@ -471,178 +367,55 @@ export function BottomSheetCreate() {
     void startVoiceCapture();
   }, [isRecording, startVoiceCapture, stopVoiceCapture]);
 
-  const submitLinkCapture = useCallback(() => {
-    setActionError(null);
-    let value = linkValue.trim();
-    if (!value) return;
-    if (!value.includes("://")) {
-      value = `https://${value}`;
-    }
-
-    let parsed: URL;
-    try {
-      parsed = new URL(value);
-    } catch {
-      setUserError("Invalid URL format.");
-      return;
-    }
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      setUserError("Only http(s) links are supported.");
-      return;
-    }
-
-    createCapture.mutate(
-      {
-        raw_content: parsed.toString(),
-        source: "manual",
-        capture_type: "link",
-        status: "captured",
-        metadata: { source: "mobile_plus", channel: "link" },
-      },
-      {
-        onSuccess: () => {
-          setShowLinkInput(false);
-          setLinkValue("");
-          close();
-          router.push("/inbox");
-        },
-        onError: (error) => {
-          setUserError(error instanceof Error ? error.message : t("create.error"));
-        },
+  const submitLinkCapture = useCallback(
+    (linkValue: string) => {
+      let value = linkValue.trim();
+      if (!value) return;
+      if (!value.includes("://")) value = `https://${value}`;
+      let parsed: URL;
+      try {
+        parsed = new URL(value);
+      } catch {
+        setUserError("Invalid URL format.");
+        return;
       }
-    );
-  }, [close, createCapture, linkValue, router, setUserError, t]);
-
-  return (
-    <BottomSheet
-      ref={bottomSheetRef}
-      index={-1}
-      snapPoints={snapPoints}
-      onChange={handleSheetChanges}
-      enablePanDownToClose
-      backgroundStyle={{ backgroundColor: "#ffffffee" }}
-      handleIndicatorStyle={{ backgroundColor: "#a3a3a3" }}
-    >
-      <BottomSheetView className="flex-1 px-4 pb-4 pt-2">
-        <View className="mb-3 flex-row items-center justify-between">
-          <Text className="text-lg font-bold text-foreground">{t("create.title")}</Text>
-          <Pressable
-            onPress={close}
-            disabled={isBusy}
-            className="rounded border border-input px-2 py-1"
-          >
-            <Text className="text-xs text-muted-foreground">{t("pages.inbox.cancel")}</Text>
-          </Pressable>
-          {isBusy ? (
-            <Text className="text-xs text-muted-foreground">{t("create.working")}</Text>
-          ) : null}
-        </View>
-
-        {actionError ? (
-          <View className="mb-3 rounded-lg border border-destructive bg-destructive/10 px-3 py-2">
-            <Text className="text-xs text-destructive">{actionError}</Text>
-          </View>
-        ) : null}
-
-        {showLinkInput ? (
-          <View className="mb-3 rounded-xl border border-border bg-card p-3">
-            <Input
-              value={linkValue}
-              onChangeText={setLinkValue}
-              placeholder="https://example.com"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <View className="mt-2 flex-row gap-2">
-              <Pressable
-                onPress={submitLinkCapture}
-                disabled={!linkValue.trim() || isBusy || isRecording}
-                className={`rounded-md px-3 py-2 ${
-                  !linkValue.trim() || isBusy || isRecording ? "bg-primary/40" : "bg-primary"
-                }`}
-              >
-                <Text className="text-xs font-semibold text-primary-foreground">Capture Link</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  setShowLinkInput(false);
-                  setLinkValue("");
-                }}
-                disabled={isBusy}
-                className="rounded-md border border-border px-3 py-2"
-              >
-                <Text className="text-xs text-foreground">{t("pages.inbox.cancel")}</Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
-
-        <View className="gap-2">
-          <CaptureOption
-            label={t("create.options.note.title")}
-            subtitle={t("create.options.note.subtitle")}
-            icon={<FileText size={18} color="#171717" />}
-            onPress={openNoteCapture}
-            disabled={isBusy || isRecording}
-          />
-          <CaptureOption
-            label={isRecording ? "Stop recording" : t("create.options.voice.title")}
-            subtitle={
-              isRecording
-                ? "Tap to stop and upload."
-                : "Record now (fallback to audio file picker)."
-            }
-            icon={<Mic size={18} color="#171717" />}
-            onPress={handleVoiceCapture}
-            translucent
-            disabled={isBusy}
-          />
-          <CaptureOption
-            label={t("create.options.photo.title")}
-            subtitle="Take a real photo capture."
-            icon={<Camera size={18} color="#171717" />}
-            onPress={() => {
-              void openPhotoCapture();
-            }}
-            translucent
-            disabled={isBusy || isRecording}
-          />
-          <CaptureOption
-            label={t("create.options.link.title")}
-            subtitle="Paste a URL and process it in Inbox."
-            icon={<Link2 size={18} color="#171717" />}
-            onPress={() => setShowLinkInput(true)}
-            translucent
-            disabled={isBusy || isRecording}
-          />
-          <CaptureOption
-            label={t("create.options.file.title")}
-            subtitle="Upload a real document."
-            icon={<FileText size={18} color="#171717" />}
-            onPress={() => {
-              void openFileCapture();
-            }}
-            translucent
-            disabled={isBusy || isRecording}
-          />
-          <CaptureOption
-            label={t("create.options.event.title")}
-            subtitle={t("create.options.event.subtitle")}
-            icon={<Calendar size={18} color="#171717" />}
-            onPress={openEvent}
-            translucent
-            disabled={isBusy || isRecording}
-          />
-          <CaptureOption
-            label={t("create.options.sync.title")}
-            subtitle={t("create.options.sync.subtitle")}
-            icon={<Bot size={18} color="#171717" />}
-            onPress={openSync}
-            translucent
-            disabled={isBusy || isRecording}
-          />
-        </View>
-      </BottomSheetView>
-    </BottomSheet>
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        setUserError("Only http(s) links are supported.");
+        return;
+      }
+      createCapture.mutate(
+        {
+          raw_content: parsed.toString(),
+          source: "manual",
+          capture_type: "link",
+          status: "captured",
+          metadata: { source: "mobile_fab", channel: "link" },
+        },
+        {
+          onSuccess: () => {
+            onClose();
+            router.push("/inbox");
+          },
+          onError: (error) => {
+            setUserError(error instanceof Error ? error.message : t("create.error"));
+          },
+        }
+      );
+    },
+    [createCapture, onClose, router, setUserError, t]
   );
+
+  return {
+    openNoteCapture,
+    openSync,
+    openEvent,
+    openFileCapture,
+    openPhotoCapture,
+    startVoiceCapture,
+    stopVoiceCapture,
+    handleVoiceCapture,
+    submitLinkCapture,
+    isBusy,
+    isRecording,
+  };
 }

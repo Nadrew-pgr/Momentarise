@@ -152,13 +152,11 @@ export default function MeScreen() {
             icon={Settings}
             label={t("pages.me.settingsPrivacy")}
             onPress={() => router.push("/settings")}
-            opacity60
           />
           <RowCard
             icon={HelpCircle}
             label={t("pages.me.helpSupport")}
             onPress={() => router.push("/help")}
-            opacity60
           />
         </View>
 

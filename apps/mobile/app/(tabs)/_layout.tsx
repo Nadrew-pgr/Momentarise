@@ -1,13 +1,12 @@
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Sun, Inbox, Calendar, User } from "lucide-react-native";
+import { Sun, Inbox, Calendar, User, Plus } from "lucide-react-native";
 import { useCreateSheet } from "@/lib/store";
-import { CreateTabIcon } from "@/components/CreateTabIcon";
 
 export default function TabLayout() {
   const { t } = useTranslation();
-  const openCreateSheet = useCreateSheet((s) => s.open);
+  const { open: openCreate } = useCreateSheet();
 
   return (
     <Tabs
@@ -15,6 +14,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: "#171717",
         tabBarInactiveTintColor: "#a3a3a3",
+        tabBarShowLabel: false,
       }}
     >
       <Tabs.Screen
@@ -35,12 +35,43 @@ export default function TabLayout() {
         name="create"
         options={{
           title: "",
-          tabBarIcon: () => <CreateTabIcon />,
-        }}
-        listeners={{
-          tabPress: (e) => {
-            e.preventDefault();
-            openCreateSheet();
+          tabBarIcon: () => (
+            <View
+              style={{
+                alignItems: "center",
+                justifyContent: "center",
+                height: 56,
+              }}
+            >
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: "#171717",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 6,
+                  elevation: 6,
+                }}
+              >
+                <Plus size={28} color="#fff" strokeWidth={2.5} />
+              </View>
+            </View>
+          ),
+          tabBarButton: (props) => {
+            const { onPress, ...rest } = props;
+            return (
+              <Pressable
+                {...rest}
+                onPress={openCreate}
+                accessibilityLabel={t("pages.inbox.add")}
+                accessibilityRole="button"
+              />
+            );
           },
         }}
       />
