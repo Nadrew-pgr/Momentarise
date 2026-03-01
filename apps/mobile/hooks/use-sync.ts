@@ -44,9 +44,18 @@ async function readSyncEventStream(
 ): Promise<void> {
   if (!res.body) {
     const raw = await res.text();
-    if (raw.trim()) {
-      const parsed = syncEventEnvelopeSchema.parse(JSON.parse(raw));
-      onEvent(parsed as SyncEventEnvelope);
+    const lines = raw.split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const jsonStr = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
+      if (!jsonStr) continue;
+      try {
+        const parsed = syncEventEnvelopeSchema.parse(JSON.parse(jsonStr));
+        onEvent(parsed as SyncEventEnvelope);
+      } catch (e) {
+        console.warn("Failed to parse fallback stream line:", jsonStr, e);
+      }
     }
     return;
   }
@@ -64,15 +73,29 @@ async function readSyncEventStream(
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      const parsed = syncEventEnvelopeSchema.parse(JSON.parse(trimmed));
-      onEvent(parsed as SyncEventEnvelope);
+      // Strip "data: " prefix if present (SSE standard)
+      const jsonStr = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
+      if (!jsonStr) continue;
+      try {
+        const parsed = syncEventEnvelopeSchema.parse(JSON.parse(jsonStr));
+        onEvent(parsed as SyncEventEnvelope);
+      } catch (e) {
+        console.warn("Failed to parse stream line:", jsonStr, e);
+      }
     }
   }
 
   const trailing = buffer.trim();
   if (trailing) {
-    const parsed = syncEventEnvelopeSchema.parse(JSON.parse(trailing));
-    onEvent(parsed as SyncEventEnvelope);
+    const jsonStr = trailing.startsWith("data: ") ? trailing.slice(6) : trailing;
+    if (jsonStr) {
+      try {
+        const parsed = syncEventEnvelopeSchema.parse(JSON.parse(jsonStr));
+        onEvent(parsed as SyncEventEnvelope);
+      } catch (e) {
+        console.warn("Failed to parse trailing stream line:", jsonStr, e);
+      }
+    }
   }
 }
 

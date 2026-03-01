@@ -1,28 +1,21 @@
-import { useCallback, useMemo, useState } from "react";
-import { ScrollView, View } from "react-native";
+import React, { useCallback, useMemo, useState, useRef } from "react";
+import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import type { SyncEventEnvelope } from "@momentarise/shared";
 import { useTranslation } from "react-i18next";
+import type { SyncEventEnvelope } from "@momentarise/shared";
 import {
-  useApplySyncRun,
-  useCreateSyncAgent,
-  useCreateSyncAutomation,
   useCreateSyncRun,
-  useSetSyncAutomationStatus,
-  useSyncAgents,
-  useSyncAutomations,
-  useSyncChanges,
   useSyncModels,
   useSyncRun,
   useSyncStream,
+  useApplySyncRun,
   useUndoSyncRun,
-  useValidateSyncAutomation,
+  useSyncChanges,
 } from "@/hooks/use-sync";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Text as UiText } from "@/components/ui/text";
-import { Textarea } from "@/components/ui/textarea";
+
+import { MessageList } from "@/components/sync-chat/message-list";
+import { Composer } from "@/components/sync-chat/composer";
+import { ActionsRail } from "@/components/sync-chat/actions-rail";
 
 function uniqueBySeq(events: SyncEventEnvelope[]): SyncEventEnvelope[] {
   const map = new Map<number, SyncEventEnvelope>();
@@ -32,40 +25,117 @@ function uniqueBySeq(events: SyncEventEnvelope[]): SyncEventEnvelope[] {
 
 export default function SyncScreen() {
   const { t } = useTranslation();
+
   const [runId, setRunId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [events, setEvents] = useState<SyncEventEnvelope[]>([]);
-  const [agentName, setAgentName] = useState("");
-  const [automationName, setAutomationName] = useState("");
+
+  // Streaming state
+  const [streamingBuffer, setStreamingBuffer] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const seqSeenRef = useRef<Set<number>>(new Set());
 
   const { data: models } = useSyncModels();
   const { data: run } = useSyncRun(runId);
   const { data: changes } = useSyncChanges(runId);
-  const { data: agents } = useSyncAgents();
-  const { data: automations } = useSyncAutomations();
-
   const createRun = useCreateSyncRun();
   const applyRun = useApplySyncRun();
   const undoRun = useUndoSyncRun();
-  const createAgent = useCreateSyncAgent();
-  const createAutomation = useCreateSyncAutomation();
-  const validateAutomation = useValidateSyncAutomation();
-  const setAutomationStatus = useSetSyncAutomationStatus();
+
+  const previewEvents = events.filter((e) => e.type === "preview");
+  const latestPreview = previewEvents.length > 0 ? previewEvents[previewEvents.length - 1].payload : null;
+  const latestUndoableChange = changes?.find((change) => change.undoable) ?? null;
+
+  const handleApply = async () => {
+    if (!runId || !latestPreview) return;
+    try {
+      await applyRun.mutateAsync({
+        runId,
+        payload: {
+          preview_id: (latestPreview as any).id,
+          idempotency_key: `${Date.now()}-${Math.random()}`,
+        },
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!runId || !latestUndoableChange) return;
+    try {
+      await undoRun.mutateAsync({
+        runId,
+        payload: {
+          change_id: latestUndoableChange.id,
+          idempotency_key: `${Date.now()}-${Math.random()}`,
+        },
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const onEvent = useCallback((event: SyncEventEnvelope) => {
-    setEvents((prev) => uniqueBySeq([...prev, event]));
+    if (seqSeenRef.current.has(event.seq)) return;
+    seqSeenRef.current.add(event.seq);
+
+    switch (event.type) {
+      case "token":
+        setIsStreaming(true);
+        setStreamingBuffer((prev) => prev + event.payload.delta);
+        break;
+      case "message":
+        setEvents((prev) => uniqueBySeq([...prev, event]));
+        setStreamingBuffer("");
+        break;
+      case "done":
+        setIsStreaming(false);
+        break;
+      default:
+        setEvents((prev) => uniqueBySeq([...prev, event]));
+        break;
+    }
   }, []);
+
   const streamRun = useSyncStream(onEvent);
 
   const lastSeq = useMemo(() => events[events.length - 1]?.seq ?? 0, [events]);
-  const messageEvents = useMemo(
-    () => events.filter((event) => event.type === "message"),
-    [events]
-  );
-  const previewEvents = useMemo(
-    () => events.filter((event) => event.type === "preview"),
-    [events]
-  );
+
+  // Extract tool events
+  const toolTimeline = useMemo(() => {
+    return events
+      .filter((e) => e.type === "tool_call" || e.type === "tool_result")
+      .map((e) => {
+        const payload = e.payload as any;
+        return {
+          id: payload.tool_call_id,
+          seq: e.seq,
+          kind: e.type as "tool_call" | "tool_result",
+          toolName: payload.tool_name,
+          status: payload.status,
+          summary: payload.summary,
+          createdAt: new Date(e.ts),
+        };
+      })
+      .reverse(); // Newest first
+  }, [events]);
+
+  const messages = useMemo(() => {
+    return events
+      .filter((e) => e.type === "message")
+      .map((e) => {
+        const payload = e.payload as Record<string, unknown>;
+        const contentJson = (payload.content_json || {}) as Record<string, unknown>;
+
+        return {
+          id: String(payload.id ?? e.seq),
+          seq: e.seq,
+          role: (payload.role as "user" | "assistant" | "system" | "tool") ?? "assistant",
+          content: String(contentJson.text ?? contentJson.content ?? ""),
+        };
+      });
+  }, [events]);
 
   async function ensureRun(): Promise<string> {
     if (runId) return runId;
@@ -77,206 +147,87 @@ export default function SyncScreen() {
     });
     setRunId(created.id);
     setEvents([]);
+    seqSeenRef.current.clear();
     return created.id;
   }
 
   async function handleSend() {
     const text = message.trim();
-    if (!text) return;
-    const targetRunId = await ensureRun();
-    await streamRun.mutateAsync({
-      runId: targetRunId,
-      payload: { message: text, from_seq: lastSeq },
-    });
+    if (!text || isStreaming) return;
+
+    // Optimistic user message insertion can be handled here if needed, 
+    // but the backend will echo it back. For speed just clear input:
     setMessage("");
+
+    try {
+      const targetRunId = await ensureRun();
+      setIsStreaming(true);
+      await streamRun.mutateAsync({
+        runId: targetRunId,
+        payload: { message: text, from_seq: lastSeq },
+      });
+    } catch (e) {
+      console.error("Stream failed", e);
+      setIsStreaming(false);
+    }
   }
 
-  async function handleResume() {
-    if (!runId) return;
-    await streamRun.mutateAsync({
-      runId,
-      payload: { message: "", from_seq: lastSeq },
-    });
-  }
-
-  async function handleApply() {
-    if (!runId) return;
-    const previewId = [...previewEvents].pop()?.payload?.id;
-    if (typeof previewId !== "string") return;
-    await applyRun.mutateAsync({
-      runId,
-      payload: {
-        preview_id: previewId,
-        idempotency_key: `${Date.now()}-${Math.random()}`,
-      },
-    });
-  }
-
-  async function handleUndo() {
-    if (!runId) return;
-    const change = changes?.find((entry) => entry.undoable);
-    if (!change) return;
-    await undoRun.mutateAsync({
-      runId,
-      payload: {
-        change_id: change.id,
-        idempotency_key: `${Date.now()}-${Math.random()}`,
-      },
-    });
-  }
-
-  async function handleCreateAgent() {
-    const name = agentName.trim();
-    if (!name) return;
-    await createAgent.mutateAsync({
-      name,
-      prompt_mode: "full",
-      tool_policy_json: {},
-      memory_scope_json: {},
-      is_default: false,
-    });
-    setAgentName("");
-  }
-
-  async function handleCreateAutomation() {
-    const name = automationName.trim();
-    if (!name) return;
-    await createAutomation.mutateAsync({
-      name,
-      description: "Simple user automation",
-      spec_json: { trigger: "manual", actions: [] },
-      requires_confirm: true,
-    });
-    setAutomationName("");
+  function handleStop() {
+    // There is no explicit abort in useSyncStream without AbortController
+    // For now we just reset UI state
+    setIsStreaming(false);
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <ScrollView className="flex-1 px-4 pt-3" contentContainerClassName="pb-10">
-        <UiText className="text-2xl font-semibold text-foreground">{t("pages.sync.title")}</UiText>
-        <UiText className="mt-1 text-sm text-muted-foreground">
-          Run {runId ? runId.slice(0, 8) : "not started"} - status {run?.status ?? "idle"}
-        </UiText>
-
-        <Card className="mt-4">
-          <CardContent className="gap-3 p-4">
-            <Textarea
-              value={message}
-              onChangeText={setMessage}
-              placeholder="Ask Sync to plan, update, or organize"
-              className="min-h-[90px]"
-            />
-            <View className="flex-row flex-wrap gap-2">
-              <Button onPress={handleSend}>
-                <UiText>Send</UiText>
-              </Button>
-              <Button variant="outline" onPress={handleResume}>
-                <UiText>Resume {lastSeq}</UiText>
-              </Button>
-              <Button variant="secondary" onPress={handleApply}>
-                <UiText>Apply</UiText>
-              </Button>
-              <Button variant="outline" onPress={handleUndo}>
-                <UiText>Undo</UiText>
-              </Button>
-            </View>
-          </CardContent>
-        </Card>
-
-        <Card className="mt-4">
-          <CardContent className="gap-2 p-4">
-            <UiText className="text-sm font-semibold text-foreground">Conversation</UiText>
-            {messageEvents.length === 0 ? (
-              <UiText className="text-sm text-muted-foreground">No messages yet.</UiText>
-            ) : (
-              messageEvents.map((event) => {
-                const payload = event.payload as Record<string, unknown>;
-                const role = String(payload.role ?? "assistant");
-                const contentJson =
-                  payload.content_json && typeof payload.content_json === "object"
-                    ? (payload.content_json as Record<string, unknown>)
-                    : {};
-                const text = String(contentJson.text ?? "");
-                return (
-                  <View key={event.seq} className="rounded-lg border border-border p-3">
-                    <UiText className="text-xs uppercase text-muted-foreground">
-                      {role} - seq {event.seq}
-                    </UiText>
-                    <UiText className="mt-1 text-sm text-foreground">{text || "(empty)"}</UiText>
-                  </View>
-                );
-              })
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="mt-4">
-          <CardContent className="gap-2 p-4">
-            <UiText className="text-sm font-semibold text-foreground">Audit</UiText>
-            {(changes ?? []).slice(0, 5).map((change) => (
-              <UiText key={change.id} className="text-sm text-muted-foreground">
-                {change.action} - undoable={String(change.undoable)}
-              </UiText>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="mt-4">
-          <CardContent className="gap-3 p-4">
-            <UiText className="text-sm font-semibold text-foreground">Agents</UiText>
-            <Input value={agentName} onChangeText={setAgentName} placeholder="Agent name" />
-            <Button onPress={handleCreateAgent}>
-              <UiText>Create agent</UiText>
-            </Button>
-            {(agents ?? []).map((agent) => (
-              <UiText key={agent.id} className="text-sm text-muted-foreground">
-                {agent.name} ({agent.prompt_mode})
-              </UiText>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="mt-4">
-          <CardContent className="gap-3 p-4">
-            <UiText className="text-sm font-semibold text-foreground">Automations</UiText>
-            <Input
-              value={automationName}
-              onChangeText={setAutomationName}
-              placeholder="Automation name"
-            />
-            <Button onPress={handleCreateAutomation}>
-              <UiText>Create automation</UiText>
-            </Button>
-            {(automations ?? []).map((automation) => (
-              <View key={automation.id} className="rounded-lg border border-border p-3">
-                <UiText className="text-sm font-medium text-foreground">{automation.name}</UiText>
-                <UiText className="text-xs text-muted-foreground">status {automation.status}</UiText>
-                <View className="mt-2 flex-row gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onPress={() => validateAutomation.mutate(automation.id)}
-                  >
-                    <UiText>Validate</UiText>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onPress={() =>
-                      setAutomationStatus.mutate({
-                        automationId: automation.id,
-                        status: automation.status === "active" ? "paused" : "active",
-                      })
-                    }
-                  >
-                    <UiText>{automation.status === "active" ? "Pause" : "Activate"}</UiText>
-                  </Button>
-                </View>
-              </View>
-            ))}
-          </CardContent>
-        </Card>
-      </ScrollView>
+    <SafeAreaView className="bg-background flex-1" edges={["top"]}>
+      <View className="flex-1 relative">
+        {/* Floating Actions Header */}
+        <MessageList
+          messages={messages}
+          streamingBuffer={streamingBuffer}
+          isStreaming={isStreaming}
+          emptyTitle={t("pages.sync.emptyTitle", "Synchronisez votre vie")}
+          emptySubtitle={t("pages.sync.emptySubtitle", "Je suis là pour vous aider")}
+        />
+        <View className="px-2">
+          <ActionsRail
+            latestPreview={latestPreview as any}
+            changes={changes ?? []}
+            toolTimeline={toolTimeline}
+            actionFeedback={[]}
+            canApply={!!(runId && latestPreview && !applyRun.isPending)}
+            canUndo={!!(runId && latestUndoableChange && !undoRun.isPending)}
+            isApplying={applyRun.isPending}
+            isUndoing={undoRun.isPending}
+            onApply={handleApply}
+            onUndo={handleUndo}
+            labels={{
+              title: t("pages.sync.actions.title", "Actions"),
+              pendingAction: t("pages.sync.actions.pending", "Pending Action"),
+              preview: t("pages.sync.actions.preview", "Preview"),
+              apply: t("pages.sync.actions.apply", "Apply"),
+              undo: t("pages.sync.actions.undo", "Undo"),
+              changelog: t("pages.sync.actions.changelog", "Changelog"),
+              debug: t("pages.sync.actions.debug", "Debug"),
+              noPendingAction: t("pages.sync.actions.noPending", "No pending actions"),
+              noChanges: t("pages.sync.actions.noChanges", "No changes yet"),
+              noToolEvents: t("pages.sync.actions.noToolEvents", "No tools used"),
+              appliedSuccess: t("pages.sync.actions.appliedSuccess", "Applied successfully"),
+              undoneSuccess: t("pages.sync.actions.undoneSuccess", "Undone successfully"),
+              noTime: t("pages.sync.actions.noTime", "Just now"),
+            }}
+          />
+        </View>
+        <Composer
+          value={message}
+          onChange={setMessage}
+          onSend={handleSend}
+          onStop={handleStop}
+          isStreaming={isStreaming}
+          disabled={streamRun.isPending && !isStreaming}
+          placeholder={t("pages.sync.placeholder", "Demander à Sync...")}
+        />
+      </View>
     </SafeAreaView>
   );
 }
