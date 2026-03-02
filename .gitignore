@@ -20,6 +20,7 @@ node_modules/
 # Env (NE JAMAIS VERSIONNER)
 .env
 .env.*
+*env.json
 !.env.example
 !.env.template
 

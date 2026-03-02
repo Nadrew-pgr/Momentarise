@@ -1,8 +1,0 @@
-[
-  {
-    "key": "API_URL",
-    "value": "https://momentarise.onrender.com",
-    "target": ["production", "preview", "development"],
-    "type": "plain"
-  }
-]
