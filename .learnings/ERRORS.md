@@ -358,3 +358,52 @@ psql: error: connection to server at "dpg-d6ikkht...oregon-postgres.render.com" 
 - Related Files: `render.yaml`
 
 ---
+
+## [ERR-20260302-005] Backend API Crash: ImportError for get_current_user and get_workspace_id
+**Logged**: 2026-03-02T20:34:46.374684+00:00
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+The local `uvicorn` API server crashed on startup due to hallucinated module imports in the `projects` and `series` routers.
+
+### Error
+```
+ImportError: cannot import name 'get_current_user' from 'src.core.security'
+ModuleNotFoundError: No module named 'src.api.context'
+```
+
+### Context
+- Command: `uv run uvicorn src.main:app --reload`
+- Related Files: `apps/api/src/api/v1/projects.py`, `apps/api/src/api/v1/series.py`, `apps/api/src/core/deps.py`
+- Issue: AI generated endpoints utilizing dependencies that didn't exist in the declared locations.
+
+### Suggested Fix
+1. Update import path for `get_current_user` to `src.core.deps`.
+2. Replace `get_workspace_id` with `get_current_workspace` from `src.core.deps` and adjust the signature to expect a `WorkspaceMember` instance rather than an isolated UUID.
+---
+
+## [ERR-20260302-006] SQLAlchemy InvalidRequestError: Missing ForeignKey for Workspace relations
+**Logged**: 2026-03-02T20:34:46.374684+00:00
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+After fixing API imports, the backend crashed during SQLAlchemy mapper initialization because it couldn't infer the join conditions for `Workspace.projects` and `Workspace.series`.
+
+### Error
+```
+sqlalchemy.exc.InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'Mapper[Workspace(workspaces)]'. Original exception was: Could not determine join condition between parent/child tables on relationship Workspace.projects - there are no foreign keys linking these tables.
+```
+
+### Context
+- Command: `uv run uvicorn src.main:app --reload`
+- Related Files: `apps/api/src/models/project.py`, `apps/api/src/models/series.py`, `apps/api/src/models/workspace.py`
+- Issue: `Project` and `Series` models had a `workspace_id` column but lacked an explicit `ForeignKey("workspaces.id")` constraint, preventing the ORM from mapping the relationships defined in the `Workspace` model.
+
+### Suggested Fix
+1. Provide explicit `ForeignKey("workspaces.id")` to `workspace_id` columns in `Project` and `Series`.
+2. Ensure bidirectional relationships are defined in the child classes (`workspace: Mapped["Workspace"] = relationship(back_populates="projects")`).
+---

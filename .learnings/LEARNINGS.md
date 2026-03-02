@@ -210,3 +210,40 @@ Dangers d'une base de données neuve (authentification) et blocages réseau par 
 - Ne pas laisser `0.0.0.0/0` dans le IP Allow List d'une DB Render après une intervention locale (rétablir en `[{"cidrBlock": ".../32"}]` ou `[]`).
 
 ---
+
+## [LRN-20260302-003] best_practice — KeyboardAvoidingView et Absolute Positioning dans un Chat
+
+**Logged**: 2026-03-02
+**Priority**: medium
+**Status**: resolved
+**Area**: mobile / layout
+
+### Summary
+L'utilisation de `position: absolute` pour ancrer un input (Composer) en bas de l'écran entre en conflit avec le fonctionnement du `KeyboardAvoidingView` sur React Native.
+
+### Details
+- Quand le `KeyboardAvoidingView` pousse le contenu pour laisser la place au clavier iOS, il modifie la taille de son conteneur principal.
+- Si le champ de texte est en `absolute bottom-0`, il sort du flux du layout et reste ancré au bas de l'écran global, se retrouvant caché par le clavier au lieu de remonter avec lui.
+- Cette erreur imposait aussi d'ajouter de très gros `paddingBottom` (ex: 80+) artificiels sur la FlatList de la conversation pour que les derniers messages ne se cachent pas derrière l'input fixe en absolu.
+- **La vraie solution** : Placer la FlatList (`flex-1`) et l'input (Composer) l'un en-dessous de l'autre dans un flex classique (sans `absolute`). Quand le clavier s'ouvre, la liste rétrécit, le composer remonte, et un simple `paddingBottom: 0` suffit pour la liste.
+
+### Suggested Action
+Toujours préférer une disposition flex en colonne (`flex-1` pour la liste, layout naturel sans absolu pour le chat input) au sein du `KeyboardAvoidingView` pour obtenir un comportement fluide et robuste avec le clavier, exactement comme l'expérience native.
+
+---
+
+## [LRN-20260302-003] Explicit SQLAlchemy ForeignKeys are Mandatory
+**Logged**: 2026-03-02T20:34:46.374684+00:00
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+When defining relationships in SQLAlchemy 2.0 with type hints (`Mapped[...]`), foreign key constraints must be strictly and correctly declared.
+
+### Details
+If the parent table (`Workspace`) declares a relationship like `projects: Mapped[list["Project"]] = relationship()`, the child table (`Project`) **must** have a column explicitly marked with `ForeignKey("workspaces.id")`. Leaving it as a plain `UUID` without a foreign key constraint causes immediate crashes on API startup (`InvalidRequestError`) during mapper configuration.
+
+### Suggested Action
+Always verify `ForeignKey` metadata when defining new models linked to a `Workspace` or `Project`, and pair it with a bidirectional `relationship(back_populates="...")`.
+---
