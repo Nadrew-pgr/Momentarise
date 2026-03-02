@@ -122,29 +122,34 @@ export default function InboxCaptureDetailPage() {
   const [manualTitle, setManualTitle] = useState("");
   const [manualDescription, setManualDescription] = useState("");
 
+  const filteredActions = useMemo(() => {
+    if (!capture) return [];
+    return capture.suggested_actions.filter((action) => action.type !== "summarize");
+  }, [capture]);
+
   useEffect(() => {
     if (!capture) return;
     const urlKey = actionKeyFromUrl ? decodeURIComponent(actionKeyFromUrl) : null;
     const validKey =
-      urlKey && capture.suggested_actions.some((a) => a.key === urlKey)
+      urlKey && filteredActions.some((a) => a.key === urlKey)
         ? urlKey
         : null;
     setSelectedActionKey((current) => {
       if (validKey) return validKey;
-      if (current && capture.suggested_actions.some((action) => action.key === current)) {
+      if (current && filteredActions.some((action) => action.key === current)) {
         return current;
       }
-      return capture.primary_action?.key ?? capture.suggested_actions[0]?.key ?? null;
+      return capture.primary_action?.key ?? filteredActions[0]?.key ?? null;
     });
     if (!manualTitle.trim()) {
       setManualTitle(defaultTitle(capture.raw_content, t("pages.inbox.captureFallbackTitle", { type: capture.capture_type })));
     }
-  }, [capture, actionKeyFromUrl, manualTitle, t]);
+  }, [capture, actionKeyFromUrl, manualTitle, t, filteredActions]);
 
   const selectedAction: CaptureActionSuggestion | null = useMemo(() => {
     if (!capture || !selectedActionKey) return null;
-    return capture.suggested_actions.find((action) => action.key === selectedActionKey) ?? null;
-  }, [capture, selectedActionKey]);
+    return filteredActions.find((action) => action.key === selectedActionKey) ?? null;
+  }, [capture, selectedActionKey, filteredActions]);
 
   const isBusy =
     applyCapture.isPending ||
@@ -167,8 +172,8 @@ export default function InboxCaptureDetailPage() {
       processCapture.mutate(
         { captureId, title },
         {
-          onSuccess: (result) => {
-            router.push(`/inbox/items/${result.item_id}`);
+          onSuccess: () => {
+            router.push(`/inbox`);
           },
         }
       );
@@ -185,8 +190,8 @@ export default function InboxCaptureDetailPage() {
         },
       },
       {
-        onSuccess: (result) => {
-          router.push(`/inbox/items/${result.item_id}`);
+        onSuccess: () => {
+          router.push(`/inbox`);
         },
       }
     );
@@ -242,7 +247,7 @@ export default function InboxCaptureDetailPage() {
         ? "border-rose-500/30 bg-rose-500/10 text-rose-600"
         : "border-border bg-muted/40 text-muted-foreground";
   const primaryAsset = assets[0] ?? null;
-  const actionCount = capture.suggested_actions.length;
+  const actionCount = filteredActions.length;
   const preview = previewCapture.data;
   const requiresVoiceContext = capture.capture_type === "voice" && !capture.archived;
   const captureTypeLabel = t(`pages.inbox.filter.${capture.capture_type}`, {
@@ -418,7 +423,7 @@ export default function InboxCaptureDetailPage() {
         </div>
 
         <div className="space-y-2">
-          {capture.suggested_actions.map((action) => {
+          {filteredActions.map((action) => {
             const selected = selectedActionKey === action.key;
             return (
               <button

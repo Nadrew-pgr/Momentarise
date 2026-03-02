@@ -20,3 +20,43 @@ Rendre l'application accessible directement via des widgets natifs sur toutes le
 ### Suggested Implementation
 Utiliser Expo Widgets sur mobile pour iOS/Android, et des frameworks adaptés (WinUI/AppKit ou frameworks cross-platform type Electron/Tauri) sur desktop.
 ---
+---
+
+### Request #FR-02: Auto-fill Form Redirection on Action Apply
+**ID:** FR-02
+**Date Logged:** 2026-03-02
+**Priority:** Medium
+**Status:** Open
+**Area:** Inbox & Calendar
+
+**Requested Capability**:
+When a user clicks "Apply" on an AI-suggested action (e.g., "Schedule an event"), the application should redirect the user to the corresponding creation form (e.g., Calendar Event Creation Dialog) with all the fields pre-filled based on the AI's parsed payload, rather than just executing the action blindly or returning to the inbox.
+
+**User Context / Verbatim**:
+"Et ensuite dans un futur proche, appliquer emmenera sur l'action appliquée, par exemple s'il propose de scheduler un item de l'inbox, à l'appuie sur appliquer on doit être redirigé verse la créatino d'un moment totalement préremplie"
+
+**Implementation Strategy**:
+- Add routing logic in `apps/web/src/app/(dashboard)/inbox/captures/[id]/page.tsx` and `apps/mobile/app/inbox/[id].tsx` that detects the type of action applied (`captureActionType`).
+- Instead of calling the regular `applyCapture` mutation which immediately executes on the server, intercept 'schedule' or 'create_event' actions.
+- Redirect to the Timeline or Calendar page while passing query parameters or using a global state store (Zustand/Context) to hydrate the `EventDialog` with the extracted `preview_payload` (title, description, start time, end time).
+
+---
+
+## [FEAT-20260302-002] Intégration Pronote (Calendrier & Inbox IA)
+**Logged**: 2026-03-02
+**Priority**: high
+**Status**: pending
+**Area**: backend / integrations
+
+### Requested Capability
+Connecter l'application à Pronote pour récupérer l'emploi du temps, les messages et le cahier de texte. 
+Le but est d'afficher le calendrier Pronote directement dans l'application, faire remonter les communications Pronote dans la boîte de réception (Inbox), et surtout permettre à l'IA d'analyser le cahier de texte pour planifier intelligemment des sessions de devoirs ou d'exercices dans le calendrier de l'utilisateur.
+
+### User Context
+"ajouter la connexion a pronote por le calendrier.. ce sera une dinguerie ça... pour pouvoir ce genre de truc ""ça veut dire que dans mon app calendrier je pourrais afficher le calendrier pronote, dans l'inbox de mon app, il y a es message pronote et communication, et l'ia peut consulter le cahier de texte pour placer des sesison exercice dans mon calendrier genre (c'est un calendrier IA mon app)"""
+
+### Suggested Implementation
+- Créer un service d'intégration backend (ex: scrapers ou API non-officielle Pronote via Python/JS) pour synchroniser périodiquement (ou à la demande) les données de session de l'élève.
+- Mapper les événements de cours Pronote vers le modèle `Event` du calendrier (en lecture seule visuellement, ou avec un tag système spécifique).
+- Transformer les items du cahier de texte et les messages en `Capture` dans l'Inbox avec des sources spécifiques (`source: "pronote"`).
+- Créer un agent/pipeline IA dédié à l'analyse du cahier de texte qui va suggérer (via les actions) la création de sous-tâches ou de blocs de révision dans le calendrier.

@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import EventSource from "react-native-sse";
+import * as SecureStore from "expo-secure-store";
 import type {
   SyncAgent,
   SyncApply,
@@ -12,6 +14,7 @@ import type {
   SyncPatchAgentRequest,
   SyncPatchAutomationRequest,
   SyncRun,
+  SyncRunSummary,
   SyncStreamRequest,
   SyncUndo,
   SyncUndoRequest,
@@ -30,7 +33,9 @@ import {
   syncPatchAgentRequestSchema,
   syncPatchAutomationRequestSchema,
   syncPublishAgentVersionResponseSchema,
+  syncRunListResponseSchema,
   syncRunsResponseSchema,
+  syncEventsResponseSchema,
   syncStreamRequestSchema,
   syncUndoRequestSchema,
   syncUndoSchema,
@@ -38,66 +43,7 @@ import {
 } from "@momentarise/shared";
 import { apiFetch, readApiError } from "@/lib/api";
 
-async function readSyncEventStream(
-  res: Response,
-  onEvent: (event: SyncEventEnvelope) => void
-): Promise<void> {
-  if (!res.body) {
-    const raw = await res.text();
-    const lines = raw.split("\n");
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      const jsonStr = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
-      if (!jsonStr) continue;
-      try {
-        const parsed = syncEventEnvelopeSchema.parse(JSON.parse(jsonStr));
-        onEvent(parsed as SyncEventEnvelope);
-      } catch (e) {
-        console.warn("Failed to parse fallback stream line:", jsonStr, e);
-      }
-    }
-    return;
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      // Strip "data: " prefix if present (SSE standard)
-      const jsonStr = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
-      if (!jsonStr) continue;
-      try {
-        const parsed = syncEventEnvelopeSchema.parse(JSON.parse(jsonStr));
-        onEvent(parsed as SyncEventEnvelope);
-      } catch (e) {
-        console.warn("Failed to parse stream line:", jsonStr, e);
-      }
-    }
-  }
-
-  const trailing = buffer.trim();
-  if (trailing) {
-    const jsonStr = trailing.startsWith("data: ") ? trailing.slice(6) : trailing;
-    if (jsonStr) {
-      try {
-        const parsed = syncEventEnvelopeSchema.parse(JSON.parse(jsonStr));
-        onEvent(parsed as SyncEventEnvelope);
-      } catch (e) {
-        console.warn("Failed to parse trailing stream line:", jsonStr, e);
-      }
-    }
-  }
-}
+// readSyncEventStream removed. Handled by EventSource inside useSyncStream now.
 
 export function useSyncModels() {
   return useQuery<SyncModel[]>({
@@ -146,6 +92,35 @@ export function useSyncRun(runId: string | null) {
   });
 }
 
+export function useSyncRuns(limit = 50) {
+  return useQuery<SyncRunSummary[]>({
+    queryKey: ["sync", "runs", limit],
+    queryFn: async () => {
+      const qs = new URLSearchParams({ limit: String(limit) });
+      const res = await apiFetch(`/api/v1/sync/runs?${qs.toString()}`);
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch sync runs"));
+      const data = await res.json();
+      const parsed = syncRunListResponseSchema.parse(data);
+      return parsed.runs as SyncRunSummary[];
+    },
+  });
+}
+
+export function useSyncRunEvents(runId: string | null, fromSeq = 0) {
+  return useQuery<SyncEventEnvelope[]>({
+    queryKey: ["sync", "events", runId, fromSeq],
+    enabled: Boolean(runId),
+    queryFn: async () => {
+      const qs = new URLSearchParams({ from_seq: String(fromSeq) });
+      const res = await apiFetch(`/api/v1/sync/runs/${runId}/events?${qs.toString()}`);
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch sync run events"));
+      const data = await res.json();
+      const parsed = syncEventsResponseSchema.parse(data);
+      return parsed.events as SyncEventEnvelope[];
+    },
+  });
+}
+
 export function useSyncStream(onEvent: (event: SyncEventEnvelope) => void) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -157,12 +132,44 @@ export function useSyncStream(onEvent: (event: SyncEventEnvelope) => void) {
       payload: SyncStreamRequest;
     }) => {
       const body = syncStreamRequestSchema.parse(payload);
-      const res = await apiFetch(`/api/v1/sync/runs/${runId}/stream`, {
-        method: "POST",
-        body: JSON.stringify(body),
+      const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+      const token = await SecureStore.getItemAsync("access_token");
+
+      return new Promise<void>((resolve, reject) => {
+        const es = new EventSource(`${API_URL}/api/v1/sync/runs/${runId}/stream`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(body),
+        });
+
+        es.addEventListener("message", (event) => {
+          if (event.data) {
+            try {
+              const parsed = syncEventEnvelopeSchema.parse(JSON.parse(event.data));
+              onEvent(parsed as SyncEventEnvelope);
+              if (parsed.type === "done") {
+                es.close();
+                resolve();
+              }
+            } catch (e) {
+              console.warn("Failed to parse stream event:", event.data, e);
+            }
+          }
+        });
+
+        es.addEventListener("error", (err) => {
+          console.error("EventSource error:", err);
+          es.close();
+          reject(new Error("Stream connection failed or was closed via error."));
+        });
+
+        es.addEventListener("close", () => {
+          resolve();
+        });
       });
-      if (!res.ok) throw new Error(await readApiError(res, "Failed to stream sync run"));
-      await readSyncEventStream(res, onEvent);
     },
     onSettled: (_, __, variables) => {
       queryClient.invalidateQueries({ queryKey: ["sync", "run", variables.runId] });

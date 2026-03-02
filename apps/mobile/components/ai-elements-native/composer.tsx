@@ -1,8 +1,8 @@
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import { View, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity, StyleSheet } from "react-native";
-import { Square, ArrowUp } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown, FadeOutDown } from "react-native-reanimated";
+import { ArrowUp, Square } from "lucide-react-native";
 
 interface ComposerProps {
     value: string;
@@ -20,7 +20,7 @@ export function Composer({
     onSend,
     onStop,
     isStreaming,
-    placeholder = "Ask Sync...",
+    placeholder = "Ask anything...",
     disabled = false,
 }: ComposerProps) {
     const insets = useSafeAreaInsets();
@@ -30,7 +30,7 @@ export function Composer({
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} // Adjust based on header/tab spacing
+            keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} // Adjust based on header
             className="absolute bottom-0 left-0 right-0"
         >
             <Animated.View
@@ -39,8 +39,9 @@ export function Composer({
                 className="px-4"
                 style={{ paddingBottom: Math.max(insets.bottom, 16) }}
             >
+                {/* Premium input wrapper */}
                 <View
-                    className="border-border bg-background/90 flex-row items-end rounded-3xl border p-2"
+                    className="border-border bg-background/95 flex-row items-end rounded-[28px] border p-[10px]"
                     style={styles.shadow}
                 >
                     <TextInput
@@ -48,23 +49,23 @@ export function Composer({
                         value={value}
                         onChangeText={onChange}
                         placeholder={placeholder}
-                        placeholderTextColor="hsl(var(--muted-foreground))"
+                        placeholderTextColor="#888888"
                         multiline
                         maxLength={2000}
-                        className="text-foreground min-h-[44px] flex-1 px-4 py-3 text-[16px] leading-6"
+                        className="text-foreground min-h-[44px] flex-1 px-3 py-[10px] text-[16px] leading-[24px]"
                         style={{ maxHeight: 120 }}
                         editable={!disabled}
                     />
 
-                    <View className="mb-1 ml-2 mr-1">
+                    <View className="ml-2 mb-[4px]">
                         {isStreaming ? (
                             <TouchableOpacity
                                 onPress={onStop}
-                                className="bg-muted flex h-10 w-10 items-center justify-center rounded-full"
+                                className="bg-muted-foreground flex h-9 w-9 items-center justify-center rounded-full"
                                 accessibilityRole="button"
                                 accessibilityLabel="Stop generating"
                             >
-                                <Square size={18} className="text-foreground" strokeWidth={2.5} />
+                                <Square size={16} color="#FFFFFF" fill="currentColor" />
                             </TouchableOpacity>
                         ) : (
                             <TouchableOpacity
@@ -72,19 +73,15 @@ export function Composer({
                                     if (hasContent && !disabled) onSend();
                                 }}
                                 disabled={!hasContent || disabled}
-                                className={`flex h-10 w-10 items-center justify-center rounded-full ${hasContent && !disabled ? "bg-primary" : "bg-muted"
+                                className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${hasContent && !disabled ? "bg-primary" : "bg-muted"
                                     }`}
                                 accessibilityRole="button"
                                 accessibilityLabel="Send message"
                             >
                                 <ArrowUp
-                                    size={20}
-                                    className={
-                                        hasContent && !disabled
-                                            ? "text-primary-foreground"
-                                            : "text-muted-foreground"
-                                    }
-                                    strokeWidth={2.5}
+                                    size={18}
+                                    color={hasContent && !disabled ? "#FFFFFF" : "#888888"}
+                                    strokeWidth={3}
                                 />
                             </TouchableOpacity>
                         )}
@@ -100,7 +97,7 @@ const styles = StyleSheet.create({
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
-        shadowRadius: 12,
+        shadowRadius: 16,
         elevation: 8,
     },
 });

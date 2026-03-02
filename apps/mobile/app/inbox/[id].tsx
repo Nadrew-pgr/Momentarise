@@ -119,13 +119,18 @@ export default function InboxCaptureDetailPage() {
   const [manualTitle, setManualTitle] = useState("");
   const [manualDescription, setManualDescription] = useState("");
 
+  const filteredActions = useMemo(() => {
+    if (!capture) return [];
+    return capture.suggested_actions.filter((action) => action.type !== "summarize");
+  }, [capture]);
+
   useEffect(() => {
     if (!capture) return;
     setSelectedActionKey((current) => {
-      if (current && capture.suggested_actions.some((action) => action.key === current)) {
+      if (current && filteredActions.some((action) => action.key === current)) {
         return current;
       }
-      return capture.primary_action?.key ?? capture.suggested_actions[0]?.key ?? null;
+      return capture.primary_action?.key ?? filteredActions[0]?.key ?? null;
     });
     if (!manualTitle.trim()) {
       setManualTitle(
@@ -135,12 +140,12 @@ export default function InboxCaptureDetailPage() {
         )
       );
     }
-  }, [capture, manualTitle, t]);
+  }, [capture, manualTitle, t, filteredActions]);
 
   const selectedAction: CaptureActionSuggestion | null = useMemo(() => {
     if (!capture || !selectedActionKey) return null;
-    return capture.suggested_actions.find((action) => action.key === selectedActionKey) ?? null;
-  }, [capture, selectedActionKey]);
+    return filteredActions.find((action) => action.key === selectedActionKey) ?? null;
+  }, [capture, selectedActionKey, filteredActions]);
 
   const isBusy =
     applyCapture.isPending ||
@@ -167,8 +172,8 @@ export default function InboxCaptureDetailPage() {
       processCapture.mutate(
         { captureId, title },
         {
-          onSuccess: (result) => {
-            router.push(`/items/${result.item_id}`);
+          onSuccess: () => {
+            router.replace(`/(tabs)/inbox`);
           },
         }
       );
@@ -185,8 +190,8 @@ export default function InboxCaptureDetailPage() {
         },
       },
       {
-        onSuccess: (result) => {
-          router.push(`/items/${result.item_id}`);
+        onSuccess: () => {
+          router.replace(`/(tabs)/inbox`);
         },
       }
     );
@@ -256,13 +261,13 @@ export default function InboxCaptureDetailPage() {
   });
   const keyClauses = Array.isArray(artifactsSummary.key_clauses)
     ? artifactsSummary.key_clauses.filter(
-        (item): item is string => typeof item === "string" && item.trim().length > 0
-      )
+      (item): item is string => typeof item === "string" && item.trim().length > 0
+    )
     : [];
   const potentialRisks = Array.isArray(artifactsSummary.potential_risks)
     ? artifactsSummary.potential_risks.filter(
-        (item): item is string => typeof item === "string" && item.trim().length > 0
-      )
+      (item): item is string => typeof item === "string" && item.trim().length > 0
+    )
     : [];
 
   return (
@@ -375,20 +380,19 @@ export default function InboxCaptureDetailPage() {
                   {t("pages.inbox.suggestedActions")}
                 </UiText>
                 <View className="rounded-full border border-primary bg-primary/10 px-2 py-0.5">
-                  <UiText className="text-xs font-medium text-primary">{actionCount}</UiText>
+                  <UiText className="text-xs font-medium text-primary">{filteredActions.length}</UiText>
                 </View>
               </View>
 
               <View className="gap-2">
-                {capture.suggested_actions.map((action) => {
+                {filteredActions.map((action) => {
                   const selected = selectedActionKey === action.key;
                   return (
                     <Pressable
                       key={action.key}
                       onPress={() => setSelectedActionKey(action.key)}
-                      className={`rounded-xl border px-3 py-2 ${
-                        selected ? "border-primary bg-primary/5" : "border-border bg-background/40"
-                      }`}
+                      className={`rounded-xl border px-3 py-2 ${selected ? "border-primary bg-primary/5" : "border-border bg-background/40"
+                        }`}
                     >
                       <View className="flex-row items-start gap-2">
                         {selected ? (

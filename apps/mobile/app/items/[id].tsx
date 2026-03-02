@@ -21,7 +21,6 @@ import {
 } from "@/hooks/use-item";
 import { useAppToast } from "@/lib/store";
 
-type TabKey = "details" | "blocks";
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 export default function ItemDetailPage() {
@@ -39,7 +38,6 @@ export default function ItemDetailPage() {
   const restoreItem = useRestoreItem(itemId);
   const showToast = useAppToast((s) => s.show);
 
-  const [activeTab, setActiveTab] = useState<TabKey>("blocks");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -179,58 +177,25 @@ export default function ItemDetailPage() {
             </View>
           </View>
 
-          <View className="flex-row border-b border-border">
-            {([
-              { key: "details", label: t("pages.item.details") },
-              { key: "blocks", label: t("pages.item.blocks") },
-            ] as { key: TabKey; label: string }[]).map((tab) => (
-              <Pressable
-                key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
-                className={`flex-1 py-3 ${activeTab === tab.key ? "border-b-2 border-primary" : ""}`}
-              >
-                <Text
-                  className={`text-center text-sm font-medium ${activeTab === tab.key ? "text-foreground" : "text-muted-foreground"
-                    }`}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            ))}
+          <View className="px-4 py-4 border-b border-border">
+            <Text className="text-base font-semibold text-foreground">{item.title}</Text>
+            {hasLinks ? (
+              <View className="mt-4 gap-2">
+                <Text className="text-sm font-semibold text-foreground">{t("pages.item.linkedTo")}</Text>
+                {links.map((link) => (
+                  <View key={link.id} className="rounded border border-border bg-card px-3 py-2">
+                    <Text className="text-xs font-medium text-foreground">
+                      {link.relation_type} {link.to_entity_type}:{link.to_entity_id}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
 
-          {activeTab === "details" ? (
-            <ScrollView className="flex-1 px-4 py-4" keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-              <Text className="text-base font-semibold text-foreground">{item.title}</Text>
-              <Text className="mt-1 text-xs text-muted-foreground">ID: {item.id}</Text>
-              {hasLinks ? (
-                <View className="mt-4 gap-2">
-                  <Text className="text-sm font-semibold text-foreground">{t("pages.item.linkedTo")}</Text>
-                  {links.map((link) => (
-                    <View key={link.id} className="rounded border border-border bg-card px-3 py-2">
-                      <Text className="text-xs font-medium text-foreground">
-                        {link.relation_type} {link.to_entity_type}:{link.to_entity_id}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <View className="mt-4 self-start rounded-full border border-border bg-muted/40 px-2 py-1">
-                  <Text className="text-[11px] text-muted-foreground">
-                    {t("pages.item.noLinksBadge")}
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-          ) : null}
-
-          {activeTab === "blocks" ? (
-            <View className="flex-1 min-h-0 px-2 py-2">
-              <View className="flex-1 bg-background">
-                <BlockEditor value={item.blocks} onChange={scheduleSave} editable />
-              </View>
-            </View>
-          ) : null}
+          <View className="flex-1 min-h-0 bg-background px-2 py-2">
+            <BlockEditor value={item.blocks} onChange={scheduleSave} editable />
+          </View>
         </View>
       </Pressable>
     </SafeAreaView>
