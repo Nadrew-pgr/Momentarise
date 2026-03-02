@@ -137,6 +137,7 @@ export default function Component() {
 
   const handleEventAdd = (event: CalendarEvent) => {
     setEvents([...events, event]);
+    return event;
   };
 
   const handleEventUpdate = (updatedEvent: CalendarEvent) => {
@@ -145,9 +146,10 @@ export default function Component() {
         event.id === updatedEvent.id ? updatedEvent : event,
       ),
     );
+    return updatedEvent;
   };
 
-  const handleEventDelete = (eventId: string) => {
+  const handleEventDelete = async (eventId: string) => {
     setEvents(events.filter((event) => event.id !== eventId));
   };
 
