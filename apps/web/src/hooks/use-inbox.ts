@@ -86,7 +86,8 @@ export function useCaptureDetail(captureId: string | null) {
   return useQuery<CaptureDetailResponse>({
     queryKey: ["inbox", "capture", captureId],
     enabled: Boolean(captureId),
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
+      const data = query.state.data as CaptureDetailResponse | undefined;
       const status = data?.capture?.status;
       return status === "queued" || status === "processing" ? 2000 : false;
     },

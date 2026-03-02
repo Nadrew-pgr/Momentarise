@@ -182,6 +182,11 @@
   border-collapse: collapse;
 }
 
+/* Remove outer border of the entire grid */
+.calendar-parity .fc .fc-scrollgrid {
+  border-width: 0 !important;
+}
+
 .calendar-parity .fc .fc-scrollgrid,
 .calendar-parity .fc .fc-scrollgrid *,
 .calendar-parity .fc table,
@@ -201,8 +206,9 @@
   border-bottom-width: 0 !important;
 }
 
+/* Headers: NO vertical borders between them, only a bottom border */
 .calendar-parity .fc .fc-scrollgrid-section-header th {
-  border-width: 0 1px 1px 0;
+  border-width: 0 0 1px 0 !important;
 }
 
 .calendar-parity .fc .fc-timegrid-slot {
@@ -264,7 +270,7 @@
 
 .calendar-parity .fc .fc-col-header-cell-cushion {
   font-size: 0.875rem;
-  font-weight: normal;
+  font-weight: 600; /* Coss is font-semibold */
   padding: 0.5rem 6px;
   color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
   text-transform: none;
@@ -283,6 +289,13 @@
 }
 
 /* --- Time axis labels: text-[10px] sm:text-xs text-muted-foreground/70 --- */
+.calendar-parity .fc .fc-timegrid-axis-frame {
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
 .calendar-parity .fc .fc-timegrid-axis-cushion,
 .calendar-parity .fc .fc-timegrid-slot-label-cushion {
   font-size: 0.625rem;
@@ -290,6 +303,16 @@
   font-weight: normal;
   text-align: right;
   padding-right: 0.5rem;
+}
+
+.calendar-parity .fc .fc-timegrid-slot-label-cushion {
+  position: relative;
+  top: -12px;
+}
+
+/* First hour label (usually 12 AM) doesn't shift up (matches Coss index === 0 ? "top-0") */
+.calendar-parity .fc table.fc-scrollgrid-sync-table tr:first-child .fc-timegrid-slot-label-cushion {
+  top: 0;
 }
 
 @media (min-width: 640px) {
@@ -301,10 +324,15 @@
 }
 
 /* --- Month view: day numbers --- */
+.calendar-parity .fc .fc-daygrid-day-top {
+  flex-direction: row; /* Align day numbers to the left to match Coss */
+  justify-content: flex-start;
+}
+
 .calendar-parity .fc .fc-daygrid-day-number {
   font-size: 0.875rem;
   color: var(--foreground);
-  padding: 4px 6px;
+  padding: 8px;
   font-weight: normal;
 }
 
@@ -355,12 +383,12 @@
   }
 }
 
-/* --- Events --- */
 .calendar-parity .fc .fc-event {
   border-radius: calc(var(--radius) - 4px);
-  border: 1px solid transparent;
+  border: none;
+  background: transparent;
   box-shadow: none;
-  padding: 0 2px;
+  padding: 0;
   overflow: hidden;
   min-height: 0;
   height: 100%;
@@ -374,37 +402,10 @@
   height: 100%;
   width: 100%;
   display: flex;
+  background: transparent;
 }
 
-.calendar-parity .fc .fc-event.event-color-sky {
-  background: rgba(125, 211, 252, 0.36);
-  border-color: rgba(56, 189, 248, 0.35);
-}
-
-.calendar-parity .fc .fc-event.event-color-amber {
-  background: rgba(252, 211, 77, 0.34);
-  border-color: rgba(251, 191, 36, 0.38);
-}
-
-.calendar-parity .fc .fc-event.event-color-violet {
-  background: rgba(196, 181, 253, 0.36);
-  border-color: rgba(167, 139, 250, 0.4);
-}
-
-.calendar-parity .fc .fc-event.event-color-rose {
-  background: rgba(253, 164, 175, 0.34);
-  border-color: rgba(251, 113, 133, 0.38);
-}
-
-.calendar-parity .fc .fc-event.event-color-emerald {
-  background: rgba(110, 231, 183, 0.34);
-  border-color: rgba(52, 211, 153, 0.38);
-}
-
-.calendar-parity .fc .fc-event.event-color-orange {
-  background: rgba(253, 186, 116, 0.34);
-  border-color: rgba(251, 146, 60, 0.38);
-}
+/* Event background colors and states are now processed inside CalendarEventChip.tsx via getEventColorClasses */
 
 .calendar-parity .fc .fc-event.is-tracking {
   box-shadow: inset 0 0 0 1px rgba(5, 150, 105, 0.45);
@@ -423,8 +424,15 @@
 /* --- Now indicator --- */
 .calendar-parity .fc .fc-timegrid-now-indicator-line {
   border-color: var(--primary);
+  border-width: 2px 0 0;
 }
 
 .calendar-parity .fc .fc-timegrid-now-indicator-arrow {
-  border-color: var(--primary);
+  border: none;
+  background: var(--primary);
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  transform: translateY(-50%) translateX(-50%);
+  margin-top: 1px;
 }

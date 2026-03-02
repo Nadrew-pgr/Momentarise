@@ -16,6 +16,7 @@ import type {
 } from "react-native-calendars";
 import { Calendar as CalendarIcon, CalendarDays, CalendarRange } from "lucide-react-native";
 import { useEventsRange } from "@/hooks/use-events";
+import { useRouter } from "expo-router";
 import { useCalendarPreferences } from "@/hooks/use-calendar-preferences";
 import type { CalendarEvent } from "@/lib/adapters/calendarAdapter";
 import { eventsListToCalendarFormat } from "@/lib/adapters/calendarAdapter";
@@ -95,6 +96,7 @@ function parseEventDate(value: string): Date {
 
 export default function TimelineScreen() {
   const { t } = useTranslation();
+  const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<TimelineView>("day");
   const openEventSheet = useEventSheet((s) => s.open);
@@ -124,21 +126,23 @@ export default function TimelineScreen() {
       if (!id) return;
       const found = data?.events?.find((e) => e.id === id);
       if (found) {
-        openEventSheet({
+        useEventSheet.getState().open({
           id: found.id,
+          itemId: found.item_id,
           title: found.title,
-          description: "",
-          location: "",
+          description: found.description ?? "",
+          location: found.location ?? "",
           start: new Date(found.start_at),
           end: new Date(found.end_at),
-          allDay: false,
+          allDay: found.all_day,
           color: found.color,
           isTracking: found.is_tracking,
           updatedAt: found.updated_at,
         });
+        router.push(`/moment/${found.id}`);
       }
     },
-    [data?.events, openEventSheet]
+    [data?.events, router]
   );
 
   const baseEventsByDate: Record<string, CalendarEvent[]> = data
@@ -283,14 +287,12 @@ export default function TimelineScreen() {
               return (
                 <Pressable
                   onPress={() => setCurrentDate(new Date(date.dateString))}
-                  className={`m-1 rounded-lg border px-2 py-1 ${
-                    isSelected ? "border-primary bg-primary/10" : "border-transparent"
-                  } ${state === "disabled" ? "opacity-40" : ""}`}
+                  className={`m-1 rounded-lg border px-2 py-1 ${isSelected ? "border-primary bg-primary/10" : "border-transparent"
+                    } ${state === "disabled" ? "opacity-40" : ""}`}
                 >
                   <UiText
-                    className={`text-xs ${
-                      isToday ? "text-primary font-semibold" : "text-foreground"
-                    }`}
+                    className={`text-xs ${isToday ? "text-primary font-semibold" : "text-foreground"
+                      }`}
                   >
                     {date.day}
                   </UiText>

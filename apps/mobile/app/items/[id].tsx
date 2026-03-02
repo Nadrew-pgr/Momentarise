@@ -21,7 +21,7 @@ import {
 } from "@/hooks/use-item";
 import { useAppToast } from "@/lib/store";
 
-type TabKey = "details" | "blocks" | "coach";
+type TabKey = "details" | "blocks";
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 export default function ItemDetailPage() {
@@ -183,7 +183,6 @@ export default function ItemDetailPage() {
             {([
               { key: "details", label: t("pages.item.details") },
               { key: "blocks", label: t("pages.item.blocks") },
-              { key: "coach", label: t("pages.item.coach") },
             ] as { key: TabKey; label: string }[]).map((tab) => (
               <Pressable
                 key={tab.key}
@@ -191,9 +190,8 @@ export default function ItemDetailPage() {
                 className={`flex-1 py-3 ${activeTab === tab.key ? "border-b-2 border-primary" : ""}`}
               >
                 <Text
-                  className={`text-center text-sm font-medium ${
-                    activeTab === tab.key ? "text-foreground" : "text-muted-foreground"
-                  }`}
+                  className={`text-center text-sm font-medium ${activeTab === tab.key ? "text-foreground" : "text-muted-foreground"
+                    }`}
                 >
                   {tab.label}
                 </Text>
@@ -231,14 +229,6 @@ export default function ItemDetailPage() {
               <View className="flex-1 bg-background">
                 <BlockEditor value={item.blocks} onChange={scheduleSave} editable />
               </View>
-            </View>
-          ) : null}
-
-          {activeTab === "coach" ? (
-            <View className="flex-1 items-center justify-center px-4">
-              <Text className="text-center text-sm text-muted-foreground">
-                {t("pages.item.coachPlaceholder")}
-              </Text>
             </View>
           ) : null}
         </View>

@@ -18,14 +18,6 @@ import { BlockEditor } from "@/components/block-editor";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -318,320 +310,330 @@ export function EventDialog({
     bgClass: string;
     borderClass: string;
   }> = [
-    {
-      bgClass: "bg-sky-400 data-[state=checked]:bg-sky-400",
-      borderClass: "border-sky-400 data-[state=checked]:border-sky-400",
-      label: "Sky",
-      value: "sky",
-    },
-    {
-      bgClass: "bg-amber-400 data-[state=checked]:bg-amber-400",
-      borderClass: "border-amber-400 data-[state=checked]:border-amber-400",
-      label: "Amber",
-      value: "amber",
-    },
-    {
-      bgClass: "bg-violet-400 data-[state=checked]:bg-violet-400",
-      borderClass: "border-violet-400 data-[state=checked]:border-violet-400",
-      label: "Violet",
-      value: "violet",
-    },
-    {
-      bgClass: "bg-rose-400 data-[state=checked]:bg-rose-400",
-      borderClass: "border-rose-400 data-[state=checked]:border-rose-400",
-      label: "Rose",
-      value: "rose",
-    },
-    {
-      bgClass: "bg-emerald-400 data-[state=checked]:bg-emerald-400",
-      borderClass: "border-emerald-400 data-[state=checked]:border-emerald-400",
-      label: "Emerald",
-      value: "emerald",
-    },
-    {
-      bgClass: "bg-orange-400 data-[state=checked]:bg-orange-400",
-      borderClass: "border-orange-400 data-[state=checked]:border-orange-400",
-      label: "Orange",
-      value: "orange",
-    },
-  ];
+      {
+        bgClass: "bg-sky-400 data-[state=checked]:bg-sky-400",
+        borderClass: "border-sky-400 data-[state=checked]:border-sky-400",
+        label: "Sky",
+        value: "sky",
+      },
+      {
+        bgClass: "bg-amber-400 data-[state=checked]:bg-amber-400",
+        borderClass: "border-amber-400 data-[state=checked]:border-amber-400",
+        label: "Amber",
+        value: "amber",
+      },
+      {
+        bgClass: "bg-violet-400 data-[state=checked]:bg-violet-400",
+        borderClass: "border-violet-400 data-[state=checked]:border-violet-400",
+        label: "Violet",
+        value: "violet",
+      },
+      {
+        bgClass: "bg-rose-400 data-[state=checked]:bg-rose-400",
+        borderClass: "border-rose-400 data-[state=checked]:border-rose-400",
+        label: "Rose",
+        value: "rose",
+      },
+      {
+        bgClass: "bg-emerald-400 data-[state=checked]:bg-emerald-400",
+        borderClass: "border-emerald-400 data-[state=checked]:border-emerald-400",
+        label: "Emerald",
+        value: "emerald",
+      },
+      {
+        bgClass: "bg-orange-400 data-[state=checked]:bg-orange-400",
+        borderClass: "border-orange-400 data-[state=checked]:border-orange-400",
+        label: "Orange",
+        value: "orange",
+      },
+    ];
 
   return (
-    <Dialog onOpenChange={(open) => !open && onClose()} open={isOpen}>
-      <DialogContent className="sm:max-w-[760px]">
-        <DialogHeader>
-          <DialogTitle>
-            {currentEventId
-              ? t("pages.calendar.momentTitleEdit")
-              : t("pages.calendar.momentTitleCreate")}
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            {currentEventId
-              ? t("pages.calendar.momentDescriptionEdit")
-              : t("pages.calendar.momentDescriptionCreate")}
-          </DialogDescription>
-        </DialogHeader>
+    <div
+      className={cn(
+        "flex w-80 shrink-0 flex-col overflow-hidden border-l border-border bg-background transition-[width,margin] duration-300",
+        isOpen ? "ml-0 w-[400px]" : "-mr-[400px] w-[0px]"
+      )}
+      aria-hidden={!isOpen}
+    >
+      <div className="flex flex-col flex-1 min-h-0 w-[400px]">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              {currentEventId
+                ? t("pages.calendar.momentTitleEdit")
+                : t("pages.calendar.momentTitleCreate")}
+            </h2>
+          </div>
+        </div>
 
-        <div className="inline-flex rounded-lg border border-border p-1">
-          <Button
-            type="button"
-            variant={activeTab === "details" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("details")}
-          >
-            {t("pages.calendar.momentTabs.details")}
-          </Button>
-          <Button
-            type="button"
-            variant={activeTab === "content" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("content")}
-          >
-            {t("pages.calendar.momentTabs.content")}
-          </Button>
-          <Button
-            type="button"
-            variant={activeTab === "coach" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("coach")}
-          >
-            {t("pages.calendar.momentTabs.coach")}
-          </Button>
+        <div className="border-b border-border p-2">
+          <div className="inline-flex w-full rounded-md border border-border bg-muted/50 p-1">
+            <Button
+              type="button"
+              variant={activeTab === "details" ? "secondary" : "ghost"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setActiveTab("details")}
+            >
+              {t("pages.calendar.momentTabs.details")}
+            </Button>
+            <Button
+              type="button"
+              variant={activeTab === "content" ? "secondary" : "ghost"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setActiveTab("content")}
+            >
+              {t("pages.calendar.momentTabs.content")}
+            </Button>
+            <Button
+              type="button"
+              variant={activeTab === "coach" ? "secondary" : "ghost"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setActiveTab("coach")}
+            >
+              {t("pages.calendar.momentTabs.coach")}
+            </Button>
+          </div>
         </div>
 
         {error && (
-          <div className="rounded-md bg-destructive/15 px-3 py-2 text-destructive text-sm">
+          <div className="mx-4 mt-4 rounded-md bg-destructive/15 px-3 py-2 text-destructive text-sm">
             {error}
           </div>
         )}
 
         {activeTab === "details" ? (
-          <div className="grid max-h-[58vh] gap-4 overflow-y-auto py-1 pr-1">
-            <div className="*:not-first:mt-1.5">
-              <Label htmlFor="title">{t("pages.calendar.momentFields.title")}</Label>
-              <Input
-                id="title"
-                onChange={(e) => setTitle(e.target.value)}
-                value={title}
-              />
-            </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="grid gap-4">
+              <div className="*:not-first:mt-1.5">
+                <Label htmlFor="title">{t("pages.calendar.momentFields.title")}</Label>
+                <Input
+                  id="title"
+                  onChange={(e) => setTitle(e.target.value)}
+                  value={title}
+                />
+              </div>
 
-            <div className="*:not-first:mt-1.5">
-              <Label htmlFor="description">{t("pages.calendar.momentFields.description")}</Label>
-              <Textarea
-                id="description"
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                value={description}
-              />
-            </div>
+              <div className="*:not-first:mt-1.5">
+                <Label htmlFor="description">{t("pages.calendar.momentFields.description")}</Label>
+                <Textarea
+                  id="description"
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  value={description}
+                />
+              </div>
 
-            <div className="flex gap-4">
-              <div className="flex-1 *:not-first:mt-1.5">
-                <Label htmlFor="start-date">{t("pages.calendar.momentFields.startDate")}</Label>
-                <Popover onOpenChange={setStartDateOpen} open={startDateOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      className={cn(
-                        "group w-full justify-between border-input bg-background px-3 font-normal outline-none outline-offset-0 hover:bg-background focus-visible:outline-[3px]",
-                        !startDate && "text-muted-foreground"
-                      )}
-                      id="start-date"
-                      variant="outline"
-                    >
-                      <span className={cn("truncate", !startDate && "text-muted-foreground")}>
-                        {startDate
-                          ? format(startDate, "PPP")
-                          : t("pages.calendar.momentFields.pickDate")}
-                      </span>
-                      <RiCalendarLine
-                        aria-hidden="true"
-                        className="shrink-0 text-muted-foreground/80"
-                        size={16}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="*:not-first:mt-1.5">
+                  <Label htmlFor="start-date">{t("pages.calendar.momentFields.startDate")}</Label>
+                  <Popover onOpenChange={setStartDateOpen} open={startDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        className={cn(
+                          "group w-full justify-between border-input bg-background px-3 font-normal outline-none outline-offset-0 hover:bg-background focus-visible:outline-[3px]",
+                          !startDate && "text-muted-foreground"
+                        )}
+                        id="start-date"
+                        variant="outline"
+                      >
+                        <span className={cn("truncate", !startDate && "text-muted-foreground")}>
+                          {startDate
+                            ? format(startDate, "PPP")
+                            : t("pages.calendar.momentFields.pickDate")}
+                        </span>
+                        <RiCalendarLine
+                          aria-hidden="true"
+                          className="shrink-0 text-muted-foreground/80"
+                          size={16}
+                        />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-auto p-2">
+                      <Calendar
+                        defaultMonth={startDate}
+                        mode="single"
+                        onSelect={(date) => {
+                          if (!date) return;
+                          setStartDate(date);
+                          if (isBefore(endDate, date)) {
+                            setEndDate(date);
+                          }
+                          setError(null);
+                          setStartDateOpen(false);
+                        }}
+                        selected={startDate}
                       />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-auto p-2">
-                    <Calendar
-                      defaultMonth={startDate}
-                      mode="single"
-                      onSelect={(date) => {
-                        if (!date) return;
-                        setStartDate(date);
-                        if (isBefore(endDate, date)) {
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {!allDay ? (
+                  <div className="*:not-first:mt-1.5">
+                    <Label htmlFor="start-time">{t("pages.calendar.momentFields.startTime")}</Label>
+                    <Select onValueChange={setStartTime} value={startTime}>
+                      <SelectTrigger id="start-time">
+                        <SelectValue placeholder={t("pages.calendar.momentFields.selectTime")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="*:not-first:mt-1.5">
+                  <Label htmlFor="end-date">{t("pages.calendar.momentFields.endDate")}</Label>
+                  <Popover onOpenChange={setEndDateOpen} open={endDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        className={cn(
+                          "group w-full justify-between border-input bg-background px-3 font-normal outline-none outline-offset-0 hover:bg-background focus-visible:outline-[3px]",
+                          !endDate && "text-muted-foreground"
+                        )}
+                        id="end-date"
+                        variant="outline"
+                      >
+                        <span className={cn("truncate", !endDate && "text-muted-foreground")}>
+                          {endDate
+                            ? format(endDate, "PPP")
+                            : t("pages.calendar.momentFields.pickDate")}
+                        </span>
+                        <RiCalendarLine
+                          aria-hidden="true"
+                          className="shrink-0 text-muted-foreground/80"
+                          size={16}
+                        />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-auto p-2">
+                      <Calendar
+                        defaultMonth={endDate}
+                        disabled={{ before: startDate }}
+                        mode="single"
+                        onSelect={(date) => {
+                          if (!date) return;
                           setEndDate(date);
-                        }
-                        setError(null);
-                        setStartDateOpen(false);
-                      }}
-                      selected={startDate}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {!allDay ? (
-                <div className="min-w-28 *:not-first:mt-1.5">
-                  <Label htmlFor="start-time">{t("pages.calendar.momentFields.startTime")}</Label>
-                  <Select onValueChange={setStartTime} value={startTime}>
-                    <SelectTrigger id="start-time">
-                      <SelectValue placeholder={t("pages.calendar.momentFields.selectTime")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex gap-4">
-              <div className="flex-1 *:not-first:mt-1.5">
-                <Label htmlFor="end-date">{t("pages.calendar.momentFields.endDate")}</Label>
-                <Popover onOpenChange={setEndDateOpen} open={endDateOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      className={cn(
-                        "group w-full justify-between border-input bg-background px-3 font-normal outline-none outline-offset-0 hover:bg-background focus-visible:outline-[3px]",
-                        !endDate && "text-muted-foreground"
-                      )}
-                      id="end-date"
-                      variant="outline"
-                    >
-                      <span className={cn("truncate", !endDate && "text-muted-foreground")}>
-                        {endDate
-                          ? format(endDate, "PPP")
-                          : t("pages.calendar.momentFields.pickDate")}
-                      </span>
-                      <RiCalendarLine
-                        aria-hidden="true"
-                        className="shrink-0 text-muted-foreground/80"
-                        size={16}
+                          setError(null);
+                          setEndDateOpen(false);
+                        }}
+                        selected={endDate}
                       />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-auto p-2">
-                    <Calendar
-                      defaultMonth={endDate}
-                      disabled={{ before: startDate }}
-                      mode="single"
-                      onSelect={(date) => {
-                        if (!date) return;
-                        setEndDate(date);
-                        setError(null);
-                        setEndDateOpen(false);
-                      }}
-                      selected={endDate}
-                    />
-                  </PopoverContent>
-                </Popover>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {!allDay ? (
+                  <div className="*:not-first:mt-1.5">
+                    <Label htmlFor="end-time">{t("pages.calendar.momentFields.endTime")}</Label>
+                    <Select onValueChange={setEndTime} value={endTime}>
+                      <SelectTrigger id="end-time">
+                        <SelectValue placeholder={t("pages.calendar.momentFields.selectTime")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
               </div>
 
-              {!allDay ? (
-                <div className="min-w-28 *:not-first:mt-1.5">
-                  <Label htmlFor="end-time">{t("pages.calendar.momentFields.endTime")}</Label>
-                  <Select onValueChange={setEndTime} value={endTime}>
-                    <SelectTrigger id="end-time">
-                      <SelectValue placeholder={t("pages.calendar.momentFields.selectTime")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-            </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={allDay}
+                  id="all-day"
+                  onCheckedChange={(checked) => setAllDay(checked === true)}
+                />
+                <Label htmlFor="all-day">{t("pages.calendar.momentFields.allDay")}</Label>
+              </div>
 
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={allDay}
-                id="all-day"
-                onCheckedChange={(checked) => setAllDay(checked === true)}
-              />
-              <Label htmlFor="all-day">{t("pages.calendar.momentFields.allDay")}</Label>
-            </div>
+              <div className="*:not-first:mt-1.5">
+                <Label htmlFor="location">{t("pages.calendar.momentFields.location")}</Label>
+                <Input
+                  id="location"
+                  onChange={(e) => setLocation(e.target.value)}
+                  value={location}
+                />
+              </div>
 
-            <div className="*:not-first:mt-1.5">
-              <Label htmlFor="location">{t("pages.calendar.momentFields.location")}</Label>
-              <Input
-                id="location"
-                onChange={(e) => setLocation(e.target.value)}
-                value={location}
-              />
-            </div>
-
-            <fieldset className="space-y-4">
-              <legend className="font-medium text-foreground text-sm leading-none">
-                {t("pages.calendar.momentFields.color")}
-              </legend>
-              <RadioGroup
-                className="flex gap-1.5"
-                defaultValue={colorOptions[0]?.value}
-                onValueChange={(value: EventColor) => setColor(value)}
-                value={color}
-              >
-                {colorOptions.map((colorOption) => (
-                  <RadioGroupItem
-                    aria-label={colorOption.label}
-                    className={cn(
-                      "size-6 shadow-none",
-                      colorOption.bgClass,
-                      colorOption.borderClass
-                    )}
-                    id={`color-${colorOption.value}`}
-                    key={colorOption.value}
-                    value={colorOption.value}
-                  />
-                ))}
-              </RadioGroup>
-            </fieldset>
-
-            <div className="space-y-2">
-              <p className="font-medium text-foreground text-sm">
-                {t("pages.calendar.momentLinks.title")}
-              </p>
-              {!itemId ? (
-                <p className="text-muted-foreground text-xs">
-                  {t("pages.calendar.momentLinks.afterCreate")}
-                </p>
-              ) : linksLoading ? (
-                <p className="text-muted-foreground text-xs">
-                  {t("pages.calendar.momentLinks.loading")}
-                </p>
-              ) : links.length === 0 ? (
-                <p className="text-muted-foreground text-xs">
-                  {t("pages.calendar.momentLinks.empty")}
-                </p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {links.map((link) => (
-                    <li
-                      className="rounded-md border border-border bg-muted/30 px-2 py-1 text-xs"
-                      key={link.id}
-                    >
-                      {link.relation_type} - {link.to_entity_type}:{link.to_entity_id}
-                    </li>
+              <fieldset className="space-y-4 pt-2">
+                <legend className="font-medium text-foreground text-sm leading-none">
+                  {t("pages.calendar.momentFields.color")}
+                </legend>
+                <RadioGroup
+                  className="flex flex-wrap gap-2"
+                  defaultValue={colorOptions[0]?.value}
+                  onValueChange={(value: EventColor) => setColor(value)}
+                  value={color}
+                >
+                  {colorOptions.map((colorOption) => (
+                    <RadioGroupItem
+                      aria-label={colorOption.label}
+                      className={cn(
+                        "size-6 shadow-none",
+                        colorOption.bgClass,
+                        colorOption.borderClass
+                      )}
+                      id={`color-${colorOption.value}`}
+                      key={colorOption.value}
+                      value={colorOption.value}
+                    />
                   ))}
-                </ul>
-              )}
+                </RadioGroup>
+              </fieldset>
+
+              <div className="space-y-2 pt-2">
+                <p className="font-medium text-foreground text-sm">
+                  {t("pages.calendar.momentLinks.title")}
+                </p>
+                {!itemId ? (
+                  <p className="text-muted-foreground text-xs">
+                    {t("pages.calendar.momentLinks.afterCreate")}
+                  </p>
+                ) : linksLoading ? (
+                  <p className="text-muted-foreground text-xs">
+                    {t("pages.calendar.momentLinks.loading")}
+                  </p>
+                ) : links.length === 0 ? (
+                  <p className="text-muted-foreground text-xs">
+                    {t("pages.calendar.momentLinks.empty")}
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {links.map((link) => (
+                      <li
+                        className="rounded-md border border-border bg-muted/30 px-2 py-1 text-xs"
+                        key={link.id}
+                      >
+                        {link.relation_type} - {link.to_entity_type}:{link.to_entity_id}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </div>
         ) : null}
 
         {activeTab === "content" ? (
-          <div className="space-y-2">
+          <div className="flex-1 flex flex-col overflow-hidden p-4">
             {contentSaveLabel ? (
-              <p className="text-muted-foreground text-xs">{contentSaveLabel}</p>
+              <p className="mb-2 text-muted-foreground text-xs">{contentSaveLabel}</p>
             ) : null}
-            <div className="h-[48vh] overflow-hidden rounded-md border border-border bg-background">
+            <div className="flex-1 min-h-0 overflow-hidden rounded-md border border-border bg-background">
               <BlockEditor
                 editorKey={currentItemId || "moment-content-draft"}
                 value={blocks}
@@ -644,51 +646,57 @@ export function EventDialog({
         ) : null}
 
         {activeTab === "coach" ? (
-          <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-6 text-muted-foreground text-sm">
-            {t("pages.calendar.coachPlaceholder")}
+          <div className="p-4">
+            <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-muted-foreground text-sm">
+              {t("pages.calendar.coachPlaceholder")}
+            </div>
           </div>
         ) : null}
 
-        <DialogFooter className="flex-row sm:justify-between">
-          <div className="flex items-center gap-2">
-            {currentEventId && onToggleTracking ? (
+        <div className="mt-auto border-t border-border p-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              {currentEventId && onToggleTracking ? (
+                <Button
+                  onClick={handleTrackingToggle}
+                  variant="outline"
+                  className="flex-1"
+                  disabled={isTrackingActionPending || isSaving || isDeleting}
+                >
+                  {isTracking ? t("pages.calendar.actions.stop") : t("pages.calendar.actions.start")}
+                </Button>
+              ) : null}
+              {currentEventId ? (
+                <Button
+                  aria-label={t("pages.calendar.actions.delete")}
+                  onClick={() => void handleDelete()}
+                  size="icon"
+                  variant="outline"
+                  disabled={isDeleting || isSaving}
+                >
+                  <RiDeleteBinLine aria-hidden="true" size={16} />
+                </Button>
+              ) : null}
+            </div>
+            <div className="flex items-center justify-between gap-2">
               <Button
-                onClick={handleTrackingToggle}
+                onClick={() => {
+                  cancelDebouncedPersistBlocks();
+                  onClose();
+                }}
                 variant="outline"
-                disabled={isTrackingActionPending || isSaving || isDeleting}
+                className="flex-1"
+                disabled={isSaving || isDeleting}
               >
-                {isTracking ? t("pages.calendar.actions.stop") : t("pages.calendar.actions.start")}
+                {t("common.cancel")}
               </Button>
-            ) : null}
-            {currentEventId ? (
-              <Button
-                aria-label={t("pages.calendar.actions.delete")}
-                onClick={() => void handleDelete()}
-                size="icon"
-                variant="outline"
-                disabled={isDeleting || isSaving}
-              >
-                <RiDeleteBinLine aria-hidden="true" size={16} />
+              <Button onClick={() => void handleSave()} className="flex-1" disabled={isSaving || isDeleting}>
+                {isSaving ? t("pages.calendar.saving") : t("common.save")}
               </Button>
-            ) : null}
+            </div>
           </div>
-          <div className="flex flex-1 justify-end gap-2">
-            <Button
-              onClick={() => {
-                cancelDebouncedPersistBlocks();
-                onClose();
-              }}
-              variant="outline"
-              disabled={isSaving || isDeleting}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={() => void handleSave()} disabled={isSaving || isDeleting}>
-              {isSaving ? t("pages.calendar.saving") : t("common.save")}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </div>
   );
 }

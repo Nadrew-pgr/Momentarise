@@ -38,6 +38,7 @@ export const useCreateSheet = create<CreateSheetState>((set) => ({
 
 export type DraftEvent = {
   id?: string;
+  itemId?: string | null;
   title: string;
   description: string;
   location: string;

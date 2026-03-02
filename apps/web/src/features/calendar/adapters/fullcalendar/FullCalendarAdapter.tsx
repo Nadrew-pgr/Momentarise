@@ -358,9 +358,9 @@ export function FullCalendarAdapter({
         setSelectedEvent((prev) =>
           prev
             ? {
-                ...prev,
-                isTracking: !source.is_tracking,
-              }
+              ...prev,
+              isTracking: !source.is_tracking,
+            }
             : prev
         );
       })
@@ -386,96 +386,107 @@ export function FullCalendarAdapter({
         shortcutsEnabled={!isDialogOpen}
       />
 
-      <div className="calendar-full min-h-0 flex-1">
-        {view === "agenda" ? (
-          <AgendaView
-            currentDate={currentDate}
-            events={agendaEvents}
-            onEventSelect={(event) => {
-              setSelectedEvent(event);
-              setIsDialogOpen(true);
-            }}
-          />
-        ) : (
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView={fullCalendarViewFrom(view)}
-            initialDate={currentDate}
-            headerToolbar={false}
-            events={fullCalendarEvents}
-            datesSet={handleDatesSet}
-            selectable
-            editable
-            eventDurationEditable
-            eventStartEditable
-            nowIndicator
-            timeZone="local"
-            slotMinTime={`${String(startHour).padStart(2, "0")}:00:00`}
-            slotMaxTime={`${String(endHour).padStart(2, "0")}:00:00`}
-            scrollTime={`${String(startHour).padStart(2, "0")}:00:00`}
-            slotDuration="00:15:00"
-            slotLabelInterval="01:00:00"
-            slotLabelFormat={{ hour: "numeric", meridiem: "short", omitZeroMinute: true }}
-            slotLabelContent={(arg) => {
-              const h = arg.date.getHours();
-              const suffix = h >= 12 ? "PM" : "AM";
-              const hour = h % 12 || 12;
-              return `${hour} ${suffix}`;
-            }}
-            dayMaxEvents={4}
-            dayMaxEventRows={4}
-            allDaySlot={hasAllDayEvents}
-            select={handleSelect}
-            eventClick={handleEventClick}
-            eventDrop={handleDrop}
-            eventResize={handleResize}
-            dayHeaderContent={(arg) => (
-              <span className="fc-day-header-label">
-                {view === "month"
-                  ? format(arg.date, "EEE")
-                  : `${format(arg.date, "E")} ${format(arg.date, "d")}`}
-              </span>
-            )}
-            eventClassNames={(arg) => {
-              const eventEnd = arg.event.end ?? arg.event.start;
-              if (!eventEnd) return [];
-              return eventEnd < new Date() ? ["is-past-event"] : [];
-            }}
-            eventContent={(arg) => {
-              const eventEnd = arg.event.end ?? arg.event.start;
-              const isPast = !!eventEnd && eventEnd < new Date();
-              const isTracking = arg.event.extendedProps?.is_tracking === true;
-              return (
-                <CalendarEventChip
-                  title={arg.event.title}
-                  timeText={arg.timeText}
-                  isPast={isPast}
-                  isTracking={isTracking}
-                />
-              );
-            }}
-          />
-        )}
-      </div>
+      <div className="flex flex-1 overflow-hidden">
+        <div className="calendar-full min-h-0 flex-1">
+          {view === "agenda" ? (
+            <AgendaView
+              currentDate={currentDate}
+              events={agendaEvents}
+              onEventSelect={(event) => {
+                setSelectedEvent(event);
+                setIsDialogOpen(true);
+              }}
+            />
+          ) : (
+            <FullCalendar
+              ref={calendarRef}
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              initialView={fullCalendarViewFrom(view)}
+              initialDate={currentDate}
+              headerToolbar={false}
+              events={fullCalendarEvents}
+              datesSet={handleDatesSet}
+              selectable
+              editable
+              eventDurationEditable
+              eventStartEditable
+              nowIndicator
+              timeZone="local"
+              slotMinTime={`${String(startHour).padStart(2, "0")}:00:00`}
+              slotMaxTime={`${String(endHour).padStart(2, "0")}:00:00`}
+              scrollTime={`${String(startHour).padStart(2, "0")}:00:00`}
+              slotDuration="00:15:00"
+              slotLabelInterval="01:00:00"
+              slotLabelFormat={{ hour: "numeric", meridiem: "short", omitZeroMinute: true }}
+              dayMaxEvents={4}
+              dayMaxEventRows={4}
+              allDaySlot={hasAllDayEvents}
+              allDayText="All day"
+              slotLabelContent={(arg) => format(arg.date, "h a")}
+              dayHeaderContent={(arg) => {
+                if (arg.view.type === "timeGridWeek" || arg.view.type === "timeGridDay") {
+                  return (
+                    <>
+                      <span aria-hidden="true" className="sm:hidden">
+                        {format(arg.date, "E")[0]} {format(arg.date, "d")}
+                      </span>
+                      <span className="max-sm:hidden">{format(arg.date, "EEE dd")}</span>
+                    </>
+                  );
+                }
+                return format(arg.date, "EEE");
+              }}
+              select={handleSelect}
+              eventClick={handleEventClick}
+              eventDrop={handleDrop}
+              eventResize={handleResize}
+              eventClassNames={(arg) => {
+                const eventEnd = arg.event.end ?? arg.event.start;
+                if (!eventEnd) return [];
+                return eventEnd < new Date() ? ["is-past-event"] : [];
+              }}
+              eventContent={(arg) => {
+                const eventStart = arg.event.start ?? new Date();
+                const eventEnd = arg.event.end ?? new Date(eventStart.getTime() + 60 * 60 * 1000);
+                const isPast = eventEnd < new Date();
+                const isTracking = arg.event.extendedProps?.is_tracking === true;
+                const durationMinutes = (eventEnd.getTime() - eventStart.getTime()) / 60000;
 
-      <CalendarEventDialog
-        key={
-          selectedEvent
-            ? `${selectedEvent.id || "new"}-${new Date(selectedEvent.start).toISOString()}-${new Date(selectedEvent.end).toISOString()}`
-            : "calendar-dialog-empty"
-        }
-        event={selectedEvent}
-        isOpen={isDialogOpen}
-        onClose={() => {
-          setIsDialogOpen(false);
-          setSelectedEvent(null);
-        }}
-        onSave={handleDialogSave}
-        onDelete={handleDialogDelete}
-        onToggleTracking={handleToggleTracking}
-        isTrackingActionPending={isMutating}
-      />
+                return (
+                  <CalendarEventChip
+                    title={arg.event.title}
+                    timeText={arg.timeText}
+                    isPast={isPast}
+                    isTracking={isTracking}
+                    color={arg.event.extendedProps?.color}
+                    viewType={arg.view.type}
+                    durationMinutes={durationMinutes}
+                    isAllDay={arg.event.allDay}
+                  />
+                );
+              }}
+            />
+          )}
+        </div>
+
+        <CalendarEventDialog
+          key={
+            selectedEvent
+              ? `${selectedEvent.id || "new"}-${new Date(selectedEvent.start).toISOString()}-${new Date(selectedEvent.end).toISOString()}`
+              : "calendar-dialog-empty"
+          }
+          event={selectedEvent}
+          isOpen={isDialogOpen}
+          onClose={() => {
+            setIsDialogOpen(false);
+            setSelectedEvent(null);
+          }}
+          onSave={handleDialogSave}
+          onDelete={handleDialogDelete}
+          onToggleTracking={handleToggleTracking}
+          isTrackingActionPending={isMutating}
+        />
+      </div>
     </div>
   );
 }

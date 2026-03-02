@@ -61,7 +61,7 @@ function extractMutations(preview: SyncPreview): PreviewMutation[] {
         const kind = typeof raw.kind === "string" ? raw.kind : "mutation";
         const args = raw.args && typeof raw.args === "object" ? (raw.args as Record<string, unknown>) : {};
         const display_summary = typeof raw.display_summary === "string" && raw.display_summary.trim() ? raw.display_summary.trim() : undefined;
-        return { kind, args, display_summary };
+        return { kind, args, display_summary } as PreviewMutation;
       })
       .filter((entry): entry is PreviewMutation => entry !== null);
   }
