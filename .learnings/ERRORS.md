@@ -301,3 +301,60 @@ Utiliser le proxy communautaire `@mistertk/vercel-mcp` qui est complet via NPX e
 - Related Files: `.gemini/antigravity/mcp_config.json`
 
 ---
+
+## [ERR-20260302-004] Render Postgres - 401 Unauthorized (Empty Database)
+
+**Logged**: 2026-03-02
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+L'authentification sur Vercel (Production) échouait avec un statut 401 "Invalid credentials" malgré des identifiants corrects localement.
+
+### Error
+```
+401 Unauthorized - POST /api/auth/login
+```
+
+### Context
+- Une nouvelle base de données de production venait d'être créée via l'API Render.
+- La base était de facto totalement vide, sans les données ni les utilisateurs du container Docker local.
+
+### Suggested Fix
+1. S'inscrire à nouveau (Sign Up) sur l'environnement de production.
+2. Ou effectuer un data dump de la base locale vers la base de production (`pg_dump -a` | `psql`).
+
+### Metadata
+- Related Files: `apps/web/src/app/api/auth/login/route.ts`
+
+---
+
+## [ERR-20260302-005] Render Postgres - SSL Connection closed unexpectedly
+
+**Logged**: 2026-03-02
+**Priority**: medium
+**Status**: resolved
+**Area**: infra
+
+### Summary
+La tentative de migration manuelle locale vers cloud (`pg_dump | psql`) s'est soldée par un kill de connexion SSL côté serveur Render.
+
+### Error
+```
+psql: error: connection to server at "dpg-d6ikkht...oregon-postgres.render.com" failed: SSL connection has been closed unexpectedly
+```
+
+### Context
+- Render bloque par défaut tout le trafic IPv4 externe vers une base de données fraîchement instanciée (`ipAllowList: null`).
+- L'API Render `PUT` ne met pas à jour cette liste proprement, la méthode `PATCH` est requise pour altérer les champs spécifiques comme `ipAllowList`.
+
+### Suggested Fix
+- Utiliser un call API explicite avec `PATCH` pour autoriser temporairement `0.0.0.0/0` (anywhere).
+- Exécuter la migration avec la variable d'environnement `PGSSLMODE=require` activée pour `psql`.
+- Rétablir l'ipAllowList à `[]` pour couper les accès externes post-migration.
+
+### Metadata
+- Related Files: `render.yaml`
+
+---

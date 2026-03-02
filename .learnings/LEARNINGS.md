@@ -189,3 +189,24 @@ Liaison sécurisée entre Render (Backend) et Vercel (Frontend), plus intégrati
 - Documenter l'usage des MCP en local pour administrer Vercel (`mcp_config.json`).
 
 ---
+
+## [LRN-20260302-002] Trousse de secours de migration Render
+
+**Logged**: 2026-03-02
+**Priority**: high
+**Status**: resolved
+**Area**: infra
+
+### Summary
+Dangers d'une base de données neuve (authentification) et blocages réseau par défaut sur Render.
+
+### Details
+- Il est très facile d'oublier lors d'un déploiement que provisionner une infra neuve requiert de migrer les données initiales ("Invalid credentials" 401). Le check de santé API n'est qu'un indicateur de boot, pas de validité relationnelle.
+- Render protège ses PostgreSQL cloud par des listes statiques d'IPs. La modification programmatique se fait via le endpoint d'update `PATCH /v1/postgres/{id}` et non `PUT`.
+- Lors d'une connexion `psql` shell direct vers la DB Cloud, `PGSSLMODE=require` est obligatoire sous peine de fin de session SSL inattendue.
+
+### Suggested Action
+- Toujours vérifier ou automatiser le remplissage d'une base de données fraîchement déployée (seeders ou migration locale).
+- Ne pas laisser `0.0.0.0/0` dans le IP Allow List d'une DB Render après une intervention locale (rétablir en `[{"cidrBlock": ".../32"}]` ou `[]`).
+
+---
