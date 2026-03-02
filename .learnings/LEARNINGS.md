@@ -168,3 +168,24 @@ Conserver la red-zone à jour selon les ownerships de sprint, et exiger `npm run
 
 ### Metadata
 - Related Files: `scripts/check-lane-boundary.mjs`, `.githooks/pre-commit`, `README.md`
+
+## [LRN-20260302-001] Déploiement Render & Vercel MCP
+
+**Logged**: 2026-03-02
+**Priority**: high
+**Status**: resolved
+**Area**: infra
+
+### Summary
+Liaison sécurisée entre Render (Backend) et Vercel (Frontend), plus intégration des serveurs MCP.
+
+### Details
+- **Render Database Sync** : Pousser un fichier `render.yaml` ne suffit pas, il faut manuellement lancer un "Blueprint Sync" dans Render pour que l'infrastructure fantôme soit allouée. En l'absence de ça, créer la base manuellement via l'API Render reste nécessaire.
+- **Asyncpg & Postgres URL** : Render donne des URL `postgres://` alors que SQLAlchemy/Asyncpg exige `postgresql+asyncpg://`. Le Pydantic `field_validator` sur Pydantic settings est indispensable.
+- **MCP Vercel** : L'intégration MCP Vercel fonctionne parfaitement avec le package `@mistertk/vercel-mcp`, ce qui permet d'éditer les `API_URL` à la volée.
+
+### Suggested Action
+- Toujours vérifier le statut du déploiement Blueprint côté Render.
+- Documenter l'usage des MCP en local pour administrer Vercel (`mcp_config.json`).
+
+---
