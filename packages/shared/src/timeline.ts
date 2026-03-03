@@ -24,6 +24,10 @@ export const eventOutSchema = z.object({
   color: eventColorSchema,
   tracking_started_at: z.string().datetime().nullable(),
   updated_at: z.string().datetime(),
+  rrule: z.string().nullable().optional(),
+  parent_event_id: z.string().uuid().nullable().optional(),
+  series_id: z.string().uuid().nullable().optional(),
+  project_id: z.string().uuid().nullable().optional(),
 });
 
 export const timelineResponseSchema = z.object({
@@ -41,6 +45,9 @@ export const eventCreateRequestSchema = z.object({
   estimated_time_seconds: z.number().int().min(0).optional(),
   item_id: z.string().uuid().optional().nullable(),
   color: eventColorSchema.optional(),
+  rrule: z.string().nullable().optional(),
+  series_id: z.string().uuid().nullable().optional(),
+  project_id: z.string().uuid().nullable().optional(),
 });
 
 export const eventUpdateRequestSchema = z.object({
@@ -53,6 +60,10 @@ export const eventUpdateRequestSchema = z.object({
   estimated_time_seconds: z.number().int().min(0).optional(),
   last_known_updated_at: z.string().datetime().optional(),
   color: eventColorSchema.optional(),
+  rrule: z.string().nullable().optional(),
+  series_id: z.string().uuid().nullable().optional(),
+  project_id: z.string().uuid().nullable().optional(),
+  update_mode: z.enum(["single", "future", "all"]).optional(),
 });
 
 export const eventsRangeResponseSchema = z.object({

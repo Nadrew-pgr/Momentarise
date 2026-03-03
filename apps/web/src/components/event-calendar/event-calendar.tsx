@@ -211,61 +211,62 @@ export function EventCalendar({
           shortcutsEnabled={!isEventDialogOpen}
         />
 
-        <div className="flex flex-1 flex-col">
-          {view === "month" && (
-            <MonthView
-              currentDate={currentDate}
-              events={events}
-              onEventCreate={handleEventCreate}
-              onEventSelect={handleEventSelect}
-            />
-          )}
-          {view === "week" && (
-            <WeekView
-              currentDate={currentDate}
-              events={events}
-              onEventCreate={handleEventCreate}
-              onEventSelect={handleEventSelect}
-              startHour={startHour}
-              endHour={endHour}
-            />
-          )}
-          {view === "day" && (
-            <DayView
-              currentDate={currentDate}
-              events={events}
-              onEventCreate={handleEventCreate}
-              onEventSelect={handleEventSelect}
-              startHour={startHour}
-              endHour={endHour}
-            />
-          )}
-          {view === "agenda" && (
-            <AgendaView
-              currentDate={currentDate}
-              events={events}
-              onEventSelect={handleEventSelect}
-            />
-          )}
-        </div>
+        <div className="flex flex-1 overflow-hidden relative">
+          <div className="flex flex-1 flex-col overflow-auto min-w-0">
+            {view === "month" && (
+              <MonthView
+                currentDate={currentDate}
+                events={events}
+                onEventCreate={handleEventCreate}
+                onEventSelect={handleEventSelect}
+              />
+            )}
+            {view === "week" && (
+              <WeekView
+                currentDate={currentDate}
+                events={events}
+                onEventCreate={handleEventCreate}
+                onEventSelect={handleEventSelect}
+                startHour={startHour}
+                endHour={endHour}
+              />
+            )}
+            {view === "day" && (
+              <DayView
+                currentDate={currentDate}
+                events={events}
+                onEventCreate={handleEventCreate}
+                onEventSelect={handleEventSelect}
+                startHour={startHour}
+                endHour={endHour}
+              />
+            )}
+            {view === "agenda" && (
+              <AgendaView
+                currentDate={currentDate}
+                events={events}
+                onEventSelect={handleEventSelect}
+              />
+            )}
+          </div>
 
-        <CalendarEventDialog
-          key={
-            selectedEvent
-              ? `${selectedEvent.id || "new"}-${new Date(selectedEvent.start).toISOString()}-${new Date(selectedEvent.end).toISOString()}`
-              : "event-dialog-empty"
-          }
-          event={selectedEvent}
-          isOpen={isEventDialogOpen}
-          onClose={() => {
-            setIsEventDialogOpen(false);
-            setSelectedEvent(null);
-          }}
-          onDelete={handleEventDelete}
-          onSave={handleEventSave}
-          onToggleTracking={
-            onEventStartTracking && onEventStopTracking
-              ? (eventId) => {
+          <CalendarEventDialog
+            key={
+              selectedEvent
+                ? `${selectedEvent.id || "new"}-${new Date(selectedEvent.start).toISOString()}-${new Date(selectedEvent.end).toISOString()}`
+                : "event-dialog-empty"
+            }
+            event={selectedEvent}
+            isOpen={isEventDialogOpen}
+            onClose={() => {
+              setIsEventDialogOpen(false);
+              setSelectedEvent(null);
+            }}
+            onDelete={handleEventDelete}
+            onSave={handleEventSave}
+            onToggleTracking={
+              onEventStartTracking && onEventStopTracking
+                ? (eventId) => {
                   const event = events.find((e) => e.id === eventId);
                   if (!event) return;
                   if (event.isTracking) {
@@ -273,9 +274,9 @@ export function EventCalendar({
                       setSelectedEvent((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              isTracking: false,
-                            }
+                            ...prev,
+                            isTracking: false,
+                          }
                           : prev
                       );
                     }).catch((error: unknown) => {
@@ -286,9 +287,9 @@ export function EventCalendar({
                       setSelectedEvent((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              isTracking: true,
-                            }
+                            ...prev,
+                            isTracking: true,
+                          }
                           : prev
                       );
                     }).catch((error: unknown) => {
@@ -296,10 +297,11 @@ export function EventCalendar({
                     });
                   }
                 }
-              : undefined
-          }
-          isTrackingActionPending={isMutating}
-        />
+                : undefined
+            }
+            isTrackingActionPending={isMutating}
+          />
+        </div>
       </CalendarDndProvider>
     </div>
   );

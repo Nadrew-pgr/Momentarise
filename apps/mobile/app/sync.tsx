@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { View, Keyboard } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Keyboard, KeyboardAvoidingView, Platform } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
     useSyncStream,
     useCreateSyncRun,
@@ -158,6 +158,8 @@ export default function SyncScreen() {
         }
     };
 
+    const insets = useSafeAreaInsets();
+
     if (!isAuthenticated) return <View className="flex-1 bg-background" />;
 
     return (
@@ -170,39 +172,47 @@ export default function SyncScreen() {
                     setStreamingText("");
                 }}
             />
-            <View className="flex-1 relative">
-                <Conversation
-                    messages={messages}
-                    isStreaming={streamMutation.isPending}
-                    streamingText={streamingText}
-                    emptyState={<EmptyState />}
-                />
+            <KeyboardAvoidingView
+                className="flex-1"
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                keyboardVerticalOffset={0}
+            >
+                {/* 
+                  Inner flex container shrinks safely with keyboard padding,
+                  allowing absolute elements inside to float directly at the bottom
+                  while the list stretches to fill the rest.
+                */}
+                <View className="flex-1">
+                    <Conversation
+                        messages={messages}
+                        isStreaming={streamMutation.isPending}
+                        streamingText={streamingText}
+                        emptyState={<EmptyState />}
+                    />
 
-                <View className="absolute bottom-[90px] left-0 right-0">
-                    <ActionsRail
-                        pendingPreviews={pendingPreviews}
-                        activeToolName={activeToolName}
-                        isApplying={applyRun.isPending}
-                        isUndoing={undoRun.isPending}
-                        onApply={handleApply}
-                        onUndo={handleUndo}
+                    <View className="absolute bottom-[90px] left-0 right-0">
+                        <ActionsRail
+                            pendingPreviews={pendingPreviews}
+                            activeToolName={activeToolName}
+                            isApplying={applyRun.isPending}
+                            isUndoing={undoRun.isPending}
+                            onApply={handleApply}
+                            onUndo={handleUndo}
+                        />
+                    </View>
+
+                    <Composer
+                        value={input}
+                        onChange={setInput}
+                        onSend={handleSend}
+                        onStop={() => {
+                            console.log("Stop pressed");
+                        }}
+                        isStreaming={streamMutation.isPending}
+                        disabled={createRun.isPending}
                     />
                 </View>
-
-                <Composer
-                    value={input}
-                    onChange={setInput}
-                    onSend={handleSend}
-                    onStop={() => {
-                        // In v3, aborting streaming isn't natively supported 
-                        // by EventSource unless we keep the instance around. 
-                        // We can just ignore for now or implement an AbortController later.
-                        console.log("Stop pressed");
-                    }}
-                    isStreaming={streamMutation.isPending}
-                    disabled={createRun.isPending}
-                />
-            </View>
+            </KeyboardAvoidingView>
 
             <HistoryDrawer
                 isOpen={isDrawerOpen}

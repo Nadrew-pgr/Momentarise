@@ -407,3 +407,26 @@ sqlalchemy.exc.InvalidRequestError: One or more mappers failed to initialize - c
 1. Provide explicit `ForeignKey("workspaces.id")` to `workspace_id` columns in `Project` and `Series`.
 2. Ensure bidirectional relationships are defined in the child classes (`workspace: Mapped["Workspace"] = relationship(back_populates="projects")`).
 ---
+## [ERR-20260302-001] Missing Foreign Keys and Bad Imports
+**Logged**: 2026-03-02T21:43:27+01:00
+**Priority**: high
+**Status**: closed
+**Area**: backend
+
+### Summary
+The `Project` and `Series` models crashed the ORM mapper due to missing explicit `ForeignKey` mappings on the `workspace_id` column.
+
+### Error
+```
+sqlalchemy.exc.InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'Mapper[Workspace(workspaces)]'. Original exception was: Could not determine join condition between parent/child tables on relationship Workspace.projects
+```
+(Additionally accompanied by `Uvicorn` crash `ImportError: cannot import name 'get_workspace_id' from 'src.api.context'`).
+
+### Context
+- Command: `uv run alembic revision --autogenerate` / `uv run uvicorn src.main:app`
+- Related Files: `src/models/project.py`, `src/models/series.py`, `src/api/v1/projects.py`, `src/api/v1/series.py`
+
+### Suggested Fix
+- Use `src.core.deps` for user and workspace dependency extraction.
+- Provide explicit `ForeignKey("workspaces.id")` to the `workspace_id` column mapping inside the child ORM model (`Project` and `Series`).
+---

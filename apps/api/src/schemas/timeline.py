@@ -19,6 +19,10 @@ class EventOut(BaseModel):
     color: str
     tracking_started_at: datetime | None
     updated_at: datetime
+    rrule: str | None = None
+    parent_event_id: uuid.UUID | None = None
+    series_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
 
     model_config = {"from_attributes": True}
 

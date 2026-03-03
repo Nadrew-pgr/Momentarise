@@ -40,6 +40,10 @@ def _event_to_out(event: Event) -> EventOut:
         color=event.color,
         tracking_started_at=event.tracking_started_at,
         updated_at=event.updated_at,
+        rrule=event.rrule,
+        parent_event_id=event.parent_event_id,
+        series_id=event.series_id,
+        project_id=event.project_id,
     )
 
 
@@ -160,6 +164,9 @@ async def create_event(
             body.end_at,
             body.estimated_time_seconds,
         ),
+        rrule=body.rrule,
+        series_id=body.series_id,
+        project_id=body.project_id,
     )
     db.add(event)
     await db.commit()
@@ -209,6 +216,12 @@ async def update_event(
         event.location = body.location
     if body.color is not None:
         event.color = body.color
+    if "rrule" in body.model_fields_set:
+        event.rrule = body.rrule
+    if "series_id" in body.model_fields_set:
+        event.series_id = body.series_id
+    if "project_id" in body.model_fields_set:
+        event.project_id = body.project_id
 
     await db.commit()
     reloaded = await _get_event(event.id, workspace.workspace_id, db)

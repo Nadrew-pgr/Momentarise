@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { BlockEditor } from "@/components/BlockEditor";
 import { useItem, useUpdateItem } from "@/hooks/use-item";
+import { RecurrenceInput } from "@/components/RecurrenceInput";
 
 const COLOR_OPTIONS: Array<{ value: EventColor; labelKey: string }> = [
     { value: "sky", labelKey: "pages.timeline.color.sky" },
@@ -99,6 +100,7 @@ export default function MomentDetailPage() {
     const [endDate, setEndDate] = useState<Date>(new Date());
     const [allDay, setAllDay] = useState(false);
     const [color, setColor] = useState<EventColor>("sky");
+    const [rrule, setRrule] = useState<string | null>(null);
     const [isTracking, setIsTracking] = useState(false);
     const [updatedAt, setUpdatedAt] = useState<string | null>(null);
     const [eventId, setEventId] = useState<string | null>(null);
@@ -214,6 +216,7 @@ export default function MomentDetailPage() {
         setEndDate(base.end ?? new Date());
         setAllDay(base.allDay ?? false);
         setColor(base.color ?? "sky");
+        setRrule(base.rrule ?? null);
         setIsTracking(!!base.isTracking);
         setEventId(base.id ?? null);
         setItemId(base.itemId ?? null);
@@ -268,6 +271,7 @@ export default function MomentDetailPage() {
                         end_at: end.toISOString(),
                         color,
                         last_known_updated_at: updatedAt ?? undefined,
+                        rrule: rrule ?? undefined,
                     },
                 });
             } else {
@@ -276,6 +280,7 @@ export default function MomentDetailPage() {
                     start_at: start.toISOString(),
                     end_at: end.toISOString(),
                     color,
+                    rrule: rrule ?? undefined,
                 });
             }
             router.back();
@@ -287,6 +292,7 @@ export default function MomentDetailPage() {
         color,
         createEvent,
         eventId,
+        rrule,
         router,
         title,
         updateEvent,
@@ -435,6 +441,12 @@ export default function MomentDetailPage() {
                                     </View>
                                     <Switch checked={allDay} onCheckedChange={(value) => setAllDay(value)} />
                                 </View>
+
+                                <RecurrenceInput
+                                    value={rrule}
+                                    onChange={setRrule}
+                                    startDate={startDate}
+                                />
 
                                 <View>
                                     <Text className="mb-1 text-sm font-medium text-foreground">{t("pages.timeline.eventSheet.location")}</Text>

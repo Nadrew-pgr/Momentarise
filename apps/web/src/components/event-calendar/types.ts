@@ -12,6 +12,10 @@ export interface CalendarEvent {
   color?: EventColor;
   location?: string;
   isTracking?: boolean;
+  rrule?: string;
+  parentEventId?: string;
+  seriesId?: string;
+  projectId?: string;
 }
 
 export type EventColor =

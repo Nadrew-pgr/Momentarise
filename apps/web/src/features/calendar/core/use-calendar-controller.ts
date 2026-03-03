@@ -90,6 +90,9 @@ export function useCalendarController(): CalendarController {
     allDay,
     location,
     color,
+    rrule,
+    seriesId,
+    projectId,
   }: CalendarCreateInput) => {
     return createMutation.mutateAsync({
       title: resolveTitle(title, "Untitled moment"),
@@ -100,6 +103,9 @@ export function useCalendarController(): CalendarController {
       location: location ?? null,
       estimated_time_seconds: toEstimatedSeconds(start, end),
       color,
+      rrule,
+      series_id: seriesId,
+      project_id: projectId,
     });
   };
 
@@ -113,6 +119,10 @@ export function useCalendarController(): CalendarController {
     location,
     lastKnownUpdatedAt,
     color,
+    rrule,
+    seriesId,
+    projectId,
+    updateMode,
   }: CalendarUpdateInput) => {
     const source = eventById.get(eventId);
 
@@ -129,6 +139,10 @@ export function useCalendarController(): CalendarController {
           estimated_time_seconds: toEstimatedSeconds(start, end),
           last_known_updated_at: lastKnownUpdatedAt ?? source?.updated_at,
           color,
+          rrule,
+          series_id: seriesId,
+          project_id: projectId,
+          update_mode: updateMode,
         },
       });
     } catch (error) {

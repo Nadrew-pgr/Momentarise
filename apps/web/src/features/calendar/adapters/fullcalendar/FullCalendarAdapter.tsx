@@ -4,6 +4,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin, { type EventResizeDoneArg } from "@fullcalendar/interaction";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
+import rrulePlugin from "@fullcalendar/rrule";
 import { format } from "date-fns";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -78,6 +79,10 @@ function toCalendarEvent(source: EventOut): CalendarEvent {
     location: source.location ?? undefined,
     color: source.color,
     isTracking: source.is_tracking,
+    rrule: source.rrule ?? undefined,
+    parentEventId: source.parent_event_id ?? undefined,
+    seriesId: source.series_id ?? undefined,
+    projectId: source.project_id ?? undefined,
   };
 }
 
@@ -108,26 +113,44 @@ export function FullCalendarAdapter({
   }, [events]);
 
   const fullCalendarEvents = useMemo<EventInput[]>(() => {
-    return events.map((event) => ({
-      id: event.id,
-      title: event.title,
-      start: event.start_at,
-      end: event.end_at,
-      allDay: event.all_day,
-      classNames: [
-        `event-color-${event.color}`,
-        event.is_tracking ? "is-tracking" : "is-standard",
-      ],
-      extendedProps: {
-        updatedAt: event.updated_at,
-        color: event.color,
-        description: event.description,
-        location: event.location,
-        itemId: event.item_id,
+    return events.map((event) => {
+      const res: EventInput = {
+        id: event.id,
+        title: event.title,
+        start: event.start_at,
+        end: event.end_at,
         allDay: event.all_day,
-        is_tracking: event.is_tracking,
-      },
-    }));
+        classNames: [
+          `event-color-${event.color}`,
+          event.is_tracking ? "is-tracking" : "is-standard",
+        ],
+        extendedProps: {
+          updatedAt: event.updated_at,
+          color: event.color,
+          description: event.description,
+          location: event.location,
+          itemId: event.item_id,
+          allDay: event.all_day,
+          is_tracking: event.is_tracking,
+          rrule: event.rrule,
+          parentEventId: event.parent_event_id,
+          seriesId: event.series_id,
+          projectId: event.project_id,
+        },
+      };
+
+      if (event.rrule) {
+        res.rrule = event.rrule;
+        const ms = new Date(event.end_at).getTime() - new Date(event.start_at).getTime();
+        const hours = Math.floor(ms / (1000 * 60 * 60));
+        const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+        res.duration = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+        delete res.start;
+        delete res.end;
+      }
+
+      return res;
+    });
   }, [events]);
 
   const agendaEvents = useMemo<CalendarEvent[]>(() => {
@@ -273,6 +296,9 @@ export function FullCalendarAdapter({
       allDay: source?.all_day ?? arg.event.allDay,
       location: source?.location ?? null,
       color: source?.color,
+      rrule: source?.rrule ?? undefined,
+      seriesId: source?.series_id ?? undefined,
+      projectId: source?.project_id ?? undefined,
     }).catch((err) => {
       arg.revert();
       toast.error(err instanceof Error ? err.message : "Failed to update moment");
@@ -294,6 +320,9 @@ export function FullCalendarAdapter({
       allDay: source?.all_day ?? arg.event.allDay,
       location: source?.location ?? null,
       color: source?.color,
+      rrule: source?.rrule ?? undefined,
+      seriesId: source?.series_id ?? undefined,
+      projectId: source?.project_id ?? undefined,
     }).catch((err) => {
       arg.revert();
       toast.error(err instanceof Error ? err.message : "Failed to update moment");
@@ -311,6 +340,9 @@ export function FullCalendarAdapter({
           allDay: event.allDay,
           location: event.location,
           color: event.color,
+          rrule: event.rrule,
+          seriesId: event.seriesId,
+          projectId: event.projectId,
         });
         return toCalendarEvent(created);
       } catch (err) {
@@ -331,6 +363,9 @@ export function FullCalendarAdapter({
         allDay: event.allDay,
         location: event.location,
         color: event.color,
+        rrule: event.rrule,
+        seriesId: event.seriesId,
+        projectId: event.projectId,
       });
       return toCalendarEvent(updated);
     } catch (err) {
@@ -400,7 +435,7 @@ export function FullCalendarAdapter({
           ) : (
             <FullCalendar
               ref={calendarRef}
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
               initialView={fullCalendarViewFrom(view)}
               initialDate={currentDate}
               headerToolbar={false}

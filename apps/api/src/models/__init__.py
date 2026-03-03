@@ -23,6 +23,8 @@ from src.models.sync_memory_chunk import SyncMemoryChunk
 from src.models.sync_memory_doc import SyncMemoryDoc
 from src.models.user import User, UserIdentity
 from src.models.workspace import Workspace, WorkspaceMember
+from src.models.project import Project
+from src.models.series import Series
 
 __all__ = [
     "Base",
@@ -56,4 +58,6 @@ __all__ = [
     "CaptureActionSuggestion",
     "CaptureTag",
     "CaptureTagLink",
+    "Project",
+    "Series",
 ]

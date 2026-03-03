@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ProjectSeriesSelector } from "@/components/event-calendar/project-series-selector";
 
 function captureIcon(type: string) {
   switch (type) {
@@ -121,6 +122,8 @@ export default function InboxCaptureDetailPage() {
   const [selectedActionKey, setSelectedActionKey] = useState<string | null>(selectedDefaultAction);
   const [manualTitle, setManualTitle] = useState("");
   const [manualDescription, setManualDescription] = useState("");
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [seriesId, setSeriesId] = useState<string | null>(null);
 
   const filteredActions = useMemo(() => {
     if (!capture) return [];
@@ -186,7 +189,11 @@ export default function InboxCaptureDetailPage() {
         payload: {
           action_key: selectedAction.key,
           title: title || undefined,
-          metadata: description ? { description } : {},
+          metadata: {
+            ...(description ? { description } : {}),
+            ...(projectId ? { projectId } : {}),
+            ...(seriesId ? { seriesId } : {}),
+          },
         },
       },
       {
@@ -473,6 +480,15 @@ export default function InboxCaptureDetailPage() {
             </div>
           </div>
         ) : null}
+
+        <div className="mt-4 pt-4 border-t border-border/50">
+          <ProjectSeriesSelector
+            projectId={projectId}
+            seriesId={seriesId}
+            onProjectChange={setProjectId}
+            onSeriesChange={setSeriesId}
+          />
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           <Button

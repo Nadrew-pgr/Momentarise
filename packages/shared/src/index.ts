@@ -6,3 +6,5 @@ export * from "./inbox";
 export * from "./item";
 export * from "./preferences";
 export * from "./sync";
+export * from "./projects";
+export * from "./series";

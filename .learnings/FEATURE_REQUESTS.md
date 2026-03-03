@@ -60,3 +60,26 @@ Le but est d'afficher le calendrier Pronote directement dans l'application, fair
 - Mapper les événements de cours Pronote vers le modèle `Event` du calendrier (en lecture seule visuellement, ou avec un tag système spécifique).
 - Transformer les items du cahier de texte et les messages en `Capture` dans l'Inbox avec des sources spécifiques (`source: "pronote"`).
 - Créer un agent/pipeline IA dédié à l'analyse du cahier de texte qui va suggérer (via les actions) la création de sous-tâches ou de blocs de révision dans le calendrier.
+
+---
+
+## [FEAT-20260302-003] Composer UI Enrichie (Voice, Context, Agents)
+**Logged**: 2026-03-02
+**Priority**: low
+**Status**: pending
+**Area**: mobile / ui / ai-elements
+
+### Requested Capability
+Transformer le `Composer` de chat en un véritable centre de commande AI.
+1. **Menu '+' (Gauche)** : Uploader fichier, photo, lien, ou mentionner l'Inbox dans le contexte.
+2. **Microphone (Droite)** : Activer la dictée `Voxtral` avec effet "listening" dans le champ, la transcription textuelle s'affichant pour édition avant envoi. Remplacé par le bouton "Envoyer" quand du texte est présent.
+3. **Commandes avancées** : Mentions de contexte (`@`) ou slash commands (`/`).
+4. **Deep Research & Agents** : Possibilité d'invoquer des recherches longues ou de basculer sur des agents spécialisés depuis l'UI.
+
+### User Context
+"un micro qui sera en fait un bouton qui utilisera voxtral pour la transcription... bouton + qui ouvrira un menu... deep research si qqun a besoin d'un plan énorme"
+
+### Suggested Implementation
+- Créer des états locaux pour `isListening` dans `Composer.tsx`.
+- Intégrer un module de BottomSheet (type Gorhom) pour le menu `+`.
+- Développer/Intégrer le package Voxtral pour le streaming audio-to-text.

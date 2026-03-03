@@ -33,7 +33,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+} from "@/components/ui/sidebar"
 import { Textarea } from "@/components/ui/textarea";
+
+import { ProjectSeriesSelector } from "./project-series-selector";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type MomentTab = "details" | "content" | "coach";
 type ContentSaveState = "idle" | "saving" | "saved" | "error";
@@ -92,6 +101,9 @@ export function EventDialog({
   const [allDay, setAllDay] = useState(event?.allDay ?? false);
   const [location, setLocation] = useState(event?.location ?? "");
   const [color, setColor] = useState<EventColor>((event?.color as EventColor) || "sky");
+  const [rrule, setRRule] = useState<string | undefined>(event?.rrule);
+  const [projectId, setProjectId] = useState<string | null>(event?.projectId ?? null);
+  const [seriesId, setSeriesId] = useState<string | null>(event?.seriesId ?? null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -245,7 +257,10 @@ export function EventDialog({
         allDay,
         location: location.trim() || undefined,
         color,
+        rrule,
         isTracking,
+        projectId: projectId ?? undefined,
+        seriesId: seriesId ?? undefined,
       });
 
       const nextEventId = persistedEvent.id || currentEventId;
@@ -348,24 +363,18 @@ export function EventDialog({
       },
     ];
 
-  return (
-    <div
-      className={cn(
-        "flex w-80 shrink-0 flex-col overflow-hidden border-l border-border bg-background transition-[width,margin] duration-300",
-        isOpen ? "ml-0 w-[400px]" : "-mr-[400px] w-[0px]"
-      )}
-      aria-hidden={!isOpen}
-    >
-      <div className="flex flex-col flex-1 min-h-0 w-[400px]">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">
-              {currentEventId
-                ? t("pages.calendar.momentTitleEdit")
-                : t("pages.calendar.momentTitleCreate")}
-            </h2>
-          </div>
-        </div>
+  const isMobile = useIsMobile();
+
+  const DialogInnerContent = (
+    <div className="flex flex-col flex-1 min-h-0 w-full md:w-[400px]">
+      <SidebarHeader className="flex-row items-center justify-between border-b px-4 py-3">
+        <h2 className="text-base font-semibold text-foreground">
+          {currentEventId
+            ? t("pages.calendar.momentTitleEdit")
+            : t("pages.calendar.momentTitleCreate")}
+        </h2>
+      </SidebarHeader>
+      <SidebarContent className="flex-1 w-full md:w-[400px]">
 
         <div className="border-b border-border p-2">
           <div className="inline-flex w-full rounded-md border border-border bg-muted/50 p-1">
@@ -560,6 +569,12 @@ export function EventDialog({
                 <Label htmlFor="all-day">{t("pages.calendar.momentFields.allDay")}</Label>
               </div>
 
+              <RecurrenceInput
+                value={rrule}
+                onChange={setRRule}
+                startDate={startDate}
+              />
+
               <div className="*:not-first:mt-1.5">
                 <Label htmlFor="location">{t("pages.calendar.momentFields.location")}</Label>
                 <Input
@@ -568,6 +583,13 @@ export function EventDialog({
                   value={location}
                 />
               </div>
+
+              <ProjectSeriesSelector
+                projectId={projectId}
+                seriesId={seriesId}
+                onProjectChange={setProjectId}
+                onSeriesChange={setSeriesId}
+              />
 
               <fieldset className="space-y-4 pt-2">
                 <legend className="font-medium text-foreground text-sm leading-none">
@@ -696,7 +718,29 @@ export function EventDialog({
             </div>
           </div>
         </div>
-      </div>
+      </SidebarContent>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <Sheet open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
+        <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
+          {DialogInnerContent}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "bg-background transition-[width,margin] duration-300 overflow-hidden flex",
+        isOpen ? "ml-0 w-[400px] border-l" : "-mr-[400px] w-[0px] border-none"
+      )}
+      aria-hidden={!isOpen}
+    >
+      {DialogInnerContent}
     </div>
   );
 }

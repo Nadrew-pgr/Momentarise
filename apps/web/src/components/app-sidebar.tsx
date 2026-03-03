@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
-import Link from "next/link";
+import { useEffect, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
@@ -11,19 +10,21 @@ import {
   ChevronsUpDown,
   Inbox,
   LayoutDashboard,
-  LogOut,
-  User,
+  Settings2,
 } from "lucide-react";
+
+import { useMe } from "@/hooks/use-me";
+import { useProjects } from "@/hooks/use-projects";
+
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
   SidebarHeader,
+  SidebarRail,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -35,17 +36,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useMe } from "@/hooks/use-me";
 
-const navItems = [
-  { href: "/today", icon: LayoutDashboard, labelKey: "nav.today" },
-  { href: "/inbox", icon: Inbox, labelKey: "nav.inbox" },
-  { href: "/sync", icon: Bot, labelKey: "nav.sync" },
-  { href: "/timeline", icon: Calendar, labelKey: "nav.timeline" },
-  { href: "/calendar", icon: CalendarDays, labelKey: "nav.calendar" },
-  { href: "/me", icon: User, labelKey: "nav.me" },
-] as const;
+import { NavMain } from "@/components/nav-main";
+import { NavFavorites } from "@/components/nav-favorites";
+import { NavWorkspaces } from "@/components/nav-workspaces";
+import { NavSecondary } from "@/components/nav-secondary";
+import { NavUser } from "@/components/nav-user";
 
 function WorkspaceSwitcher() {
   const { t } = useTranslation();
@@ -106,117 +102,72 @@ function WorkspaceSwitcher() {
   );
 }
 
-function NavMain() {
-  const pathname = usePathname();
-  const { t } = useTranslation();
-
-  return (
-    <SidebarGroup>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          {navItems.map(({ href, icon: Icon, labelKey }) => (
-            <SidebarMenuItem key={href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === href}
-                tooltip={t(labelKey)}
-              >
-                <Link href={href}>
-                  <Icon className="size-4" />
-                  <span>{t(labelKey)}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
-  );
-}
-
-function NavUser() {
-  const { t } = useTranslation();
-  const router = useRouter();
-  const { data } = useMe();
-  const user = data?.user;
-  const email = user?.email ?? "";
-  const initials = email
-    ? email.slice(0, 2).toUpperCase()
-    : "?";
-
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  }
-
-  return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{email || "—"}</span>
-                <span className="text-muted-foreground truncate text-xs">
-                  {t("auth.logout")}
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-            side="bottom"
-            align="end"
-            sideOffset={4}
-          >
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{email || "—"}</span>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
-              <LogOut className="mr-2 size-4" />
-              {t("auth.logout")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
-  );
-}
-
-export function AppSidebar() {
+export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
+  const { t } = useTranslation();
+
+  const { data: meData } = useMe();
+  const { data: projects = [] } = useProjects();
+
+  const user = meData?.user;
 
   useEffect(() => {
     if (isMobile) setOpenMobile(false);
   }, [pathname, isMobile, setOpenMobile]);
 
+  const navMainParams = useMemo(() => [
+    { title: t("nav.today"), url: "/today", icon: LayoutDashboard, isActive: pathname === "/today" },
+    { title: t("nav.inbox"), url: "/inbox", icon: Inbox, isActive: pathname === "/inbox" },
+    { title: t("nav.sync"), url: "/sync", icon: Bot, isActive: pathname === "/sync" },
+    { title: t("nav.timeline"), url: "/timeline", icon: Calendar, isActive: pathname === "/timeline" },
+    { title: t("nav.calendar"), url: "/calendar", icon: CalendarDays, isActive: pathname === "/calendar" },
+  ], [t, pathname]);
+
+  const navSecondaryParams = useMemo(() => [
+    { title: "Settings", url: "/settings", icon: Settings2 },
+  ], []);
+
+  const workspaceData = useMemo(() => {
+    if (!meData?.active_workspace) return [];
+
+    return [
+      {
+        name: meData.active_workspace.name,
+        emoji: "💼", // default pending dynamic icons
+        pages: projects.map(p => ({
+          name: p.title,
+          url: `/projects/${p.id}`,
+          emoji: (
+            <div className="flex items-center justify-center w-4 h-4 mr-1">
+              <div className={`w-2 h-2 rounded-full bg-${p.color}-500`} />
+            </div>
+          )
+        }))
+      }
+    ]
+  }, [projects, meData?.active_workspace]);
+
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar className="border-r-0" {...props}>
       <SidebarHeader>
         <WorkspaceSwitcher />
+        <NavMain items={navMainParams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain />
+        <NavFavorites favorites={[]} />
+        <NavWorkspaces workspaces={workspaceData} />
+        <NavSecondary items={navSecondaryParams} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser />
+        <NavUser user={{
+          name: user?.email ? user.email.split('@')[0]! : "User",
+          email: user?.email || "",
+          initials: user?.email ? user.email.slice(0, 2).toUpperCase() : "?",
+          avatar: undefined // could pass an avatar later
+        }} />
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

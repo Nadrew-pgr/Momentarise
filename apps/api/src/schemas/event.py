@@ -19,6 +19,9 @@ class EventCreateRequest(BaseModel):
     estimated_time_seconds: int | None = Field(default=None, ge=0)
     item_id: uuid.UUID | None = None
     color: EventColor | None = None
+    rrule: str | None = None
+    series_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
 
 
 class EventUpdateRequest(BaseModel):
@@ -31,6 +34,10 @@ class EventUpdateRequest(BaseModel):
     estimated_time_seconds: int | None = Field(default=None, ge=0)
     last_known_updated_at: datetime | None = None
     color: EventColor | None = None
+    rrule: str | None = None
+    series_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
+    update_mode: Literal["single", "future", "all"] | None = None
 
 
 class EventsRangeResponse(BaseModel):

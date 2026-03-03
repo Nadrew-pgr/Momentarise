@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ProjectHeader } from "./project-header";
+import { SeriesHeader } from "./series-header";
 
 const pathToLabelKey: Record<string, string> = {
   today: "nav.today",
@@ -39,6 +41,13 @@ export function DashboardHeader() {
 
   function openSyncActions() {
     window.dispatchEvent(new Event("sync-chat:open-actions"));
+  }
+
+  if (pathname.startsWith("/projects/")) {
+    return <ProjectHeader />;
+  }
+  if (pathname.startsWith("/series/")) {
+    return <SeriesHeader />;
   }
 
   return (

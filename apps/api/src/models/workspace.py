@@ -37,6 +37,8 @@ class Workspace(BaseMixin, Base):
     capture_tag_links: Mapped[list["CaptureTagLink"]] = relationship(back_populates="workspace")  # noqa: F821
     entity_links: Mapped[list["EntityLink"]] = relationship(back_populates="workspace")  # noqa: F821
     ai_changes: Mapped[list["AIChange"]] = relationship(back_populates="workspace")  # noqa: F821
+    projects: Mapped[list["Project"]] = relationship(back_populates="workspace") # noqa: F821
+    series: Mapped[list["Series"]] = relationship(back_populates="workspace") # noqa: F821
 
 
 class WorkspaceMember(BaseMixin, Base):

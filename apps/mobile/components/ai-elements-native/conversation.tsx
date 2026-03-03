@@ -68,9 +68,10 @@ export function Conversation({ messages, isStreaming, streamingText, emptyState 
                 ref={listRef}
                 data={data}
                 keyExtractor={item => item.id}
-                contentContainerStyle={styles.contentContainer}
+                contentContainerStyle={styles.contentContainerStyle}
                 indicatorStyle="white"
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="interactive"
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
                 onContentSizeChange={(_w, h) => {
@@ -103,7 +104,7 @@ export function Conversation({ messages, isStreaming, streamingText, emptyState 
                 <Animated.View
                     entering={FadeIn}
                     exiting={FadeOut}
-                    className="absolute bottom-28 self-center"
+                    className="absolute bottom-[110px] self-center"
                 >
                     <TouchableOpacity
                         onPress={scrollToBottom}
@@ -119,8 +120,8 @@ export function Conversation({ messages, isStreaming, streamingText, emptyState 
 }
 
 const styles = StyleSheet.create({
-    contentContainer: {
+    contentContainerStyle: {
         paddingTop: 24,
-        paddingBottom: 160, // Clear the composer input field at the bottom
+        paddingBottom: 80, // Must clear the absolute floating composer
     }
 });

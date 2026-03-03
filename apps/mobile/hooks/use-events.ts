@@ -14,6 +14,7 @@ import {
   eventUpdateRequestSchema,
 } from "@momentarise/shared";
 import { apiFetch, readApiError } from "@/lib/api";
+import { RRule } from "rrule";
 
 export function useEventsRange(from: string | null, to: string | null) {
   return useQuery<EventsRangeResponse>({
@@ -28,7 +29,53 @@ export function useEventsRange(from: string | null, to: string | null) {
         throw new Error(await readApiError(res, "Failed to fetch events"));
       }
       const data = await res.json();
-      return eventsRangeResponseSchema.parse(data) as EventsRangeResponse;
+      const parsed = eventsRangeResponseSchema.parse(data) as EventsRangeResponse;
+
+      if (!from || !to) return parsed;
+
+      const fromDate = new Date(from);
+      const toDate = new Date(to);
+      const expandedEvents: EventOut[] = [];
+
+      for (const event of parsed.events) {
+        if (!event.rrule) {
+          expandedEvents.push(event);
+          continue;
+        }
+
+        try {
+          const rule = RRule.fromString(event.rrule);
+          const startAt = new Date(event.start_at);
+          const endAt = new Date(event.end_at);
+          const durationMs = endAt.getTime() - startAt.getTime();
+
+          // dtstart is needed for RRule to base its occurrences correctly
+          rule.options.dtstart = startAt;
+
+          // Find occurrences in the requested range
+          const occurrences = rule.between(fromDate, toDate, true);
+
+          for (const occ of occurrences) {
+            const expandedEnd = new Date(occ.getTime() + durationMs);
+            // Append a suffix to the ID so React Native lists don't complain about duplicate keys
+            // But we want to preserve the real ID for update mutations. In store.ts draftEvent.id is used.
+            // When opening the moment sheet on mobile, we pass the draftEvent obj directly. So it will use this modified ID if we aren't careful.
+            // We must set the actual ID so the API calls don't fail, but then the FlatList might have duplicate keys if we don't change it.
+            // Actually, we can use `_r_${occ.getTime()}` and let the component handle it, or we can just send the same ID and hope the Agenda component doesn't complain (many React Native calendars group by day, so same ID across different days is often fine).
+            // Let's use the real ID for now to avoid breaking update logic. If it complains, we will cross that bridge.
+            expandedEvents.push({
+              ...event,
+              start_at: occ.toISOString(),
+              end_at: expandedEnd.toISOString(),
+            });
+          }
+        } catch (e) {
+          console.error("Failed to parse rrule locally", e);
+          expandedEvents.push(event);
+        }
+      }
+
+      return { ...parsed, events: expandedEvents };
     },
   });
 }

@@ -247,3 +247,76 @@ If the parent table (`Workspace`) declares a relationship like `projects: Mapped
 ### Suggested Action
 Always verify `ForeignKey` metadata when defining new models linked to a `Workspace` or `Project`, and pair it with a bidirectional `relationship(back_populates="...")`.
 ---
+## [LRN-20260302-001] correction
+**Logged**: 2026-03-02T21:43:27+01:00
+**Priority**: high
+**Status**: pending
+**Area**: backend
+
+### Summary
+Incorrect imports for `get_workspace_id` and `get_current_user` in new API routes, and missing explicit `ForeignKey` in SQLAlchemy models.
+
+### Details
+- **Imports:** I assumed the paths for dependency properties like `get_current_user` and `get_workspace` (`src.core.security` and `src.api.context`) which actually reside under `src.core.deps`. This crashed `uvicorn` on startup. 
+- **Database Modeling:** When declaring relationships to the `Workspace` table from the `Project` and `Series` SQLAlchemy models, I included the `Mapped[uuid.UUID]` definition but failed to attach explicitly the `ForeignKey("workspaces.id")` constraint. SQLAlchemy cannot magically infer these connections without the explicit FK declarations, leading to an ORM mapping failure. 
+
+### Suggested Action
+- Always verify the location of core dependencies like `get_current_user` in `src.core.deps` rather than guessing directory structures. Take 10 seconds to `grep` for existing usages.
+- When creating new SQLAlchemy models that reference an existing parent (`Workspace`), absolute certainty applies: the column mapping MUST contain the `ForeignKey('table.id')` declaration, not just an index boolean.
+- Always monitor the active `uvicorn` and `alembic` terminal windows to catch import errors or mapping failures immediately before considering the task complete.
+---
+
+## [LRN-20260303-001] best_practice — Glassmorphism Chat Composer (KeyboardAvoidingView & Absolute)
+**Logged**: 2026-03-03
+**Priority**: medium
+**Status**: resolved
+**Area**: mobile / layout
+
+### Summary
+Obtenir un chat type "Glassmorphism" (le Composer flotte par-dessus les messages qui scrollent en dessous) demande une intégration spécifique avec `KeyboardAvoidingView`.
+
+### Details
+- Mettre le Composer en `absolute` à l'intérieur du `KeyboardAvoidingView` peut causer des bugs : si positionné sur l'écran global, il ne remontera pas avec le clavier iOS. 
+- L'astuce : Créer une `<View className="flex-1">` enfant *directement* dans le `KeyboardAvoidingView`.
+- Placer le Composer en `absolute bottom-0` **à l'intérieur** de cette View enfant. Ainsi, il flotte visuellement au-dessus des messages de la liste.
+
+### Suggested Action
+Toujours encapsuler les layouts absolus dans un conteneur flex interne (`flex-1`) au sein du `KeyboardAvoidingView`.
+
+---
+
+## [LRN-20260303-002] correction — React Keys & Markdown Streaming Animation
+**Logged**: 2026-03-03
+**Priority**: high
+**Status**: resolved
+**Area**: mobile / reanimated
+
+### Summary
+Les animations `FadeIn` sur des mots (streaming) provoquent des flashs si les clés React sont instables.
+
+### Details
+- L'algorithme déduisait la `key` du type de syntaxe. L'arrivée d'un caractère de formatage modifiait le type des mots passés et invalidait les clés, générant un flash.
+- L'utilisation de `delay(index * 20)` figeait la fin des très longues réponses.
+
+### Suggested Action
+Utiliser un compteur pur (ex: `{keyPrefix}-${part++}`) pour les clés et supprimer le délai pour un FadeIn.
+
+---
+
+## [LRN-20260303-003] correction — KeyboardAvoidingView et keyboardVerticalOffset en mode padding
+**Logged**: 2026-03-03
+**Priority**: high
+**Status**: resolved
+**Area**: mobile / layout
+
+### Summary
+L'utilisation de `keyboardVerticalOffset` sur un `KeyboardAvoidingView` peut créer un vide au-dessus du clavier.
+
+### Details
+- Définir `keyboardVerticalOffset={50}` pour compenser la hauteur du header va *s'ajouter* à la translation du clavier iOS si la vue est déjà bien placée (sous le header).
+- Résultat : le padding appliqué repousse le contenu beaucoup trop haut.
+
+### Suggested Action
+Gardez `keyboardVerticalOffset={0}` si le conteneur démarre pile au bon endroit.
+
+---

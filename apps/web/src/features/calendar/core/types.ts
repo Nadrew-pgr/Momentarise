@@ -16,6 +16,9 @@ export interface CalendarCreateInput {
   allDay?: boolean;
   location?: string | null;
   color?: EventColor;
+  rrule?: string;
+  seriesId?: string;
+  projectId?: string;
 }
 
 export interface CalendarUpdateInput {
@@ -28,6 +31,10 @@ export interface CalendarUpdateInput {
   location?: string | null;
   lastKnownUpdatedAt?: string;
   color?: EventColor;
+  rrule?: string;
+  seriesId?: string;
+  projectId?: string;
+  updateMode?: "single" | "future" | "all";
 }
 
 export interface CalendarController {

@@ -22,6 +22,8 @@ from src.api.v1.health import router as health_router
 from src.api.v1.inbox import router as inbox_router
 from src.api.v1.items import router as items_router
 from src.api.v1.preferences import router as preferences_router
+from src.api.v1.projects import router as projects_router
+from src.api.v1.series import router as series_router
 from src.api.v1.sync import router as sync_router
 from src.api.v1.timeline import router as timeline_router
 from src.api.v1.today import router as today_router
@@ -236,7 +238,9 @@ app.include_router(today_router, prefix="/api/v1")
 app.include_router(timeline_router, prefix="/api/v1")
 app.include_router(events_router, prefix="/api/v1")
 app.include_router(inbox_router, prefix="/api/v1")
-app.include_router(items_router, prefix="/api/v1")
-app.include_router(preferences_router, prefix="/api/v1")
+app.include_router(items_router, prefix="/api/v1/items")
+app.include_router(preferences_router, prefix="/api/v1/preferences")
+app.include_router(projects_router, prefix="/api/v1/projects")
+app.include_router(series_router, prefix="/api/v1/series")
 app.include_router(capture_external_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")

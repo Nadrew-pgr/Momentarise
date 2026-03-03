@@ -33,6 +33,18 @@ class Event(BaseMixin, Base):
     tracking_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    rrule: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("events.id"), nullable=True
+    )
+    series_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("series.id"), nullable=True
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True
+    )
 
     workspace: Mapped["Workspace"] = relationship(back_populates="events")  # noqa: F821
     item: Mapped["Item"] = relationship(back_populates="events")  # noqa: F821
+    project: Mapped["Project"] = relationship("Project", back_populates="events") # noqa: F821
+    series: Mapped["Series"] = relationship("Series", back_populates="events") # noqa: F821

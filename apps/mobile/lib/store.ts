@@ -48,6 +48,10 @@ export type DraftEvent = {
   color: "sky" | "amber" | "violet" | "rose" | "emerald" | "orange";
   isTracking?: boolean;
   updatedAt?: string | null;
+  rrule?: string | null;
+  parentEventId?: string | null;
+  seriesId?: string | null;
+  projectId?: string | null;
 };
 
 interface EventSheetState {

@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { View, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity, StyleSheet } from "react-native";
+import { View, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity, StyleSheet, Keyboard } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown, FadeOutDown } from "react-native-reanimated";
 import { ArrowUp, Square } from "lucide-react-native";
@@ -26,18 +26,33 @@ export function Composer({
     const insets = useSafeAreaInsets();
     const inputRef = useRef<TextInput>(null);
     const hasContent = value.trim().length > 0;
+    const [isKeyboardVisible, setKeyboardVisible] = React.useState(false);
+
+    React.useEffect(() => {
+        const kbShow = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            () => setKeyboardVisible(true)
+        );
+        const kbHide = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => setKeyboardVisible(false)
+        );
+        return () => {
+            kbShow.remove();
+            kbHide.remove();
+        };
+    }, []);
+
+    // When keyboard is visible, we don't need the bottom safe area padding!
+    const paddingBottom = isKeyboardVisible ? 16 : Math.max(insets.bottom, 16);
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} // Adjust based on header
-            className="absolute bottom-0 left-0 right-0"
-        >
+        <>
             <Animated.View
                 entering={FadeInDown.duration(400).springify()}
                 exiting={FadeOutDown.duration(200)}
-                className="px-4"
-                style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+                className="absolute bottom-0 left-0 right-0 px-4"
+                style={{ paddingBottom }}
             >
                 {/* Premium input wrapper */}
                 <View
@@ -88,7 +103,7 @@ export function Composer({
                     </View>
                 </View>
             </Animated.View>
-        </KeyboardAvoidingView>
+        </>
     );
 }
 

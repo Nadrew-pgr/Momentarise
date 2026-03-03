@@ -7,11 +7,11 @@ interface MarkdownRendererProps {
     isStreaming?: boolean;
 }
 
-function AnimatedWord({ word, index }: { word: string; index: number }) {
+function AnimatedWord({ word }: { word: string }) {
     return (
         <Animated.Text
-            entering={FadeIn.duration(250).delay(index * 20)}
-            style={styles.text} // In NativeWind v4, styling inline text is best, but we'll adapt className for color
+            entering={FadeIn.duration(200)}
+            style={styles.text}
             className="text-foreground text-[16px] leading-[24px]"
         >
             {word}
@@ -30,7 +30,7 @@ function renderWords(text: string, keyPrefix: string, animated: boolean): React.
         if (!animated) {
             return <Text key={`${keyPrefix}-tx-${idx}`} className="text-foreground text-[16px] leading-[24px]" style={styles.text}>{token}</Text>;
         }
-        return <AnimatedWord key={`${keyPrefix}-an-${idx}`} word={token} index={idx} />;
+        return <AnimatedWord key={`${keyPrefix}-an-${idx}`} word={token} />;
     });
 }
 
@@ -44,7 +44,7 @@ function renderInline(text: string, animated: boolean, keyPrefix: string): React
         const codeMatch = remaining.match(/^`([^`]+)`/);
         if (codeMatch) {
             nodes.push(
-                <Text key={`${keyPrefix}-code-${part++}`} style={styles.inlineCode}>
+                <Text key={`${keyPrefix}-${part++}`} style={styles.inlineCode}>
                     {codeMatch[1]}
                 </Text>
             );
@@ -55,9 +55,10 @@ function renderInline(text: string, animated: boolean, keyPrefix: string): React
         // Bold
         const boldMatch = remaining.match(/^\*\*([^*]+)\*\*/);
         if (boldMatch) {
+            const boldKey = `${keyPrefix}-${part++}`;
             nodes.push(
-                <Text key={`${keyPrefix}-bold-${part++}`} style={styles.bold}>
-                    {renderWords(boldMatch[1], `${keyPrefix}-boldw-${part}`, animated)}
+                <Text key={boldKey} style={styles.bold}>
+                    {renderWords(boldMatch[1], `${boldKey}-w`, animated)}
                 </Text>
             );
             remaining = remaining.slice(boldMatch[0].length);
@@ -67,9 +68,10 @@ function renderInline(text: string, animated: boolean, keyPrefix: string): React
         // Italic
         const italicMatch = remaining.match(/^\*([^*]+)\*/);
         if (italicMatch) {
+            const italicKey = `${keyPrefix}-${part++}`;
             nodes.push(
-                <Text key={`${keyPrefix}-italic-${part++}`} style={styles.italic}>
-                    {renderWords(italicMatch[1], `${keyPrefix}-itw-${part}`, animated)}
+                <Text key={italicKey} style={styles.italic}>
+                    {renderWords(italicMatch[1], `${italicKey}-w`, animated)}
                 </Text>
             );
             remaining = remaining.slice(italicMatch[0].length);
@@ -79,12 +81,11 @@ function renderInline(text: string, animated: boolean, keyPrefix: string): React
         // Link
         const linkMatch = remaining.match(/^\[([^\]]+)\]\(([^)\s]+)\)/);
         if (linkMatch) {
-            const url = linkMatch[2];
             nodes.push(
                 <Text
-                    key={`${keyPrefix}-link-${part++}`}
+                    key={`${keyPrefix}-${part++}`}
                     style={styles.link}
-                    onPress={() => Linking.openURL(url)}
+                    onPress={() => Linking.openURL(linkMatch[2])}
                 >
                     {linkMatch[1]}
                 </Text>
@@ -96,19 +97,19 @@ function renderInline(text: string, animated: boolean, keyPrefix: string): React
         // Plain text sequence up to next special char
         const nextSpecial = remaining.search(/[`*\[]/);
         if (nextSpecial === -1) {
-            nodes.push(...renderWords(remaining, `${keyPrefix}-txt-${part++}`, animated));
+            nodes.push(...renderWords(remaining, `${keyPrefix}-${part++}`, animated));
             break;
         }
 
         if (nextSpecial === 0) {
             // Escaped or literal special character not matching patterns
-            nodes.push(<Text key={`${keyPrefix}-lit-${part++}`} style={styles.text}>{remaining[0]}</Text>);
+            nodes.push(<Text key={`${keyPrefix}-${part++}`} style={styles.text}>{remaining[0]}</Text>);
             remaining = remaining.slice(1);
             continue;
         }
 
         const plain = remaining.slice(0, nextSpecial);
-        nodes.push(...renderWords(plain, `${keyPrefix}-pl-${part++}`, animated));
+        nodes.push(...renderWords(plain, `${keyPrefix}-${part++}`, animated));
         remaining = remaining.slice(nextSpecial);
     }
 
@@ -122,7 +123,7 @@ function renderCodeBlock(block: string, key: string): React.ReactNode {
     const code = firstLineBreak > 0 ? raw.slice(firstLineBreak + 1) : raw;
 
     return (
-        <View key={key} className="my-2 rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
+        <Animated.View entering={FadeIn.duration(400)} key={key} className="my-2 rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
             {language ? (
                 <View className="bg-zinc-800/50 px-3 py-1.5 border-b border-zinc-800">
                     <Text className="text-zinc-400 text-[11px] font-mono">{language}</Text>
@@ -131,7 +132,7 @@ function renderCodeBlock(block: string, key: string): React.ReactNode {
             <View className="p-3">
                 <Text className="text-zinc-100 font-mono text-[13px] leading-[20px]">{code}</Text>
             </View>
-        </View>
+        </Animated.View>
     );
 }
 
