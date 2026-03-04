@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { ActivityIndicator, Modal, Pressable, ScrollView, View } from "react-native";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import {
+  Archive,
   ArrowLeft,
   Camera,
   CheckCircle2,
@@ -11,19 +12,21 @@ import {
   FileText,
   Link2,
   Mic,
+  MoreHorizontal,
   RefreshCw,
   Sparkles,
+  Trash2,
 } from "lucide-react-native";
 import type { CaptureActionSuggestion, CaptureAssetOut, CaptureArtifactOut } from "@momentarise/shared";
 import {
   useApplyCapture,
+  useArchiveCapture,
   useCaptureDetail,
+  useDeleteCapture,
   usePreviewCapture,
-  useProcessCapture,
   useReprocessCapture,
 } from "@/hooks/use-inbox";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,7 +63,7 @@ function readArtifactText(artifact: CaptureArtifactOut): string {
 }
 
 function pickSummary(artifacts: CaptureArtifactOut[]): string {
-  const preferred = ["summary", "transcript", "extracted_text"];
+  const preferred = ["summary", "preprocess_summary", "vlm_analysis", "transcript", "extracted_text"];
   for (const artifactType of preferred) {
     const found = artifacts.find((artifact) => artifact.artifact_type === artifactType);
     if (!found) continue;
@@ -68,6 +71,10 @@ function pickSummary(artifacts: CaptureArtifactOut[]): string {
     if (text) return text;
   }
   return "";
+}
+
+function readString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function formatBytes(value: number): string {
@@ -98,12 +105,14 @@ function defaultTitle(raw: string, fallback: string): string {
 export default function InboxCaptureDetailPage() {
   const { t } = useTranslation();
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const captureId = typeof params.id === "string" ? params.id : null;
 
   const { data, isLoading, isError, error, refetch } = useCaptureDetail(captureId);
   const applyCapture = useApplyCapture();
-  const processCapture = useProcessCapture();
+  const archiveCapture = useArchiveCapture();
+  const deleteCapture = useDeleteCapture();
   const previewCapture = usePreviewCapture();
   const reprocessCapture = useReprocessCapture();
 
@@ -118,6 +127,8 @@ export default function InboxCaptureDetailPage() {
   const [selectedActionKey, setSelectedActionKey] = useState<string | null>(null);
   const [manualTitle, setManualTitle] = useState("");
   const [manualDescription, setManualDescription] = useState("");
+  const [actionsDialogOpen, setActionsDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const filteredActions = useMemo(() => {
     if (!capture) return [];
@@ -126,11 +137,20 @@ export default function InboxCaptureDetailPage() {
 
   useEffect(() => {
     if (!capture) return;
+    const defaultActionKey =
+      (capture.primary_action &&
+      capture.primary_action.type !== "summarize" &&
+      filteredActions.some((action) => action.key === capture.primary_action?.key)
+        ? capture.primary_action.key
+        : null) ??
+      filteredActions.find((action) => action.is_primary)?.key ??
+      filteredActions[0]?.key ??
+      null;
     setSelectedActionKey((current) => {
       if (current && filteredActions.some((action) => action.key === current)) {
         return current;
       }
-      return capture.primary_action?.key ?? filteredActions[0]?.key ?? null;
+      return defaultActionKey;
     });
     if (!manualTitle.trim()) {
       setManualTitle(
@@ -149,13 +169,22 @@ export default function InboxCaptureDetailPage() {
 
   const isBusy =
     applyCapture.isPending ||
-    processCapture.isPending ||
+    archiveCapture.isPending ||
+    deleteCapture.isPending ||
     previewCapture.isPending ||
     reprocessCapture.isPending;
 
-  const onBack = useCallback(() => {
+  const navigateToInbox = useCallback(() => {
+    if (typeof navigation.canGoBack === "function" && navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
     router.replace("/(tabs)/inbox");
-  }, [router]);
+  }, [navigation, router]);
+
+  const onBack = useCallback(() => {
+    navigateToInbox();
+  }, [navigateToInbox]);
 
   const handlePreview = useCallback(() => {
     if (!captureId || !selectedAction) return;
@@ -166,19 +195,6 @@ export default function InboxCaptureDetailPage() {
     if (!captureId || !capture || !selectedAction || capture.archived) return;
     const title = manualTitle.trim();
     const description = manualDescription.trim();
-
-    if (selectedAction.type === "review") {
-      if (!title) return;
-      processCapture.mutate(
-        { captureId, title },
-        {
-          onSuccess: () => {
-            router.replace(`/(tabs)/inbox`);
-          },
-        }
-      );
-      return;
-    }
 
     applyCapture.mutate(
       {
@@ -191,7 +207,7 @@ export default function InboxCaptureDetailPage() {
       },
       {
         onSuccess: () => {
-          router.replace(`/(tabs)/inbox`);
+          navigateToInbox();
         },
       }
     );
@@ -201,8 +217,7 @@ export default function InboxCaptureDetailPage() {
     captureId,
     manualDescription,
     manualTitle,
-    processCapture,
-    router,
+    navigateToInbox,
     selectedAction,
   ]);
 
@@ -253,7 +268,6 @@ export default function InboxCaptureDetailPage() {
         ? "border-rose-500/30 bg-rose-500/10 text-rose-600"
         : "border-border bg-muted/40 text-muted-foreground";
   const primaryAsset = assets[0] ?? null;
-  const actionCount = capture.suggested_actions.length;
   const preview = previewCapture.data;
   const requiresVoiceContext = capture.capture_type === "voice" && !capture.archived;
   const captureTypeLabel = t(`pages.inbox.filter.${capture.capture_type}`, {
@@ -269,26 +283,56 @@ export default function InboxCaptureDetailPage() {
       (item): item is string => typeof item === "string" && item.trim().length > 0
     )
     : [];
+  const summaryText =
+    summary ||
+    readString(artifactsSummary.summary) ||
+    readString(artifactsSummary.headline) ||
+    capture.raw_content ||
+    t("pages.inbox.emptyCapture");
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       <View className="flex-1 px-4 pt-2">
         <View className="mb-3 flex-row items-center justify-between">
-          <Button size="sm" variant="outline" onPress={onBack}>
+          <Button size="icon" variant="outline" onPress={onBack} accessibilityLabel={t("pages.item.backToInbox")}>
             <ArrowLeft size={14} color="#171717" />
-            <UiText> {t("pages.item.backToInbox")}</UiText>
           </Button>
-          {capture.status === "failed" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onPress={() => reprocessCapture.mutate({ captureId: capture.id })}
-              disabled={isBusy}
+          <View className="flex-row items-center gap-2">
+            {capture.status === "failed" ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onPress={() => reprocessCapture.mutate({ captureId: capture.id })}
+                disabled={isBusy}
+              >
+                <RefreshCw size={12} color="#171717" />
+                <UiText> {t("pages.inbox.reprocess")}</UiText>
+              </Button>
+            ) : null}
+            <Pressable
+              onPress={() => setActionsDialogOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t("pages.inbox.itemActions", { defaultValue: "Actions" })}
+              hitSlop={8}
+              className="h-9 w-9 items-center justify-center rounded-md border border-border bg-background"
             >
-              <RefreshCw size={12} color="#171717" />
-              <UiText> {t("pages.inbox.reprocess")}</UiText>
-            </Button>
-          ) : null}
+              <MoreHorizontal size={14} color="#171717" />
+            </Pressable>
+          </View>
+        </View>
+
+        <View className="mb-3 rounded-xl border border-border bg-muted/40 px-3 py-2">
+          <UiText className="text-[11px] font-semibold uppercase text-muted-foreground">
+            {t("pages.inbox.comingSoonContextResearchTitle", {
+              defaultValue: "Coming soon",
+            })}
+          </UiText>
+          <UiText className="mt-1 text-sm text-foreground">
+            {t("pages.inbox.comingSoonContextResearchBody", {
+              defaultValue:
+                "Context research, web research, advanced enrichments, and connectors are coming soon.",
+            })}
+          </UiText>
         </View>
 
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
@@ -316,20 +360,6 @@ export default function InboxCaptureDetailPage() {
                         {captureTypeLabel}
                       </UiText>
                     </View>
-                    {capture.badges.map((badge) => (
-                      <Badge
-                        key={`${capture.id}-${badge.key}`}
-                        variant={
-                          badge.tone === "default"
-                            ? "default"
-                            : badge.tone === "secondary"
-                              ? "secondary"
-                              : "outline"
-                        }
-                      >
-                        <UiText>{badge.label}</UiText>
-                      </Badge>
-                    ))}
                   </View>
                 </View>
                 <View className="rounded-full border border-border bg-background p-2">
@@ -348,7 +378,7 @@ export default function InboxCaptureDetailPage() {
                 </UiText>
               </View>
               <UiText className="text-sm leading-6 text-foreground">
-                {summary || capture.raw_content || t("pages.inbox.emptyCapture")}
+                {summaryText}
               </UiText>
               {keyClauses.length ? (
                 <View className="mt-3">
@@ -445,12 +475,7 @@ export default function InboxCaptureDetailPage() {
                 <Button
                   size="sm"
                   onPress={handleApply}
-                  disabled={
-                    !selectedAction ||
-                    isBusy ||
-                    capture.archived ||
-                    (selectedAction.type === "review" && !manualTitle.trim())
-                  }
+                  disabled={!selectedAction || isBusy || capture.archived}
                 >
                   <UiText>{t("pages.inbox.applySelected")}</UiText>
                 </Button>
@@ -517,6 +542,140 @@ export default function InboxCaptureDetailPage() {
           ) : null}
         </ScrollView>
       </View>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={actionsDialogOpen}
+        statusBarTranslucent
+        onRequestClose={() => setActionsDialogOpen(false)}
+      >
+        <View className="flex-1 justify-end">
+          <Pressable className="absolute inset-0 bg-black/45" onPress={() => setActionsDialogOpen(false)} />
+          <View className="w-full rounded-t-2xl border border-border bg-card p-4">
+            <UiText className="mb-3 text-base font-semibold text-foreground">
+              {t("pages.inbox.itemActions", { defaultValue: "Actions" })}
+            </UiText>
+            <View className="gap-2">
+              <Button
+                variant="outline"
+                onPress={() => {
+                  setActionsDialogOpen(false);
+                  handleApply();
+                }}
+                disabled={!selectedAction || capture.archived}
+              >
+                <UiText>{t("pages.inbox.reviewApply", { defaultValue: "Review / Apply" })}</UiText>
+              </Button>
+
+              <Button
+                variant="outline"
+                onPress={() => {
+                  reprocessCapture.mutate({ captureId: capture.id });
+                  setActionsDialogOpen(false);
+                }}
+                disabled={capture.status !== "failed" || capture.archived}
+              >
+                <RefreshCw size={12} color="#171717" />
+                <UiText> {t("pages.inbox.reprocess")}</UiText>
+              </Button>
+
+              <Button
+                variant="outline"
+                onPress={() => {
+                  archiveCapture.mutate({ captureId: capture.id });
+                  setActionsDialogOpen(false);
+                }}
+                disabled={capture.archived}
+              >
+                <Archive size={12} color="#171717" />
+                <UiText> {t("pages.inbox.archive", { defaultValue: "Archive" })}</UiText>
+              </Button>
+
+              <Button
+                variant="destructive"
+                onPress={() => {
+                  setActionsDialogOpen(false);
+                  setDeleteDialogOpen(true);
+                }}
+                disabled={capture.archived}
+              >
+                <Trash2 size={12} color="#ffffff" />
+                <UiText> {t("pages.item.delete")}</UiText>
+              </Button>
+
+              <View className="mt-2 gap-1 rounded-lg border border-border/70 bg-muted/30 p-2">
+                {[
+                  ["pages.inbox.menuDuplicate", "Duplicate"],
+                  ["pages.inbox.menuMoveTo", "Move to"],
+                  ["pages.inbox.menuCopyLink", "Copy link"],
+                  ["pages.inbox.menuVersionHistory", "Version history"],
+                  ["pages.inbox.menuNotifications", "Notifications"],
+                  ["pages.inbox.menuAnalytics", "Analytics"],
+                  ["pages.inbox.menuImportExport", "Import / Export"],
+                ].map(([key, fallback]) => (
+                  <View key={key} className="rounded-md px-2 py-1 opacity-60">
+                    <UiText className="text-sm text-muted-foreground">
+                      {t(key, { defaultValue: fallback })}
+                    </UiText>
+                  </View>
+                ))}
+              </View>
+              <View className="mt-3">
+                <Button variant="outline" onPress={() => setActionsDialogOpen(false)}>
+                  <UiText>{t("common.cancel")}</UiText>
+                </Button>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={deleteDialogOpen}
+        statusBarTranslucent
+        onRequestClose={() => setDeleteDialogOpen(false)}
+      >
+        <View className="flex-1 justify-end">
+          <Pressable className="absolute inset-0 bg-black/45" onPress={() => setDeleteDialogOpen(false)} />
+          <View className="w-full rounded-t-2xl border border-border bg-card p-4">
+            <UiText className="text-base font-semibold text-foreground">
+              {t("pages.inbox.confirmDeleteTitle", {
+                defaultValue: "Delete this item?",
+              })}
+            </UiText>
+            <UiText className="mt-2 text-sm text-muted-foreground">
+              {t("pages.inbox.confirmDeleteBody", {
+                defaultValue: "This action is final. Restore is disabled for inbox captures.",
+              })}
+            </UiText>
+            <View className="mt-4 flex-row justify-end gap-2">
+              <Button variant="outline" onPress={() => setDeleteDialogOpen(false)}>
+                <UiText>{t("common.cancel")}</UiText>
+              </Button>
+              <Button
+                variant="destructive"
+                onPress={() => {
+                  if (!captureId) return;
+                  deleteCapture.mutate(
+                    { captureId },
+                    {
+                      onSettled: () => {
+                        setDeleteDialogOpen(false);
+                        navigateToInbox();
+                      },
+                    }
+                  );
+                }}
+              >
+                <UiText>{t("pages.item.delete")}</UiText>
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

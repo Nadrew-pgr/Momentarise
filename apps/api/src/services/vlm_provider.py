@@ -9,7 +9,16 @@ logger = logging.getLogger(__name__)
 
 
 def _heuristic_visual_analysis(file_name: str | None) -> dict[str, Any]:
-    base = f"Visual analysis placeholder for {file_name}." if file_name else "Visual analysis placeholder."
+    if file_name:
+        base = (
+            f"Image capture detected ({file_name}). "
+            "Visual AI fallback active, so this is a lightweight description pending richer analysis."
+        )
+    else:
+        base = (
+            "Image capture detected. Visual AI fallback active, "
+            "so this is a lightweight description pending richer analysis."
+        )
     return {
         "text": base,
         "provider": "heuristic",

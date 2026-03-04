@@ -1,12 +1,10 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { MarkdownRenderer } from './markdown-renderer';
+import { ChatMessage } from './types';
 
 interface MessageProps {
-    message: {
-        role: "user" | "assistant" | "system";
-        content: string;
-    };
+    message: ChatMessage;
     isStreaming?: boolean;
 }
 

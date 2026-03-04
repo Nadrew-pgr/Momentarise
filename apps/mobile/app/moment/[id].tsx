@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { BlockEditor } from "@/components/BlockEditor";
 import { useItem, useUpdateItem } from "@/hooks/use-item";
 import { RecurrenceInput } from "@/components/RecurrenceInput";
+import { ProjectSeriesSelector } from "@/components/ProjectSeriesSelector";
 
 const COLOR_OPTIONS: Array<{ value: EventColor; labelKey: string }> = [
     { value: "sky", labelKey: "pages.timeline.color.sky" },
@@ -101,6 +102,8 @@ export default function MomentDetailPage() {
     const [allDay, setAllDay] = useState(false);
     const [color, setColor] = useState<EventColor>("sky");
     const [rrule, setRrule] = useState<string | null>(null);
+    const [projectId, setProjectId] = useState<string | null>(null);
+    const [seriesId, setSeriesId] = useState<string | null>(null);
     const [isTracking, setIsTracking] = useState(false);
     const [updatedAt, setUpdatedAt] = useState<string | null>(null);
     const [eventId, setEventId] = useState<string | null>(null);
@@ -217,6 +220,8 @@ export default function MomentDetailPage() {
         setAllDay(base.allDay ?? false);
         setColor(base.color ?? "sky");
         setRrule(base.rrule ?? null);
+        setProjectId(base.projectId ?? null);
+        setSeriesId(base.seriesId ?? null);
         setIsTracking(!!base.isTracking);
         setEventId(base.id ?? null);
         setItemId(base.itemId ?? null);
@@ -272,6 +277,8 @@ export default function MomentDetailPage() {
                         color,
                         last_known_updated_at: updatedAt ?? undefined,
                         rrule: rrule ?? undefined,
+                        project_id: projectId ?? undefined,
+                        series_id: seriesId ?? undefined,
                     },
                 });
             } else {
@@ -281,6 +288,8 @@ export default function MomentDetailPage() {
                     end_at: end.toISOString(),
                     color,
                     rrule: rrule ?? undefined,
+                    project_id: projectId ?? undefined,
+                    series_id: seriesId ?? undefined,
                 });
             }
             router.back();
@@ -292,6 +301,8 @@ export default function MomentDetailPage() {
         color,
         createEvent,
         eventId,
+        projectId,
+        seriesId,
         rrule,
         router,
         title,
@@ -452,6 +463,13 @@ export default function MomentDetailPage() {
                                     <Text className="mb-1 text-sm font-medium text-foreground">{t("pages.timeline.eventSheet.location")}</Text>
                                     <Input value={location} onChangeText={setLocation} />
                                 </View>
+
+                                <ProjectSeriesSelector
+                                    projectId={projectId}
+                                    seriesId={seriesId}
+                                    onProjectChange={setProjectId}
+                                    onSeriesChange={setSeriesId}
+                                />
 
                                 <View>
                                     <Text className="mb-1 text-sm font-medium text-foreground">{t("pages.timeline.eventSheet.color")}</Text>

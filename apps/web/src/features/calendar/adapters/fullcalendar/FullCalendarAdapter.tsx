@@ -6,7 +6,7 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import rrulePlugin from "@fullcalendar/rrule";
 import { format } from "date-fns";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   DateSelectArg,
@@ -106,11 +106,34 @@ export function FullCalendarAdapter({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const lastEmittedRangeRef = useRef<{ from: string; to: string } | null>(null);
 
-  const hasAllDayEvents = useMemo(() => events.some((e) => e.all_day), [events]);
-
   const eventsById = useMemo(() => {
     return new Map(events.map((event) => [event.id, event]));
   }, [events]);
+
+  const hasAllDayEvents = useMemo(() => events.some((e) => e.all_day), [events]);
+
+  // Keep selectedEvent in sync with the underlying events if it was modified (e.g. from drag & drop)
+  useEffect(() => {
+    if (!selectedEvent?.id) return;
+    const source = eventsById.get(selectedEvent.id);
+    if (!source) return;
+
+    // Use getTime() for stable date comparison
+    const sourceStart = new Date(source.start_at).getTime();
+    const sourceEnd = new Date(source.end_at).getTime();
+    const currentStart = selectedEvent.start.getTime();
+    const currentEnd = selectedEvent.end.getTime();
+
+    const hasChanged =
+      sourceStart !== currentStart ||
+      sourceEnd !== currentEnd ||
+      source.title !== selectedEvent.title ||
+      source.all_day !== selectedEvent.allDay;
+
+    if (hasChanged) {
+      setSelectedEvent(toCalendarEvent(source));
+    }
+  }, [eventsById, selectedEvent?.id, selectedEvent?.start.getTime(), selectedEvent?.end.getTime(), selectedEvent?.title, selectedEvent?.allDay]);
 
   const fullCalendarEvents = useMemo<EventInput[]>(() => {
     return events.map((event) => {
@@ -439,6 +462,7 @@ export function FullCalendarAdapter({
               initialView={fullCalendarViewFrom(view)}
               initialDate={currentDate}
               headerToolbar={false}
+              firstDay={1}
               events={fullCalendarEvents}
               datesSet={handleDatesSet}
               selectable
@@ -505,11 +529,7 @@ export function FullCalendarAdapter({
         </div>
 
         <CalendarEventDialog
-          key={
-            selectedEvent
-              ? `${selectedEvent.id || "new"}-${new Date(selectedEvent.start).toISOString()}-${new Date(selectedEvent.end).toISOString()}`
-              : "calendar-dialog-empty"
-          }
+          key={selectedEvent ? (selectedEvent.id || "new") : "calendar-dialog-empty"}
           event={selectedEvent}
           isOpen={isDialogOpen}
           onClose={() => {

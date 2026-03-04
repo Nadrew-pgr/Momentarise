@@ -19,7 +19,7 @@ import {
 import type React from "react";
 import { useMemo } from "react";
 
-import { WeekCellsHeight } from "./constants";
+import { WeekCellsHeight, WEEK_STARTS_ON } from "./constants";
 import {
   CALENDAR_AXIS_LABEL_CLASSES,
   CALENDAR_DAY_CELL_CLASSES,
@@ -63,13 +63,13 @@ export function WeekView({
   endHour,
 }: WeekViewProps) {
   const days = useMemo(() => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: WEEK_STARTS_ON });
+    const weekEnd = endOfWeek(currentDate, { weekStartsOn: WEEK_STARTS_ON });
     return eachDayOfInterval({ end: weekEnd, start: weekStart });
   }, [currentDate]);
 
   const weekStart = useMemo(
-    () => startOfWeek(currentDate, { weekStartsOn: 0 }),
+    () => startOfWeek(currentDate, { weekStartsOn: WEEK_STARTS_ON }),
     [currentDate],
   );
 
@@ -433,11 +433,11 @@ export function WeekView({
                           "absolute h-[calc(var(--week-cells-height)/4)] w-full",
                           quarter === 0 && "top-0",
                           quarter === 1 &&
-                            "top-[calc(var(--week-cells-height)/4)]",
+                          "top-[calc(var(--week-cells-height)/4)]",
                           quarter === 2 &&
-                            "top-[calc(var(--week-cells-height)/4*2)]",
+                          "top-[calc(var(--week-cells-height)/4*2)]",
                           quarter === 3 &&
-                            "top-[calc(var(--week-cells-height)/4*3)]",
+                          "top-[calc(var(--week-cells-height)/4*3)]",
                         )}
                         date={day}
                         id={`week-cell-${day.toISOString()}-${quarterHourTime}`}

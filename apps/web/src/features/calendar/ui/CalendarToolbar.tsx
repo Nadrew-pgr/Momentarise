@@ -1,21 +1,14 @@
 "use client";
 
+import { createPortal } from "react-dom";
+
 import { RiCalendarCheckLine } from "@remixicon/react";
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CalendarViewKind } from "../core/view-types";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuShortcut, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface CalendarToolbarProps {
   view: CalendarViewKind;
@@ -49,38 +42,10 @@ export function CalendarToolbar({
   className,
 }: CalendarToolbarProps) {
   const { t } = useTranslation();
-  const [isHoursOpen, setIsHoursOpen] = useState(false);
-  const [isHoursSaving, setIsHoursSaving] = useState(false);
-  const [draftStartHour, setDraftStartHour] = useState(startHour);
-  const [draftEndHour, setDraftEndHour] = useState(endHour);
+  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setDraftStartHour(startHour);
-    setDraftEndHour(endHour);
-  }, [startHour, endHour]);
+  useEffect(() => setMounted(true), []);
 
-  const startHourOptions = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
-  const endHourOptions = useMemo(
-    () => Array.from({ length: 24 }, (_, i) => i + 1).filter((value) => value > draftStartHour),
-    [draftStartHour]
-  );
-
-  const hasHoursChanged = draftStartHour !== startHour || draftEndHour !== endHour;
-  const hasValidHours = draftEndHour > draftStartHour;
-
-  const applyDisplayHours = async () => {
-    if (!onDisplayHoursChange || !hasValidHours || !hasHoursChanged) {
-      setIsHoursOpen(false);
-      return;
-    }
-    setIsHoursSaving(true);
-    try {
-      await onDisplayHoursChange(draftStartHour, draftEndHour);
-      setIsHoursOpen(false);
-    } finally {
-      setIsHoursSaving(false);
-    }
-  };
 
   useEffect(() => {
     if (!shortcutsEnabled) return;
@@ -105,8 +70,8 @@ export function CalendarToolbar({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onViewChange, shortcutsEnabled]);
 
-  return (
-    <div className={["flex items-center justify-between p-2 sm:p-4", className].filter(Boolean).join(" ")}>
+  const inner = (
+    <div className={["flex w-full items-center justify-between", className].filter(Boolean).join(" ")}>
       <div className="flex items-center gap-1 sm:gap-4">
         <Button
           className="max-[479px]:aspect-square max-[479px]:p-0!"
@@ -125,76 +90,11 @@ export function CalendarToolbar({
             <ChevronRightIcon aria-hidden="true" size={16} />
           </Button>
         </div>
-        <h2 className="font-semibold text-sm sm:text-lg md:text-xl">{title}</h2>
+        <h2 className="font-semibold text-sm sm:text-base md:text-lg truncate">{title}</h2>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Popover open={isHoursOpen} onOpenChange={setIsHoursOpen}>
-          <PopoverTrigger asChild>
-            <Button className="gap-1.5 max-[479px]:h-8" variant="outline" disabled={disableActions || !onDisplayHoursChange}>
-              {t("pages.calendar.displayHours")}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-60 space-y-3">
-            <div className="space-y-1.5">
-              <Label>{t("pages.calendar.displayHoursStart")}</Label>
-              <Select
-                value={String(draftStartHour)}
-                onValueChange={(value) => {
-                  const next = Number(value);
-                  setDraftStartHour(next);
-                  if (draftEndHour <= next) setDraftEndHour(next + 1);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {startHourOptions.map((hour) => (
-                    <SelectItem key={hour} value={String(hour)}>
-                      {`${String(hour).padStart(2, "0")}:00`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>{t("pages.calendar.displayHoursEnd")}</Label>
-              <Select value={String(draftEndHour)} onValueChange={(value) => setDraftEndHour(Number(value))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {endHourOptions.map((hour) => (
-                    <SelectItem key={hour} value={String(hour)}>
-                      {`${String(hour).padStart(2, "0")}:00`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setDraftStartHour(startHour);
-                  setDraftEndHour(endHour);
-                  setIsHoursOpen(false);
-                }}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => void applyDisplayHours()}
-                disabled={disableActions || isHoursSaving || !hasValidHours || !hasHoursChanged}
-              >
-                {isHoursSaving ? "Saving..." : t("common.save")}
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -223,4 +123,11 @@ export function CalendarToolbar({
       </div>
     </div>
   );
+
+  if (!mounted) return null;
+  const container = typeof document !== "undefined" ? document.getElementById("dashboard-header-slot") : null;
+  if (container) {
+    return createPortal(inner, container);
+  }
+  return inner;
 }

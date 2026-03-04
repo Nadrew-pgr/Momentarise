@@ -83,3 +83,23 @@ Transformer le `Composer` de chat en un véritable centre de commande AI.
 - Créer des états locaux pour `isListening` dans `Composer.tsx`.
 - Intégrer un module de BottomSheet (type Gorhom) pour le menu `+`.
 - Développer/Intégrer le package Voxtral pour le streaming audio-to-text.
+
+---
+
+## [FEAT-20260303-004] Inbox/Capture — Contexte, web research et connecteurs pilotés par sous-agent Sync
+**Logged**: 2026-03-03
+**Priority**: high
+**Status**: pending
+**Area**: backend / ai / inbox
+
+### Requested Capability
+Permettre au pipeline Inbox/Capture de s’appuyer sur un sous-agent Sync configurable (type OpenClaw) capable d’activer progressivement la recherche de contexte, la recherche web et des enrichissements via connecteurs.
+
+### User Context
+Demande explicite de préparer une structure de sous-agent Sync avec prompt builder dynamique, agents utilisateur, et mention produit \"bientôt\" pour les capacités de contexte/web/enrichissements/connecteurs.
+
+### Suggested Implementation
+- Finaliser `CaptureSubAgentRuntime` avec routage par préférences utilisateur (`capture_default_agent_id`, règles de routage).
+- Activer les modules par feature flags (`CAPTURE_CONTEXT_ENRICHMENT_ENABLED`, `CAPTURE_WEB_RESEARCH_ENABLED`, `CAPTURE_SUBAGENT_ROUTING_ENABLED`).
+- Ajouter des tool adapters pour web/context/connecteurs avec policy stricte (`proposal_only` vs `auto_if_safe`).
+- Conserver des snapshots auditables (prompt/toolset/retrieval) pour chaque analyse capture.

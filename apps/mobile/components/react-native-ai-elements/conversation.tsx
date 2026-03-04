@@ -1,17 +1,10 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { FlatList, View, StyleSheet, Keyboard, TouchableOpacity, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
-import type { SyncEventEnvelope } from '@momentarise/shared';
 import { Message } from './message';
 import { TypingIndicator } from './typing-indicator';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { ArrowDown } from 'lucide-react-native';
-
-// A type definition assuming we assemble the messages locally
-interface ChatMessage {
-    id: string;
-    role: "user" | "assistant" | "system";
-    content: string;
-}
+import { ChatMessage } from './types';
 
 interface ConversationProps {
     messages: ChatMessage[];
@@ -54,7 +47,7 @@ export function Conversation({ messages, isStreaming, streamingText, emptyState 
     }, [streamingText, messages.length, isStreaming]);
 
     // Data consists of messages + the live streaming assistant message, if there's any running stream right now
-    const data = useMemo(() => {
+    const data: ChatMessage[] = useMemo(() => {
         const items = [...messages];
         if (isStreaming && streamingText) {
             items.push({ id: "streaming-temp", role: "assistant", content: streamingText });

@@ -8,6 +8,7 @@ export const capturePipelineStatusSchema = z.enum([
   "ready",
   "failed",
   "applied",
+  "archived",
 ]);
 
 export const captureTypeSchema = z.enum([
@@ -28,6 +29,7 @@ export const captureStatusSchema = z.enum([
   "ready",
   "failed",
   "applied",
+  "archived",
 ]);
 
 export const captureActionTypeSchema = z.enum([
@@ -81,17 +83,23 @@ export const captureActionSuggestionSchema = z.object({
 
 const inboxCaptureOutWireSchema = z.object({
   id: z.string().uuid(),
+  item_id: z.string().uuid().nullable().optional(),
   raw_content: z.string(),
   source: z.string().nullable().optional(),
+  source_type: z.string().optional(),
   capture_type: captureTypeSchema,
   status: captureStatusSchema,
+  pipeline_state: capturePipelineStatusSchema.optional(),
+  treated_bucket: z.enum(["untreated", "treated"]).optional(),
+  agent_hint: z.string().nullable().optional(),
+  coming_soon_capabilities: z.array(z.string()).optional(),
   metadata: metadataRecordSchema.optional(),
   meta: metadataRecordSchema.optional(),
   suggested_actions: z.array(captureActionSuggestionSchema).default([]),
   primary_action: captureActionSuggestionSchema.nullable().optional(),
   requires_review: z.boolean().optional(),
   archived: z.boolean().optional(),
-  archived_reason: z.enum(["applied", "deleted"]).nullable().optional(),
+  archived_reason: z.enum(["applied", "deleted", "archived"]).nullable().optional(),
   deleted_at: z.string().datetime().nullable().optional(),
   category: captureCategorySchema.nullable().optional(),
   actor: captureActorSchema.optional(),
@@ -107,6 +115,12 @@ export const inboxCaptureOutSchema = inboxCaptureOutWireSchema.transform(
     requires_review,
     primary_action,
     suggested_actions,
+    item_id,
+    source_type,
+    pipeline_state,
+    treated_bucket,
+    agent_hint,
+    coming_soon_capabilities,
     archived,
     archived_reason,
     deleted_at,
@@ -117,6 +131,12 @@ export const inboxCaptureOutSchema = inboxCaptureOutWireSchema.transform(
     ...rest
   }) => ({
     ...rest,
+    item_id: item_id ?? null,
+    source_type: source_type ?? rest.capture_type,
+    pipeline_state: pipeline_state ?? rest.status,
+    treated_bucket: treated_bucket ?? (rest.status === "applied" ? "treated" : "untreated"),
+    agent_hint: agent_hint ?? null,
+    coming_soon_capabilities: coming_soon_capabilities ?? [],
     metadata: metadata ?? meta ?? {},
     suggested_actions,
     primary_action: primary_action ?? null,
@@ -131,9 +151,19 @@ export const inboxCaptureOutSchema = inboxCaptureOutWireSchema.transform(
   })
 );
 
-export const inboxListResponseSchema = z.object({
-  captures: z.array(inboxCaptureOutSchema),
-});
+export const inboxListResponseSchema = z
+  .object({
+    captures: z.array(inboxCaptureOutSchema).optional(),
+    entries: z.array(inboxCaptureOutSchema).optional(),
+  })
+  .transform(({ captures, entries }) => {
+    const resolvedEntries = entries ?? captures ?? [];
+    const resolvedCaptures = captures ?? entries ?? [];
+    return {
+      captures: resolvedCaptures,
+      entries: resolvedEntries,
+    };
+  });
 
 export const createCaptureRequestSchema = z.object({
   raw_content: z.string().default(""),

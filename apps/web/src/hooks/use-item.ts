@@ -60,11 +60,13 @@ export function useItem(itemId: string | null) {
     queryFn: async () => {
       if (!itemId) return null;
       const res = await fetchWithAuth(`/api/items/${itemId}`);
+      if (res.status === 404) return null;
       if (!res.ok) throw new Error(await readWebError(res, "Failed to fetch item"));
       const data = await res.json();
       return itemOutSchema.parse(data) as ItemOut;
     },
     enabled: !!itemId,
+    retry: false,
   });
 }
 
@@ -223,10 +225,12 @@ export function useItemLinks(itemId: string | null) {
     queryFn: async () => {
       if (!itemId) return { links: [] };
       const res = await fetchWithAuth(`/api/items/${itemId}/links`);
+      if (res.status === 404) return { links: [] } as ItemLinksResponse;
       if (!res.ok) throw new Error("Failed to fetch links");
       const data = await res.json();
       return itemLinksResponseSchema.parse(data) as ItemLinksResponse;
     },
+    retry: false,
   });
 }
 

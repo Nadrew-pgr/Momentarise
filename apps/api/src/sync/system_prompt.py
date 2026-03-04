@@ -48,9 +48,10 @@ def _build_tools_section(allowed_tools: list[dict]) -> list[str]:
     lines = [
         "## Tooling",
         "Use only declared tools. Never execute writes without preview/apply confirmation.",
-        "When the user asks to create, update, plan, or change something in the workspace, you MUST call one of the preview tools (item.preview, event.preview, inbox.transform.preview) so a structured preview card is shown. Replying only in text for such intents is not allowed.",
+        "When the user asks to create, update, plan, or change something in the workspace, you MUST call one of the preview tools (item_preview, event_preview, inbox_transform_preview) so a structured preview card is shown. Replying only in text for such intents is not allowed.",
         "The plan is the structured preview card (with Apply/Cancel) that appears when you call a preview tool. You must call the tool so this card is shown; do not only describe the change in plain text.",
-        "When calling preview tools (item.preview, event.preview, inbox.transform.preview), always pass display_summary with the same user-facing text you would put in your reply for that change: event title, schedule (e.g. \"Horaire : 09:00 - 09:30 (30 min)\"), color in user language, and a short description if relevant. This text is shown in the plan card instead of raw parameters.",
+        "When calling preview tools (item_preview, event_preview, inbox_transform_preview), always pass display_summary with the same user-facing text you would put in your reply for that change: event title, schedule (e.g. \"Horaire : 09:00 - 09:30 (30 min)\"), color in user language, and a short description if relevant. This text is shown in the plan card instead of raw parameters.",
+        "CRITICAL: Your text reply before a preview tool call MUST be at most 1-2 sentences. Call the preview tool IMMEDIATELY. Do NOT describe the event/item details in your reply — those details belong ONLY in the tool call arguments and display_summary.",
     ]
 
     if not allowed_tools:
@@ -98,8 +99,9 @@ def _build_autonomous_policy_section() -> list[str]:
         "## Autonomous Planning Policy",
         "- Infer missing defaults when safe (title, duration, color, scheduling window).",
         "- Do not ask for fields that can be inferred from context, memory, or preferences.",
-        "- For planning/scheduling/edit intents, proactively call preview tools before replying (`event.preview`, `item.preview`, `inbox.transform.preview`).",
+        "- For planning/scheduling/edit intents, proactively call preview tools before replying (`event_preview`, `item_preview`, `inbox_transform_preview`).",
         "- Do NOT describe planned changes or steps in plain text only. Always emit a structured preview via the preview tools so the user gets a preview card with Apply/Cancel.",
+        "- Output format for mutation intents: 1 short sentence intro → tool call. No bullet lists. No markdown headers. No detailed prose.",
         "- Avoid long questionnaires: ask at most one blocking question only when a critical field cannot be inferred.",
         "- Resolve relative dates/times into absolute datetimes with timezone in outputs.",
         "- If assumptions are made, state them briefly and proceed with preview-first execution.",
@@ -113,6 +115,7 @@ def _build_reply_contract_section() -> list[str]:
         "- Keep answers concise and actionable.",
         "- Use the user's own words and correct spelling; do not merge or invent words (e.g. write \"ma journée\" not \"manjournée\", \"ma semaine\" not \"masemaine\").",
         "- Do not output a plan or list of steps as plain text when the user wants to apply changes; use the preview tools instead so a structured preview card is shown.",
+        "- NEVER list event/item details (title, time, color, description, etc.) as prose when a preview tool exists. Those details belong ONLY inside the tool call arguments and display_summary.",
         "- If the user only asks for an explanation (no mutation), you may reply in text.",
         "- If context is insufficient, ask one direct question.",
         "- Use markdown only when it improves readability.",

@@ -7,7 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
 from src.core.database import get_db
 from src.core.deps import get_current_user, get_current_workspace
-from src.api.v1.inbox import _maybe_auto_apply_capture
+from src.api.v1.inbox import (
+    _ensure_source_item_for_capture,
+    _maybe_auto_apply_capture,
+    _sync_source_item_from_capture,
+)
 from src.models.inbox_capture import InboxCapture
 from src.models.user import User
 from src.models.workspace import WorkspaceMember
@@ -81,6 +85,7 @@ async def create_external_capture(
         actor="sync" if (body.source or "").strip().lower() in {"sync", "agent", "automation"} else "user",
         meta={
             **body.metadata,
+            "source_type": body.capture_type,
             "external": {
                 "idempotency_key": body.idempotency_key,
                 "ingested_at": "api",
@@ -89,10 +94,20 @@ async def create_external_capture(
     )
     db.add(capture)
     await db.flush()
+    await _ensure_source_item_for_capture(
+        db,
+        workspace_id=workspace.workspace_id,
+        capture=capture,
+    )
 
     await enqueue_default_jobs(db, capture)
     await process_capture_jobs(db, capture)
     await _maybe_auto_apply_capture(db=db, workspace=workspace, capture=capture)
+    await _sync_source_item_from_capture(
+        db,
+        workspace_id=workspace.workspace_id,
+        capture=capture,
+    )
 
     await db.commit()
     await db.refresh(capture)

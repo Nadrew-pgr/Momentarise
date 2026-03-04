@@ -5,7 +5,12 @@ from types import SimpleNamespace
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
 os.environ.setdefault("JWT_SECRET", "test-secret")
 
-from src.services.capture_pipeline import _build_action_suggestions, _derive_category_and_tags
+from src.services.capture_pipeline import (
+    _build_action_suggestions,
+    _derive_category_and_tags,
+    _should_run_ocr_for_asset,
+    job_types_for_capture,
+)
 
 
 def build_capture(*, capture_type: str = "file", meta: dict | None = None):
@@ -51,6 +56,7 @@ class CapturePipelineSuggestionTests(unittest.TestCase):
             self.assertEqual(task.type, "create_task")
             self.assertEqual(task.payload.get("reason"), "trial_renewal")
             self.assertEqual(task.payload.get("payment_method"), "PayPal")
+        self.assertNotIn("summarize", [item.type for item in suggestions])
 
     def test_returns_review_when_no_action_is_detected(self) -> None:
         capture = build_capture(capture_type="text")
@@ -72,6 +78,53 @@ class CapturePipelineSuggestionTests(unittest.TestCase):
         self.assertEqual(category, "finance")
         self.assertIn("invoice", tags)
         self.assertIn("subscription", tags)
+
+    def test_media_capture_does_not_emit_summarize_action(self) -> None:
+        capture = build_capture(capture_type="photo")
+        suggestions = _build_action_suggestions(
+            capture,
+            "Photo of invoice and warranty card with due date.",
+        )
+        self.assertNotIn("summarize", [item.type for item in suggestions])
+
+    def test_photo_ocr_is_skipped_without_document_hints(self) -> None:
+        capture = build_capture(capture_type="photo", meta={"channel": "camera"})
+        asset = SimpleNamespace(
+            mime_type="image/jpeg",
+            meta={"file_name": "IMG_0012.jpg"},
+            storage_key="captures/IMG_0012.jpg",
+        )
+        self.assertFalse(_should_run_ocr_for_asset(capture, asset))  # type: ignore[arg-type]
+
+    def test_photo_ocr_runs_with_scan_hint(self) -> None:
+        capture = build_capture(capture_type="photo", meta={"intent": "scan_receipt"})
+        asset = SimpleNamespace(
+            mime_type="image/jpeg",
+            meta={"file_name": "receipt.jpg"},
+            storage_key="captures/receipt.jpg",
+        )
+        self.assertTrue(_should_run_ocr_for_asset(capture, asset))  # type: ignore[arg-type]
+
+    def test_photo_ocr_runs_when_vlm_detects_text(self) -> None:
+        capture = build_capture(capture_type="photo", meta={"channel": "camera"})
+        asset = SimpleNamespace(
+            mime_type="image/jpeg",
+            meta={"file_name": "IMG_0012.jpg"},
+            storage_key="captures/IMG_0012.jpg",
+        )
+        self.assertTrue(
+            _should_run_ocr_for_asset(
+                capture,  # type: ignore[arg-type]
+                asset,  # type: ignore[arg-type]
+                vlm_hint_text="The image shows a document with visible text and a signature.",
+            )
+        )
+
+    def test_photo_pipeline_runs_vlm_before_ocr(self) -> None:
+        self.assertEqual(
+            job_types_for_capture("photo"),
+            ["ingest", "vlm_enrich", "transcribe_or_extract", "preprocess", "suggest_actions"],
+        )
 
 
 if __name__ == "__main__":

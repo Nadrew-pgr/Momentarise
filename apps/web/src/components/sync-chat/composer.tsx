@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
-import { Brain, Mic, Paperclip, Square } from "lucide-react";
+import { Brain, Mic, Paperclip, Square, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -16,10 +18,38 @@ import {
 } from "@/components/ui/tooltip";
 import { AnimatedOrb } from "./animated-orb";
 import { AudioWaveform } from "./audio-waveform";
+import { ProviderIcon } from "./provider-icons";
 
 interface ComposerModel {
   id: string;
   label: string;
+  provider?: string;
+  tier?: string;
+  reasoning_levels?: string[] | null;
+}
+
+const TIER_CONFIG: Record<string, { label: string; className: string }> = {
+  pro: {
+    label: "Pro",
+    className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+  },
+  ultra: {
+    label: "Ultra",
+    className: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20",
+  },
+};
+
+function TierBadge({ tier }: { tier?: string }) {
+  if (!tier || tier === "free") return null;
+  const config = TIER_CONFIG[tier];
+  if (!config) return null;
+  return (
+    <span
+      className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none tracking-wide ${config.className}`}
+    >
+      {config.label}
+    </span>
+  );
 }
 
 interface ComposerProps {
@@ -92,6 +122,25 @@ export function Composer({
   );
 
   const currentModel = models.find((model) => model.id === selectedModel);
+  const isAutoMode = selectedModel === "auto";
+
+  // Group models by provider for the dropdown
+  const groupedModels = useMemo(() => {
+    const groups: Record<string, ComposerModel[]> = {};
+    for (const model of models) {
+      const provider = model.provider ?? "other";
+      if (!groups[provider]) groups[provider] = [];
+      groups[provider].push(model);
+    }
+    return groups;
+  }, [models]);
+
+  const providerLabels: Record<string, string> = {
+    mistral: "Mistral",
+    anthropic: "Anthropic",
+    openai: "OpenAI",
+    gemini: "Google",
+  };
 
   return (
     <div className="sync-chat-composer-wrap pointer-events-none absolute inset-x-0 bottom-3 z-10 px-4">
@@ -188,20 +237,61 @@ export function Composer({
                     <Brain className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-52 rounded-xl">
-                  {models.map((model) => (
-                    <DropdownMenuItem
-                      key={model.id}
-                      onClick={() => onModelChange(model.id)}
-                      className={model.id === selectedModel ? "bg-accent" : undefined}
-                    >
-                      {model.label}
-                    </DropdownMenuItem>
+                <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-64 rounded-xl p-1">
+                  {/* Auto mode option */}
+                  <DropdownMenuItem
+                    onClick={() => onModelChange("auto")}
+                    className={`rounded-lg px-3 py-2.5 ${isAutoMode ? "bg-accent" : ""}`}
+                  >
+                    <Sparkles className="mr-2.5 h-4 w-4 text-amber-500" />
+                    <span className="flex-1 font-medium">Auto</span>
+                    <span className="text-[10px] text-muted-foreground">adaptatif</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+
+                  {/* Models grouped by provider */}
+                  {Object.entries(groupedModels).map(([provider, providerModels]) => (
+                    <div key={provider}>
+                      <DropdownMenuLabel className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                        <ProviderIcon provider={provider} size={11} />
+                        {providerLabels[provider] ?? provider}
+                      </DropdownMenuLabel>
+                      {providerModels.map((model) => (
+                        <DropdownMenuItem
+                          key={model.id}
+                          onClick={() => onModelChange(model.id)}
+                          className={`rounded-lg px-3 py-2 ${model.id === selectedModel ? "bg-accent" : ""}`}
+                        >
+                          <span className="flex-1 text-[13px]">{model.label}</span>
+                          <div className="flex items-center gap-1">
+                            {model.reasoning_levels && model.reasoning_levels.length > 0 && (
+                              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium leading-none text-amber-600 dark:text-amber-400">
+                                Thinking
+                              </span>
+                            )}
+                            <TierBadge tier={model.tier} />
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <span className="text-muted-foreground ml-1 truncate text-xs">{currentModel?.label ?? "-"}</span>
+              <span className="text-muted-foreground ml-1 flex items-center truncate text-xs">
+                {isAutoMode ? (
+                  <>
+                    <Sparkles className="mr-1 h-3 w-3 text-amber-500" />
+                    Auto
+                  </>
+                ) : (
+                  <>
+                    <ProviderIcon provider={currentModel?.provider ?? ""} size={12} className="mr-1" />
+                    {currentModel?.label ?? "-"}
+                    <TierBadge tier={currentModel?.tier} />
+                  </>
+                )}
+              </span>
             </div>
           </div>
         </div>

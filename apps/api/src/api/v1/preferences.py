@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
 from src.core.database import get_db
 from src.core.deps import get_current_workspace
+from src.models.agent_profile import AgentProfile
 from src.models.workspace import Workspace
 from src.models.workspace import WorkspaceMember
 from src.schemas.preferences import (
@@ -14,13 +17,14 @@ from src.schemas.preferences import (
     CalendarPreferencesUpdateRequest,
 )
 
-router = APIRouter(prefix="/preferences", tags=["preferences"])
+router = APIRouter(tags=["preferences"])
 
 DEFAULT_START_HOUR = 8
 DEFAULT_END_HOUR = 24
 DEFAULT_AI_MODE = "proposal_only"
 DEFAULT_AUTO_APPLY_THRESHOLD = 0.90
 DEFAULT_MAX_ACTIONS = 3
+DEFAULT_CAPTURE_RESEARCH_POLICY = "proposal_only"
 
 
 def _default_capture_provider_preferences() -> dict:
@@ -143,11 +147,19 @@ def _to_response(member: WorkspaceMember) -> CalendarPreferencesResponse:
     )
 
 
-def _read_ai_preferences(member: WorkspaceMember, workspace_defaults: dict | None = None) -> tuple[str, float, int, dict]:
+def _read_ai_preferences(
+    member: WorkspaceMember,
+    workspace_defaults: dict | None = None,
+) -> tuple[str, float, int, dict, UUID | None, dict, str, str, str | None]:
     mode = DEFAULT_AI_MODE
     threshold = DEFAULT_AUTO_APPLY_THRESHOLD
     max_actions = DEFAULT_MAX_ACTIONS
     provider_preferences = _merge_provider_preferences(None, workspace_defaults)
+    capture_default_agent_id: UUID | None = None
+    capture_agent_routing_rules: dict = {}
+    capture_research_policy = DEFAULT_CAPTURE_RESEARCH_POLICY
+    sync_model = "auto"
+    sync_reasoning_level: str | None = None
 
     if isinstance(member.preferences, dict):
         ai_prefs = member.preferences.get("ai")
@@ -165,12 +177,50 @@ def _read_ai_preferences(member: WorkspaceMember, workspace_defaults: dict | Non
                 ai_prefs.get("capture_provider_preferences"),
                 provider_preferences,
             )
+            raw_default_agent = ai_prefs.get("capture_default_agent_id")
+            if isinstance(raw_default_agent, str) and raw_default_agent.strip():
+                try:
+                    capture_default_agent_id = UUID(raw_default_agent.strip())
+                except ValueError:
+                    capture_default_agent_id = None
+            raw_routing_rules = ai_prefs.get("capture_agent_routing_rules")
+            if isinstance(raw_routing_rules, dict):
+                capture_agent_routing_rules = raw_routing_rules
+            raw_research_policy = ai_prefs.get("capture_research_policy")
+            if raw_research_policy in {"proposal_only", "auto_if_safe"}:
+                capture_research_policy = raw_research_policy
+            raw_sync_model = ai_prefs.get("sync_model")
+            if isinstance(raw_sync_model, str) and raw_sync_model.strip():
+                sync_model = raw_sync_model.strip()
+            raw_reasoning = ai_prefs.get("sync_reasoning_level")
+            if isinstance(raw_reasoning, str) and raw_reasoning.strip():
+                sync_reasoning_level = raw_reasoning.strip()
 
-    return mode, threshold, max_actions, provider_preferences
+    return (
+        mode,
+        threshold,
+        max_actions,
+        provider_preferences,
+        capture_default_agent_id,
+        capture_agent_routing_rules,
+        capture_research_policy,
+        sync_model,
+        sync_reasoning_level,
+    )
 
 
 def _to_ai_response(member: WorkspaceMember, workspace_defaults: dict | None = None) -> AiPreferencesResponse:
-    mode, threshold, max_actions, provider_preferences = _read_ai_preferences(
+    (
+        mode,
+        threshold,
+        max_actions,
+        provider_preferences,
+        capture_default_agent_id,
+        capture_agent_routing_rules,
+        capture_research_policy,
+        sync_model,
+        sync_reasoning_level,
+    ) = _read_ai_preferences(
         member,
         workspace_defaults,
     )
@@ -179,6 +229,11 @@ def _to_ai_response(member: WorkspaceMember, workspace_defaults: dict | None = N
         auto_apply_threshold=threshold,
         max_actions_per_capture=max_actions,
         capture_provider_preferences=provider_preferences,  # type: ignore[arg-type]
+        capture_default_agent_id=capture_default_agent_id,
+        capture_agent_routing_rules=capture_agent_routing_rules,
+        capture_research_policy=capture_research_policy,  # type: ignore[arg-type]
+        sync_model=sync_model,
+        sync_reasoning_level=sync_reasoning_level,
         updated_at=member.updated_at,
     )
 
@@ -255,12 +310,69 @@ async def update_ai_preferences(
     ai_preferences["auto_apply_threshold"] = body.auto_apply_threshold
     ai_preferences["max_actions_per_capture"] = body.max_actions_per_capture
     workspace_defaults = await _read_workspace_provider_defaults(db, workspace.workspace_id)
-    _, _, _, current_provider_preferences = _read_ai_preferences(workspace, workspace_defaults)
+    (
+        _,
+        _,
+        _,
+        current_provider_preferences,
+        current_default_agent_id,
+        current_routing_rules,
+        current_research_policy,
+        _,  # sync_model — handled separately below
+        _,  # sync_reasoning_level — handled separately below
+    ) = _read_ai_preferences(workspace, workspace_defaults)
     ai_preferences["capture_provider_preferences"] = (
         body.capture_provider_preferences.model_dump(mode="json")
         if body.capture_provider_preferences is not None
         else current_provider_preferences
     )
+
+    if "capture_default_agent_id" in body.model_fields_set:
+        default_agent_id = body.capture_default_agent_id
+    else:
+        default_agent_id = current_default_agent_id
+    if default_agent_id is not None:
+        result = await db.execute(
+            select(AgentProfile).where(
+                AgentProfile.id == default_agent_id,
+                AgentProfile.workspace_id == workspace.workspace_id,
+                AgentProfile.deleted_at.is_(None),
+                AgentProfile.is_active.is_(True),
+            )
+        )
+        agent = result.scalar_one_or_none()
+        if agent is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="capture_default_agent_id must reference an active workspace agent",
+            )
+    ai_preferences["capture_default_agent_id"] = (
+        str(default_agent_id) if default_agent_id is not None else None
+    )
+
+    if "capture_agent_routing_rules" in body.model_fields_set:
+        ai_preferences["capture_agent_routing_rules"] = (
+            body.capture_agent_routing_rules
+            if isinstance(body.capture_agent_routing_rules, dict)
+            else {}
+        )
+    else:
+        ai_preferences["capture_agent_routing_rules"] = current_routing_rules
+
+    if "capture_research_policy" in body.model_fields_set:
+        ai_preferences["capture_research_policy"] = (
+            body.capture_research_policy
+            if body.capture_research_policy is not None
+            else DEFAULT_CAPTURE_RESEARCH_POLICY
+        )
+    else:
+        ai_preferences["capture_research_policy"] = current_research_policy
+
+    if "sync_model" in body.model_fields_set and body.sync_model is not None:
+        ai_preferences["sync_model"] = body.sync_model.strip() or "auto"
+    if "sync_reasoning_level" in body.model_fields_set:
+        ai_preferences["sync_reasoning_level"] = body.sync_reasoning_level
+
     preferences["ai"] = ai_preferences
 
     workspace.preferences = preferences

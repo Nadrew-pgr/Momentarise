@@ -10,10 +10,11 @@ import {
 import { apiFetch, readApiError } from "@/lib/api";
 
 export function useCalendarPreferences() {
-  return useQuery<CalendarPreferencesResponse>({
+  return useQuery<CalendarPreferencesResponse | null>({
     queryKey: ["calendar-preferences"],
     queryFn: async () => {
       const res = await apiFetch("/api/v1/preferences/calendar");
+      if (res.status === 404) return null;
       if (!res.ok) {
         throw new Error(
           await readApiError(res, "Failed to fetch calendar preferences")
@@ -22,6 +23,7 @@ export function useCalendarPreferences() {
       const data = await res.json();
       return calendarPreferencesResponseSchema.parse(data);
     },
+    retry: false,
   });
 }
 

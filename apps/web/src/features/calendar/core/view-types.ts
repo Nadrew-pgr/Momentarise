@@ -18,8 +18,8 @@ export function getCalendarViewTitle(date: Date, view: CalendarViewKind): string
   if (view === "month") return format(date, "MMMM yyyy");
 
   if (view === "week") {
-    const start = startOfWeek(date, { weekStartsOn: 0 });
-    const end = endOfWeek(date, { weekStartsOn: 0 });
+    const start = startOfWeek(date, { weekStartsOn: 1 });
+    const end = endOfWeek(date, { weekStartsOn: 1 });
     if (isSameMonth(start, end)) return format(start, "MMMM yyyy");
     return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`;
   }
@@ -37,15 +37,15 @@ export function getRangeForCalendarView(date: Date, view: CalendarViewKind): {
 } {
   if (view === "month") {
     return {
-      from: startOfWeek(startOfMonth(date), { weekStartsOn: 0 }),
-      to: endOfWeek(endOfMonth(date), { weekStartsOn: 0 }),
+      from: startOfWeek(startOfMonth(date), { weekStartsOn: 1 }),
+      to: endOfWeek(endOfMonth(date), { weekStartsOn: 1 }),
     };
   }
 
   if (view === "week") {
     return {
-      from: startOfWeek(date, { weekStartsOn: 0 }),
-      to: endOfWeek(date, { weekStartsOn: 0 }),
+      from: startOfWeek(date, { weekStartsOn: 1 }),
+      to: endOfWeek(date, { weekStartsOn: 1 }),
     };
   }
 

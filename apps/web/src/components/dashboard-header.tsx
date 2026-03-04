@@ -87,7 +87,9 @@ export function DashboardHeader() {
             <Menu className="h-4 w-4" />
           </Button>
         </div>
-      ) : null}
+      ) : (
+        <div id="dashboard-header-slot" className="flex flex-1 items-center ml-4" />
+      )}
     </header>
   );
 }

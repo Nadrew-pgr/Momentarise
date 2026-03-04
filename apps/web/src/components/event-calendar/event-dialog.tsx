@@ -1,11 +1,12 @@
 "use client";
 
-import { RiCalendarLine, RiDeleteBinLine } from "@remixicon/react";
+import { RiCalendarLine, RiDeleteBinLine, RiCloseLine } from "@remixicon/react";
 import type { Block } from "@blocknote/core";
 import type { ProseMirrorNode } from "@momentarise/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { format, isBefore } from "date-fns";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import type { CalendarEvent, EventColor } from "./types";
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Textarea } from "@/components/ui/textarea";
 
+import { RecurrenceInput } from "./recurrence-input";
 import { ProjectSeriesSelector } from "./project-series-selector";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -88,6 +90,9 @@ export function EventDialog({
     return `${hours}:${minutes.toString().padStart(2, "0")}`;
   }, []);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const initialStart = event ? new Date(event.start) : new Date();
   const initialEnd = event ? new Date(event.end) : new Date(initialStart.getTime() + 60 * 60 * 1000);
 
@@ -132,6 +137,51 @@ export function EventDialog({
     setBlocks(item.blocks as unknown as Block[]);
     setBlocksHydrated(true);
   }, [blocksHydrated, contentDirty, item, itemId]);
+
+  // Sync local state if the 'event' prop changes via external means (e.g., Drag & Drop on Calendar or switching events)
+  useEffect(() => {
+    if (!event) return;
+
+    // Use functional updates or condition checks to avoid redundant setStates
+    setTitle(prev => prev !== (event.title ?? "") ? (event.title ?? "") : prev);
+    setDescription(prev => prev !== (event.description ?? "") ? (event.description ?? "") : prev);
+    setAllDay(prev => prev !== (event.allDay ?? false) ? (event.allDay ?? false) : prev);
+    setLocation(prev => prev !== (event.location ?? "") ? (event.location ?? "") : prev);
+    setColor(prev => prev !== ((event.color as EventColor) || "sky") ? ((event.color as EventColor) || "sky") : prev);
+    setRRule(prev => prev !== event.rrule ? event.rrule : prev);
+    setProjectId(prev => prev !== (event.projectId ?? null) ? (event.projectId ?? null) : prev);
+    setSeriesId(prev => prev !== (event.seriesId ?? null) ? (event.seriesId ?? null) : prev);
+
+    setCurrentEventId(prev => prev !== (event.id ?? "") ? (event.id ?? "") : prev);
+    setCurrentItemId(prev => prev !== (event.itemId ?? "") ? (event.itemId ?? "") : prev);
+    setCurrentUpdatedAt(prev => prev !== event.updatedAt ? event.updatedAt : prev);
+    setIsTracking(prev => prev !== (event.isTracking ?? false) ? (event.isTracking ?? false) : prev);
+
+    const newStart = new Date(event.start);
+    const newEnd = new Date(event.end);
+
+    setStartDate(prev => prev.getTime() !== newStart.getTime() ? newStart : prev);
+    setEndDate(prev => prev.getTime() !== newEnd.getTime() ? newEnd : prev);
+
+    const formatTimeLocal = (date: Date) => {
+      const hours = date.getHours().toString().padStart(2, "0");
+      const minutes = Math.floor(date.getMinutes() / 15) * 15;
+      return `${hours}:${minutes.toString().padStart(2, "0")}`;
+    };
+
+    const nextStartTime = formatTimeLocal(newStart);
+    const nextEndTime = formatTimeLocal(newEnd);
+    setStartTime(prev => prev !== nextStartTime ? nextStartTime : prev);
+    setEndTime(prev => prev !== nextEndTime ? nextEndTime : prev);
+
+    // Reset content hydration when switching to a DIFFERENT event/item
+    if (event.itemId !== currentItemId || event.id !== currentEventId) {
+      setBlocksHydrated(false);
+      setContentDirty(false);
+      setBlocks([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event?.id, event?.itemId, event?.start.getTime(), event?.end.getTime(), event?.allDay, event?.title]);
 
   const persistBlocks = useCallback(
     async (targetItemId: string, nextBlocks: ProseMirrorNode[]) => {
@@ -373,6 +423,10 @@ export function EventDialog({
             ? t("pages.calendar.momentTitleEdit")
             : t("pages.calendar.momentTitleCreate")}
         </h2>
+        <Button onClick={onClose} size="icon" variant="ghost" className="h-8 w-8 rounded-full">
+          <RiCloseLine size={16} aria-hidden="true" />
+          <span className="sr-only">Close</span>
+        </Button>
       </SidebarHeader>
       <SidebarContent className="flex-1 w-full md:w-[400px]">
 
@@ -732,15 +786,21 @@ export function EventDialog({
     );
   }
 
-  return (
+  const desktopSidebar = (
     <div
       className={cn(
-        "bg-background transition-[width,margin] duration-300 overflow-hidden flex",
-        isOpen ? "ml-0 w-[400px] border-l" : "-mr-[400px] w-[0px] border-none"
+        "bg-background transition-[width] duration-200 ease-linear hidden md:flex flex-col h-svh overflow-hidden shrink-0",
+        isOpen ? "w-[400px] border-l border-border" : "w-0"
       )}
       aria-hidden={!isOpen}
     >
       {DialogInnerContent}
     </div>
   );
+
+  if (!mounted) return null;
+  const container = typeof document !== 'undefined' ? document.getElementById("right-sidebar-slot") : null;
+  if (!container) return desktopSidebar;
+
+  return createPortal(desktopSidebar, container);
 }

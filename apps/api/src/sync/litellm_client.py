@@ -263,6 +263,7 @@ class LiteLLMClient:
         tools: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         provider, target_model = cls._resolve_provider_and_model(model)
+        print(f"[SYNC-DEBUG] LLM routing: requested={model!r} → provider={provider!r}, model={target_model!r}", flush=True)
         request_messages = messages or [
             {"role": "system", "content": prompt},
             {"role": "user", "content": user_message},
@@ -311,6 +312,7 @@ class LiteLLMClient:
                 provider=adapter.provider,
             )
         except LiteLLMClientError as exc:
+            print(f"[SYNC-DEBUG] POST error: {exc.message}", flush=True)
             if settings.SYNC_ENABLE_FALLBACK:
                 return cls._fallback(
                     prompt=prompt,
@@ -323,6 +325,7 @@ class LiteLLMClient:
         try:
             data = response.json()
         except ValueError as exc:
+            print(f"[SYNC-DEBUG] JSON parse error from {adapter.provider}: {exc}", flush=True)
             warning = f"Invalid JSON from {adapter.provider}, fallback enabled."
             if settings.SYNC_ENABLE_FALLBACK:
                 return cls._fallback(
@@ -340,6 +343,7 @@ class LiteLLMClient:
         try:
             return adapter.parse_response(data, target_model)
         except LiteLLMClientError as exc:
+            print(f"[SYNC-DEBUG] parse_response error: {exc.message}", flush=True)
             if settings.SYNC_ENABLE_FALLBACK:
                 return cls._fallback(
                     prompt=prompt,
@@ -414,12 +418,20 @@ class LiteLLMClient:
 
         target_model = (model or settings.SYNC_MODEL_BALANCED or "mistral-medium-latest").strip()
 
+        # 1. Explicit prefix like "gemini/gemini-3-flash" → split into provider + model
         if "/" in target_model:
             prefix, remainder = target_model.split("/", 1)
             normalized_prefix = prefix.strip().lower()
             if normalized_prefix in cls.PROVIDERS and remainder.strip():
                 return normalized_prefix, remainder.strip()
 
+        # 2. Look up provider from the model registry
+        from src.sync.model_registry import get_model_entry
+        entry = get_model_entry(target_model)
+        if entry and entry.provider in cls.PROVIDERS:
+            return entry.provider, target_model
+
+        # 3. Fallback to configured provider
         return configured_provider, target_model
 
     @classmethod

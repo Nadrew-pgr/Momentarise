@@ -7,14 +7,17 @@ import {
     useApplySyncRun,
     useUndoSyncRun,
     useSyncRunEvents,
+    useSyncRuns,
+    useSyncModels,
 } from "@/hooks/use-sync";
 import { useAuthStore } from "@/lib/store";
-import { Header } from "@/components/ai-elements-native/header";
-import { EmptyState } from "@/components/ai-elements-native/empty-state";
-import { Conversation } from "@/components/ai-elements-native/conversation";
-import { Composer } from "@/components/ai-elements-native/composer";
-import { ActionsRail } from "@/components/ai-elements-native/actions-rail";
-import { HistoryDrawer } from "@/components/ai-elements-native/history-drawer";
+import { Header } from "@/components/react-native-ai-elements/header";
+import { EmptyState } from "@/components/react-native-ai-elements/empty-state";
+import { Conversation } from "@/components/react-native-ai-elements/conversation";
+import { Composer } from "@/components/react-native-ai-elements/composer";
+import { ActionsRail } from "@/components/react-native-ai-elements/actions-rail";
+import { HistoryDrawer } from "@/components/react-native-ai-elements/history-drawer";
+import { ModelSelector } from "@/components/react-native-ai-elements/model-selector";
 
 export default function SyncScreen() {
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -23,14 +26,18 @@ export default function SyncScreen() {
     const [input, setInput] = useState("");
     const [streamingText, setStreamingText] = useState("");
     const [runId, setRunId] = useState<string | null>(null);
+    const [selectedModel, setSelectedModel] = useState("auto");
     const [activeToolName, setActiveToolName] = useState<string | undefined>();
     const [pendingPreviews, setPendingPreviews] = useState<{ id: string }[]>([]);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+    const { data: syncModels = [] } = useSyncModels();
 
     const createRun = useCreateSyncRun();
     const applyRun = useApplySyncRun();
     const undoRun = useUndoSyncRun();
     const eventsQuery = useSyncRunEvents(runId);
+    const { data: historyRuns, isLoading: isHistoryLoading } = useSyncRuns(50);
 
 
 
@@ -105,8 +112,11 @@ export default function SyncScreen() {
         try {
             let currentRunId = runId;
             if (!currentRunId) {
-                // If there's missing payload for createRun, adjust as per your backend generic run creation
-                const run = await createRun.mutateAsync({} as any);
+                const run = await createRun.mutateAsync({
+                    mode: "guided",
+                    message: "",
+                    model: selectedModel || "auto",
+                } as any);
                 currentRunId = run.id;
                 setRunId(run.id);
             }
@@ -165,6 +175,7 @@ export default function SyncScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
             <Header
+                title="Sync"
                 onMenuPress={() => setIsDrawerOpen(true)}
                 onNewChatPress={() => {
                     setMessages([]);
@@ -172,6 +183,14 @@ export default function SyncScreen() {
                     setStreamingText("");
                 }}
             />
+            <View className="items-center py-1">
+                <ModelSelector
+                    models={syncModels}
+                    selectedModel={selectedModel}
+                    onModelChange={setSelectedModel}
+                    disabled={streamMutation.isPending}
+                />
+            </View>
             <KeyboardAvoidingView
                 className="flex-1"
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -218,6 +237,8 @@ export default function SyncScreen() {
                 isOpen={isDrawerOpen}
                 onClose={() => setIsDrawerOpen(false)}
                 currentRunId={runId}
+                runs={historyRuns ?? []}
+                isLoading={isHistoryLoading}
                 onSelectRun={(id) => {
                     setRunId(id);
                     setMessages([]); // Will be populated by eventsQuery

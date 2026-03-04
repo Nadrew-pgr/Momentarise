@@ -258,6 +258,25 @@ Incorrect imports for `get_workspace_id` and `get_current_user` in new API route
 
 ### Details
 - **Imports:** I assumed the paths for dependency properties like `get_current_user` and `get_workspace` (`src.core.security` and `src.api.context`) which actually reside under `src.core.deps`. This crashed `uvicorn` on startup. 
+
+---
+
+## [LRN-20260303-001] correction — Inbox/Capture product semantics (note directe, apply aval, restore interdit)
+**Logged**: 2026-03-03T12:00:00+01:00
+**Priority**: high
+**Status**: applied
+**Area**: product / inbox / capture
+
+### Summary
+Les décisions produit Inbox/Capture imposent une sémantique stricte: note créée = item direct dans Inbox, `Apply` exécute une action aval IA (pas une création d’item), suppression finale sans restore, et menu d’actions complet visible avec actions secondaires atténuées.
+
+### Details
+- Éviter de maintenir un flux \"process\" séparé qui recrée un item.
+- Éviter toute UX \"undo restore\" pour les captures supprimées.
+- Afficher l’ensemble du menu `...` avec statut visuel clair pour les actions non encore actives.
+
+### Suggested Action
+Conserver ces règles comme contrat produit de référence pour tous les prochains lots Inbox/Capture (web + mobile + API), et bloquer les regressions via tests de contrat (410 restore/process, apply sans duplication d’item).
 - **Database Modeling:** When declaring relationships to the `Workspace` table from the `Project` and `Series` SQLAlchemy models, I included the `Mapped[uuid.UUID]` definition but failed to attach explicitly the `ForeignKey("workspaces.id")` constraint. SQLAlchemy cannot magically infer these connections without the explicit FK declarations, leading to an ORM mapping failure. 
 
 ### Suggested Action

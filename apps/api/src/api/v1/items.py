@@ -25,7 +25,7 @@ from src.schemas.item import (
     UpdateItemRequest,
 )
 
-router = APIRouter(prefix="/items", tags=["items"])
+router = APIRouter(tags=["items"])
 
 
 async def _get_item_or_404(

@@ -36,6 +36,7 @@ from src.services.maps_provider import estimate_travel_minutes
 from src.sync.litellm_client import LiteLLMClient, LiteLLMClientError
 from src.sync.prompt_composer import PromptComposer, PromptComposerInput
 from src.sync.retrieval import RetrievalService
+from src.sync.model_registry import get_available_models as _registry_get_models, resolve_auto_model, get_model_entry
 from src.sync.sync_mutation_engine import (
     SyncMutationEngine,
     SyncMutationNotFoundError,
@@ -258,6 +259,13 @@ class SyncOrchestrator:
             preview_emitted = False
             final_output: dict[str, Any] | None = None
 
+            # Resolve the model (handles "auto" and unknown models)
+            print(f"[SYNC-DEBUG] run.selected_model={run.selected_model!r}", flush=True)
+            resolved_model = self.resolve_model(run.selected_model, feature="sync")
+            print(f"[SYNC-DEBUG] resolved_model={resolved_model!r}", flush=True)
+            if run.selected_model != resolved_model:
+                run.selected_model = resolved_model
+
             max_tool_loops = max(1, int(settings.SYNC_MAX_TOOL_LOOPS))
             tool_loop_count = 0
 
@@ -265,7 +273,7 @@ class SyncOrchestrator:
                 llm_output = await LiteLLMClient.complete(
                     prompt=system_prompt,
                     user_message=clean_message,
-                    model=run.selected_model,
+                    model=resolved_model,
                     messages=llm_messages,
                     tools=llm_tools if llm_tools else None,
                 )
@@ -1209,7 +1217,7 @@ class SyncOrchestrator:
         args: dict[str, Any],
         user_message: str,
     ) -> dict[str, Any]:
-        if tool_name == "calendar.events.range":
+        if tool_name == "calendar_events_range":
             from_at = self._parse_optional_datetime(args.get("from_at"))
             to_at = self._parse_optional_datetime(args.get("to_at"))
             if from_at is None or to_at is None:
@@ -1226,14 +1234,14 @@ class SyncOrchestrator:
                 "result_json": {"events": events, "from_at": from_at.isoformat(), "to_at": to_at.isoformat()},
             }
 
-        if tool_name == "calendar.preferences.get":
+        if tool_name == "calendar_preferences_get":
             preferences = await self._calendar_preferences_get()
             return {
                 "summary": "Calendar preferences loaded",
                 "result_json": preferences,
             }
 
-        if tool_name == "calendar.patterns.suggest":
+        if tool_name == "calendar_patterns_suggest":
             title = str(args.get("title") or "").strip() or user_message.strip()
             if not title:
                 raise SyncValidationError("calendar.patterns.suggest requires title")
@@ -1243,7 +1251,7 @@ class SyncOrchestrator:
                 "result_json": suggestion,
             }
 
-        if tool_name == "travel.estimate":
+        if tool_name == "travel_estimate":
             destination = str(args.get("destination") or "").strip()
             if not destination:
                 raise SyncValidationError("travel.estimate requires destination")
@@ -1255,7 +1263,7 @@ class SyncOrchestrator:
                 "result_json": estimate,
             }
 
-        if tool_name == "memory.search":
+        if tool_name == "memory_search":
             query = str(args.get("query") or user_message).strip()
             if not query:
                 raise SyncValidationError("memory.search requires a non-empty query")
@@ -1273,7 +1281,7 @@ class SyncOrchestrator:
                 "result_json": {"snippets": snippets},
             }
 
-        if tool_name == "item.preview":
+        if tool_name == "item_preview":
             preview = ToolExecutor.build_item_preview(args, user_message)
             return {
                 "summary": str(preview.get("summary") or "Preview generated"),
@@ -1281,7 +1289,7 @@ class SyncOrchestrator:
                 "preview": preview,
             }
 
-        if tool_name == "event.preview":
+        if tool_name == "event_preview":
             preview = ToolExecutor.build_event_preview(args, user_message)
             return {
                 "summary": str(preview.get("summary") or "Preview generated"),
@@ -1289,7 +1297,7 @@ class SyncOrchestrator:
                 "preview": preview,
             }
 
-        if tool_name == "inbox.transform.preview":
+        if tool_name == "inbox_transform_preview":
             preview = ToolExecutor.build_inbox_transform_preview(args, user_message)
             return {
                 "summary": str(preview.get("summary") or "Preview generated"),
@@ -1632,55 +1640,36 @@ class SyncOrchestrator:
         return SyncRunOut.model_validate(run)
 
     @staticmethod
-    def available_models() -> list[dict]:
-        balanced = settings.SYNC_MODEL_BALANCED
-        small = settings.SYNC_MODEL_SMALL
-        quality = settings.SYNC_MODEL_QUALITY
-        configured_provider = (settings.SYNC_LLM_PROVIDER or "mistral").strip().lower()
-        provider = (
-            configured_provider
-            if configured_provider in {"mistral", "openai", "anthropic", "gemini"}
-            else "mistral"
-        )
+    def available_models(*, feature: str = "sync") -> list[dict]:
+        """Return all models available for a given feature, filtered by API keys."""
+        models = _registry_get_models(feature=feature)
+        # Add is_default flag (the auto-route default for the free tier)
+        default_id = resolve_auto_model(feature, user_tier="free")
+        for model in models:
+            model["is_default"] = model["id"] == default_id
+        return models
 
-        return [
-            {
-                "id": small,
-                "provider": provider,
-                "label": "Small",
-                "is_default": False,
-                "capabilities": {
-                    "supports_tools": True,
-                    "supports_vision": False,
-                    "supports_json_schema": True,
-                    "max_context": 128000,
-                    "cost_hint": "fast",
-                },
-            },
-            {
-                "id": balanced,
-                "provider": provider,
-                "label": "Balanced",
-                "is_default": True,
-                "capabilities": {
-                    "supports_tools": True,
-                    "supports_vision": False,
-                    "supports_json_schema": True,
-                    "max_context": 128000,
-                    "cost_hint": "balanced",
-                },
-            },
-            {
-                "id": quality,
-                "provider": provider,
-                "label": "Quality",
-                "is_default": False,
-                "capabilities": {
-                    "supports_tools": True,
-                    "supports_vision": False,
-                    "supports_json_schema": True,
-                    "max_context": 128000,
-                    "cost_hint": "reasoning",
-                },
-            },
-        ]
+    @staticmethod
+    def resolve_model(
+        selected_model: str | None,
+        *,
+        feature: str = "sync",
+        user_tier: str = "free",
+    ) -> str:
+        """
+        Resolve the actual model ID to use.
+
+        Priority:
+        1. Explicit model selected by user (unless it's 'auto')
+        2. Auto routing based on feature + user tier
+        3. Fallback to .env defaults
+        """
+        if selected_model and selected_model.strip().lower() != "auto":
+            # Verify the model exists in the registry
+            entry = get_model_entry(selected_model)
+            if entry is not None:
+                return selected_model
+            # Unknown model — fall through to auto
+
+        # Auto mode: pick the best model for this feature × tier
+        return resolve_auto_model(feature, user_tier=user_tier)

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
   Bot,
@@ -20,6 +20,8 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
   SidebarHeader,
   SidebarRail,
   SidebarMenu,
@@ -40,8 +42,8 @@ import {
 import { NavMain } from "@/components/nav-main";
 import { NavFavorites } from "@/components/nav-favorites";
 import { NavWorkspaces } from "@/components/nav-workspaces";
-import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
+import { SettingsDialog } from "@/components/settings-dialog";
 
 function WorkspaceSwitcher() {
   const { t } = useTranslation();
@@ -124,9 +126,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     { title: t("nav.calendar"), url: "/calendar", icon: CalendarDays, isActive: pathname === "/calendar" },
   ], [t, pathname]);
 
-  const navSecondaryParams = useMemo(() => [
-    { title: "Settings", url: "/settings", icon: Settings2 },
-  ], []);
+
 
   const workspaceData = useMemo(() => {
     if (!meData?.active_workspace) return [];
@@ -157,7 +157,20 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavFavorites favorites={[]} />
         <NavWorkspaces workspaces={workspaceData} />
-        <NavSecondary items={navSecondaryParams} className="mt-auto" />
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SettingsDialog>
+                  <SidebarMenuButton size="sm">
+                    <Settings2 />
+                    <span>Settings</span>
+                  </SidebarMenuButton>
+                </SettingsDialog>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={{

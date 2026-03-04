@@ -15,7 +15,7 @@ import {
 import type React from "react";
 import { useMemo } from "react";
 
-import { EventGap, EventHeight } from "./constants";
+import { EventGap, EventHeight, WEEK_STARTS_ON } from "./constants";
 import {
   CALENDAR_DAY_CELL_CLASSES,
   CALENDAR_DAY_NUMBER_CLASSES,
@@ -59,15 +59,15 @@ export function MonthView({
   const days = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
-    const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    const calendarStart = startOfWeek(monthStart, { weekStartsOn: WEEK_STARTS_ON });
+    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: WEEK_STARTS_ON });
 
     return eachDayOfInterval({ end: calendarEnd, start: calendarStart });
   }, [currentDate]);
 
   const weekdays = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
-      const date = addDays(startOfWeek(new Date()), i);
+      const date = addDays(startOfWeek(new Date(), { weekStartsOn: WEEK_STARTS_ON }), i);
       return format(date, "EEE");
     });
   }, []);

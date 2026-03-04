@@ -21,6 +21,7 @@ export default function DashboardLayout({
         </div>
         <CaptureFab />
       </SidebarInset>
+      <div id="right-sidebar-slot" className="contents" />
     </SidebarProvider>
   );
 }

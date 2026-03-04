@@ -20,7 +20,7 @@ class ToolExecutor:
             {
                 "type": "function",
                 "function": {
-                    "name": "calendar.events.range",
+                    "name": "calendar_events_range",
                     "description": "Read scheduled events in a date/time range.",
                     "parameters": {
                         "type": "object",
@@ -36,7 +36,7 @@ class ToolExecutor:
             {
                 "type": "function",
                 "function": {
-                    "name": "calendar.preferences.get",
+                    "name": "calendar_preferences_get",
                     "description": "Read calendar preference defaults such as working hours.",
                     "parameters": {"type": "object", "properties": {}},
                 },
@@ -44,7 +44,7 @@ class ToolExecutor:
             {
                 "type": "function",
                 "function": {
-                    "name": "calendar.patterns.suggest",
+                    "name": "calendar_patterns_suggest",
                     "description": "Suggest default color and duration for a similar title from history.",
                     "parameters": {
                         "type": "object",
@@ -58,7 +58,7 @@ class ToolExecutor:
             {
                 "type": "function",
                 "function": {
-                    "name": "travel.estimate",
+                    "name": "travel_estimate",
                     "description": "Estimate travel time from origin to destination.",
                     "parameters": {
                         "type": "object",
@@ -74,7 +74,7 @@ class ToolExecutor:
             {
                 "type": "function",
                 "function": {
-                    "name": "memory.search",
+                    "name": "memory_search",
                     "description": "Search workspace memory by query.",
                     "parameters": {
                         "type": "object",
@@ -89,7 +89,7 @@ class ToolExecutor:
             {
                 "type": "function",
                 "function": {
-                    "name": "item.preview",
+                    "name": "item_preview",
                     "description": "Call this to show the user a structured application plan card (Apply/Cancel) for item create/update. Use this instead of describing the plan in plain text. Required for any item creation or modification intent.",
                     "parameters": {
                         "type": "object",
@@ -104,9 +104,9 @@ class ToolExecutor:
                                 "type": "string",
                                 "enum": ["draft", "captured", "processing", "ready", "applied", "archived"],
                             },
-                            "metadata": {"type": "object"},
-                            "blocks": {"type": "array"},
-                            "changes": {"type": "object"},
+                            "metadata": {"type": "object", "additionalProperties": True},
+                            "blocks": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
+                            "changes": {"type": "object", "additionalProperties": True},
                             "display_summary": {
                                 "type": "string",
                                 "description": "User-facing one-line or short text for the plan card (e.g. title, schedule, color, short description). Same style as your reply. Shown instead of raw parameters.",
@@ -118,7 +118,7 @@ class ToolExecutor:
             {
                 "type": "function",
                 "function": {
-                    "name": "event.preview",
+                    "name": "event_preview",
                     "description": "Call this to show the user a structured application plan card (Apply/Cancel) for event create/update/delete. Use this instead of describing the plan in plain text. Required for any calendar/scheduling or event modification intent.",
                     "parameters": {
                         "type": "object",
@@ -137,7 +137,7 @@ class ToolExecutor:
                                 "type": "string",
                                 "enum": ["sky", "amber", "violet", "rose", "emerald", "orange"],
                             },
-                            "changes": {"type": "object"},
+                            "changes": {"type": "object", "additionalProperties": True},
                             "display_summary": {
                                 "type": "string",
                                 "description": "User-facing one-line or short text for the plan card (e.g. title, schedule, color, short description). Same style as your reply. Shown instead of raw parameters.",
@@ -149,7 +149,7 @@ class ToolExecutor:
             {
                 "type": "function",
                 "function": {
-                    "name": "inbox.transform.preview",
+                    "name": "inbox_transform_preview",
                     "description": "Call this to show the user a structured application plan card (Apply/Cancel) for transforming an inbox capture into item or event. Use this instead of describing the plan in plain text. Required when the user wants to turn a capture into an item or calendar event.",
                     "parameters": {
                         "type": "object",
@@ -167,7 +167,7 @@ class ToolExecutor:
                                 "type": "string",
                                 "enum": ["sky", "amber", "violet", "rose", "emerald", "orange"],
                             },
-                            "metadata": {"type": "object"},
+                            "metadata": {"type": "object", "additionalProperties": True},
                             "display_summary": {
                                 "type": "string",
                                 "description": "User-facing one-line or short text for the plan card (e.g. title, schedule, color, short description). Same style as your reply. Shown instead of raw parameters.",

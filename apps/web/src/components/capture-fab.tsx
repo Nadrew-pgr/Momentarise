@@ -4,10 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { Bot, CalendarDays, Camera, FileText, Link2, Loader2, Mic, Plus, X } from "lucide-react";
+import { Bot, CalendarDays, Camera, FileImage, FileText, Link2, Loader2, Mic, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateCapture, useUploadCapture } from "@/hooks/use-inbox";
-import { useCreateItem } from "@/hooks/use-item";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,6 +33,7 @@ export function CaptureFab() {
   const [fabProximity, setFabProximity] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
   const fabRef = useRef<HTMLButtonElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -46,10 +46,9 @@ export function CaptureFab() {
 
   const createCapture = useCreateCapture();
   const uploadCapture = useUploadCapture();
-  const createItem = useCreateItem();
 
   const isHidden = pathname?.startsWith("/sync");
-  const isBusy = createCapture.isPending || uploadCapture.isPending || createItem.isPending || isRecording;
+  const isBusy = createCapture.isPending || uploadCapture.isPending || isRecording;
 
   const cleanupRecordingStream = useCallback(() => {
     if (recordingStreamRef.current) {
@@ -107,19 +106,19 @@ export function CaptureFab() {
     devLog("action_clicked", { key: "note" });
     setPendingActionKey("note");
     const title = `${t("pages.inbox.noteFallbackTitle")} ${new Date().toLocaleString()}`;
-    createItem.mutate(
+    createCapture.mutate(
       {
-        title,
-        kind: "note",
-        status: "draft",
-        metadata: { source: "web_fab", channel: "note" },
-        blocks: [],
+        raw_content: title,
+        source: "note",
+        capture_type: "text",
+        status: "ready",
+        metadata: { source: "web_fab", channel: "note", intent: "note" },
       },
       {
-        onSuccess: (item) => {
+        onSuccess: (created) => {
           setPendingActionKey(null);
           setFabOpen(false);
-          router.push(`/inbox/items/${item.id}`);
+          router.push(`/inbox/captures/${created.id}`);
         },
         onError: (error) => {
           setPendingActionKey(null);
@@ -127,7 +126,7 @@ export function CaptureFab() {
         },
       }
     );
-  }, [createItem, router, t]);
+  }, [createCapture, router, t]);
 
   const handleChooseFile = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -148,10 +147,10 @@ export function CaptureFab() {
           },
         },
         {
-          onSuccess: () => {
+          onSuccess: (created) => {
             setFabOpen(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
-            router.push("/inbox");
+            router.push(`/inbox/captures/${created.id}`);
           },
           onError: (error) => {
             devLog("upload_failed", { channel: "file", error: String(error) });
@@ -167,7 +166,7 @@ export function CaptureFab() {
     (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
-      devLog("upload_started", { channel: "photo", file_name: file.name });
+      devLog("upload_started", { channel: "camera", file_name: file.name });
       uploadCapture.mutate(
         {
           file,
@@ -175,20 +174,56 @@ export function CaptureFab() {
           source: "manual",
           metadata: {
             source: "web_fab",
-            channel: "photo",
+            channel: "camera",
+            intent: "scan_candidate",
+            photo_mode: "document_candidate",
             file_name: file.name,
             file_size: file.size,
             mime_type: file.type,
           },
         },
         {
-          onSuccess: () => {
+          onSuccess: (created) => {
             setFabOpen(false);
             if (photoInputRef.current) photoInputRef.current.value = "";
-            router.push("/inbox");
+            router.push(`/inbox/captures/${created.id}`);
           },
           onError: (error) => {
-            devLog("upload_failed", { channel: "photo", error: String(error) });
+            devLog("upload_failed", { channel: "camera", error: String(error) });
+            toast.error(error instanceof Error ? error.message : "Unable to upload photo");
+          },
+        }
+      );
+    },
+    [router, uploadCapture]
+  );
+
+  const handleChooseGallery = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      devLog("upload_started", { channel: "gallery", file_name: file.name });
+      uploadCapture.mutate(
+        {
+          file,
+          captureType: "photo",
+          source: "manual",
+          metadata: {
+            source: "web_fab",
+            channel: "gallery",
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          },
+        },
+        {
+          onSuccess: (created) => {
+            setFabOpen(false);
+            if (galleryInputRef.current) galleryInputRef.current.value = "";
+            router.push(`/inbox/captures/${created.id}`);
+          },
+          onError: (error) => {
+            devLog("upload_failed", { channel: "gallery", error: String(error) });
             toast.error(error instanceof Error ? error.message : "Unable to upload photo");
           },
         }
@@ -216,10 +251,10 @@ export function CaptureFab() {
           },
         },
         {
-          onSuccess: () => {
+          onSuccess: (created) => {
             setFabOpen(false);
             if (audioInputRef.current) audioInputRef.current.value = "";
-            router.push("/inbox");
+            router.push(`/inbox/captures/${created.id}`);
           },
           onError: (error) => {
             devLog("upload_failed", { channel: "voice_audio_file", error: String(error) });
@@ -239,6 +274,11 @@ export function CaptureFab() {
   const openPhotoPicker = useCallback(() => {
     devLog("picker_opened", { key: "photo" });
     photoInputRef.current?.click();
+  }, []);
+
+  const openGalleryPicker = useCallback(() => {
+    devLog("picker_opened", { key: "gallery" });
+    galleryInputRef.current?.click();
   }, []);
 
   const openAudioPicker = useCallback(() => {
@@ -279,9 +319,9 @@ export function CaptureFab() {
           },
         },
         {
-          onSuccess: () => {
+          onSuccess: (created) => {
             setFabOpen(false);
-            router.push("/inbox");
+            router.push(`/inbox/captures/${created.id}`);
           },
           onError: (error) => {
             devLog("upload_failed", { channel: "voice_media_recorder", error: String(error) });
@@ -401,7 +441,8 @@ export function CaptureFab() {
       return [
         { key: "note", icon: <FileText className="h-4 w-4" />, label: fr ? "Note" : "Note" },
         { key: "voice", icon: <Mic className="h-4 w-4" />, label: isRecording ? (fr ? "Stop" : "Stop") : fr ? "Parler" : "Voice" },
-        { key: "photo", icon: <Camera className="h-4 w-4" />, label: fr ? "Scan" : "Scan" },
+        { key: "photo", icon: <Camera className="h-4 w-4" />, label: fr ? "Caméra" : "Camera" },
+        { key: "gallery", icon: <FileImage className="h-4 w-4" />, label: fr ? "Galerie" : "Gallery" },
         { key: "file", icon: <FileText className="h-4 w-4" />, label: fr ? "Fichier" : "File" },
         { key: "link", icon: <Link2 className="h-4 w-4" />, label: fr ? "Lien" : "Link" },
         { key: "event", icon: <CalendarDays className="h-4 w-4" />, label: fr ? "Événement" : "Event" },
@@ -430,6 +471,10 @@ export function CaptureFab() {
         openPhotoPicker();
         return;
       }
+      if (key === "gallery") {
+        openGalleryPicker();
+        return;
+      }
       if (key === "file") {
         openFilePicker();
         return;
@@ -450,6 +495,7 @@ export function CaptureFab() {
     },
     [
       createQuickNote,
+      openGalleryPicker,
       isRecording,
       openFilePicker,
       openPhotoPicker,
@@ -549,6 +595,13 @@ export function CaptureFab() {
         accept="image/*"
         capture="environment"
         onChange={handleChoosePhoto}
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        className="hidden"
+        accept="image/*"
+        onChange={handleChooseGallery}
       />
       <input
         ref={audioInputRef}

@@ -4,7 +4,6 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useCreateCapture, useUploadCapture } from "@/hooks/use-inbox";
-import { useCreateItem } from "@/hooks/use-item";
 import { useAppToast, useEventSheet } from "@/lib/store";
 
 export type PickedAsset = {
@@ -44,12 +43,11 @@ export function useCreateActions(onClose: () => void) {
   const openEventSheet = useEventSheet((s) => s.open);
   const createCapture = useCreateCapture();
   const uploadCapture = useUploadCapture();
-  const createItem = useCreateItem();
   const showToast = useAppToast((s) => s.show);
   const [isRecording, setIsRecording] = useState(false);
   const voiceStopRef = useRef<null | (() => Promise<string | null>)>(null);
 
-  const isBusy = createCapture.isPending || uploadCapture.isPending || createItem.isPending;
+  const isBusy = createCapture.isPending || uploadCapture.isPending;
 
   const setUserError = useCallback(
     (message: string) => {
@@ -60,6 +58,7 @@ export function useCreateActions(onClose: () => void) {
 
   const uploadSelectedAsset = useCallback(
     (asset: PickedAsset, captureType: "voice" | "photo" | "file", channel: string) => {
+      const isCameraPhoto = captureType === "photo" && channel === "camera";
       uploadCapture.mutate(
         {
           uri: asset.uri,
@@ -73,12 +72,18 @@ export function useCreateActions(onClose: () => void) {
             file_name: asset.name,
             file_size: asset.size,
             mime_type: asset.mimeType,
+            ...(isCameraPhoto
+              ? {
+                intent: "scan_candidate",
+                photo_mode: "document_candidate",
+              }
+              : {}),
           },
         },
         {
-          onSuccess: () => {
+          onSuccess: (created) => {
             onClose();
-            router.push("/inbox");
+            router.push(`/inbox/${created.id}`);
           },
           onError: (error) => {
             setUserError(error instanceof Error ? error.message : t("create.error"));
@@ -145,25 +150,25 @@ export function useCreateActions(onClose: () => void) {
   }, [setUserError, t, uploadSelectedAsset]);
 
   const openNoteCapture = useCallback(() => {
-    createItem.mutate(
+    createCapture.mutate(
       {
-        title: t("create.defaultNoteTitle"),
-        kind: "note",
-        status: "draft",
-        metadata: { source: "mobile_fab", channel: "note" },
-        blocks: [],
+        raw_content: t("create.defaultNoteTitle"),
+        source: "note",
+        capture_type: "text",
+        status: "ready",
+        metadata: { source: "mobile_fab", channel: "note", intent: "note" },
       },
       {
-        onSuccess: (item) => {
+        onSuccess: (created) => {
           onClose();
-          router.push(`/items/${item.id}`);
+          router.push(`/inbox/${created.id}`);
         },
         onError: (error) => {
           setUserError(error instanceof Error ? error.message : t("create.error"));
         },
       }
     );
-  }, [createItem, onClose, router, setUserError, t]);
+  }, [createCapture, onClose, router, setUserError, t]);
 
   const openSync = useCallback(() => {
     onClose();
@@ -226,6 +231,52 @@ export function useCreateActions(onClose: () => void) {
         },
         "photo",
         "camera"
+      );
+    } catch (error) {
+      setUserError(error instanceof Error ? error.message : t("create.error"));
+    }
+  }, [setUserError, t, uploadSelectedAsset]);
+
+  const openPhotoLibraryCapture = useCallback(async () => {
+    try {
+      const moduleName = "expo-image-picker";
+      const ImagePicker = (await import(moduleName)) as {
+        requestMediaLibraryPermissionsAsync?: () => Promise<unknown>;
+        launchImageLibraryAsync?: (options?: Record<string, unknown>) => Promise<unknown>;
+      };
+      if (typeof ImagePicker.requestMediaLibraryPermissionsAsync === "function") {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!isPermissionGranted(permission)) {
+          setUserError("Media library permission is required to pick a photo.");
+          return;
+        }
+      }
+      if (typeof ImagePicker.launchImageLibraryAsync !== "function") {
+        throw new Error("Gallery picker unavailable");
+      }
+      const result = (await ImagePicker.launchImageLibraryAsync({ quality: 0.9 })) as {
+        canceled?: boolean;
+        assets?: Array<Record<string, unknown>>;
+      };
+      if (result?.canceled || !Array.isArray(result?.assets) || !result.assets.length) return;
+      const first = result.assets[0];
+      const uri = typeof first.uri === "string" ? first.uri : null;
+      if (!uri) {
+        setUserError("Invalid gallery image selection.");
+        return;
+      }
+      uploadSelectedAsset(
+        {
+          uri,
+          name:
+            typeof first.fileName === "string" && first.fileName.length
+              ? first.fileName
+              : `gallery-${Date.now()}.jpg`,
+          mimeType: typeof first.mimeType === "string" ? first.mimeType : "image/jpeg",
+          size: typeof first.fileSize === "number" ? first.fileSize : undefined,
+        },
+        "photo",
+        "gallery"
       );
     } catch (error) {
       setUserError(error instanceof Error ? error.message : t("create.error"));
@@ -411,6 +462,7 @@ export function useCreateActions(onClose: () => void) {
     openEvent,
     openFileCapture,
     openPhotoCapture,
+    openPhotoLibraryCapture,
     startVoiceCapture,
     stopVoiceCapture,
     handleVoiceCapture,

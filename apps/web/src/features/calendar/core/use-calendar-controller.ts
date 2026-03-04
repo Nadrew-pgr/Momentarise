@@ -2,7 +2,7 @@
 
 import { endOfMonth, endOfWeek, startOfMonth, startOfWeek } from "date-fns";
 import { differenceInSeconds } from "date-fns";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { EventOut } from "@momentarise/shared";
 import { useCalendarPreferences, useUpdateCalendarPreferences } from "@/hooks/use-calendar-preferences";
 import { useCreateEvent, useDeleteEvent, useEventsRange, useUpdateEvent } from "@/hooks/use-events";
@@ -26,8 +26,8 @@ function getInitialMonthRange(): { from: string; to: string } {
   const now = new Date();
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(monthStart);
-  const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   return {
     from: toLocalYYYYMMDD(gridStart),
     to: toLocalYYYYMMDD(gridEnd),
@@ -45,6 +45,7 @@ function resolveTitle(inputTitle: string | undefined, fallback: string): string 
 
 const DEFAULT_START_HOUR = 8;
 const DEFAULT_END_HOUR = 24;
+const EMPTY_EVENTS: EventOut[] = [];
 
 export function useCalendarController(): CalendarController {
   const [visibleRange, setVisibleRange] = useState<{ from: string; to: string }>(getInitialMonthRange);
@@ -65,7 +66,7 @@ export function useCalendarController(): CalendarController {
     isStopping,
   } = useTracking();
 
-  const events = useMemo<EventOut[]>(() => data?.events ?? [], [data?.events]);
+  const events = useMemo<EventOut[]>(() => data?.events ?? EMPTY_EVENTS, [data?.events]);
   const startHour = preferencesQuery.data?.start_hour ?? DEFAULT_START_HOUR;
   const endHour = preferencesQuery.data?.end_hour ?? DEFAULT_END_HOUR;
   const eventById = useMemo(() => {
@@ -82,7 +83,7 @@ export function useCalendarController(): CalendarController {
     );
   };
 
-  const createEvent = async ({
+  const createEvent = useCallback(async ({
     title,
     description,
     start,
@@ -107,9 +108,9 @@ export function useCalendarController(): CalendarController {
       series_id: seriesId,
       project_id: projectId,
     });
-  };
+  }, [createMutation]);
 
-  const updateEvent = async ({
+  const updateEvent = useCallback(async ({
     eventId,
     title,
     description,
@@ -149,26 +150,26 @@ export function useCalendarController(): CalendarController {
       await refetch();
       throw error;
     }
-  };
+  }, [updateMutation, eventById, refetch]);
 
-  const deleteEvent = async (eventId: string) => {
+  const deleteEvent = useCallback(async (eventId: string) => {
     try {
       await deleteMutation.mutateAsync(eventId);
     } catch (error) {
       await refetch();
       throw error;
     }
-  };
+  }, [deleteMutation, refetch]);
 
-  const startTracking = async (eventId: string) => {
+  const startTracking = useCallback(async (eventId: string) => {
     await startTrackingMutation(eventId);
-  };
+  }, [startTrackingMutation]);
 
-  const stopTracking = async (eventId: string) => {
+  const stopTracking = useCallback(async (eventId: string) => {
     await stopTrackingMutation(eventId);
-  };
+  }, [stopTrackingMutation]);
 
-  const updateCalendarPreferences = async (nextStartHour: number, nextEndHour: number) => {
+  const updateCalendarPreferences = useCallback(async (nextStartHour: number, nextEndHour: number) => {
     try {
       await updatePreferencesMutation.mutateAsync({
         start_hour: nextStartHour,
@@ -179,9 +180,9 @@ export function useCalendarController(): CalendarController {
       await preferencesQuery.refetch();
       throw error;
     }
-  };
+  }, [updatePreferencesMutation, preferencesQuery]);
 
-  return {
+  return useMemo(() => ({
     events,
     error: error ?? null,
     isLoading,
@@ -204,5 +205,28 @@ export function useCalendarController(): CalendarController {
     deleteEvent,
     startTracking,
     stopTracking,
-  };
+  }), [
+    events,
+    error,
+    isLoading,
+    isFetching,
+    createMutation.isPending,
+    updateMutation.isPending,
+    deleteMutation.isPending,
+    updatePreferencesMutation.isPending,
+    isStarting,
+    isStopping,
+    startHour,
+    endHour,
+    visibleRange,
+    refetch,
+    preferencesQuery,
+    onRangeChange,
+    updateCalendarPreferences,
+    createEvent,
+    updateEvent,
+    deleteEvent,
+    startTracking,
+    stopTracking,
+  ]);
 }

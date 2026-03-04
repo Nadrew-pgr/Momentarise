@@ -96,7 +96,7 @@ export function SyncChatShell() {
 
   const [runId, setRunId] = useState<string | null>(null);
   const [composerValue, setComposerValue] = useState("");
-  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("auto");
 
   const [messages, setMessages] = useState<SyncChatMessage[]>([]);
   const [pendingUserMessages, setPendingUserMessages] = useState<PendingUserMessage[]>([]);
@@ -355,27 +355,27 @@ export function SyncChatShell() {
         const items =
           Array.isArray(payload.items)
             ? payload.items.reduce<SyncSourcesEntry["items"]>((acc, item, index) => {
-                if (!item || typeof item !== "object") return acc;
-                const raw = item as {
-                  id?: unknown;
-                  title?: unknown;
-                  url?: unknown;
-                  snippet?: unknown;
-                };
-                const title = typeof raw.title === "string" ? raw.title : "";
-                const url = typeof raw.url === "string" ? raw.url : "";
-                if (!title || !url) return acc;
-                acc.push({
-                  id:
-                    typeof raw.id === "string" && raw.id.trim()
-                      ? raw.id
-                      : `${event.run_id}-${event.seq}-${index}`,
-                  title,
-                  url,
-                  snippet: typeof raw.snippet === "string" ? raw.snippet : undefined,
-                });
-                return acc;
-              }, [])
+              if (!item || typeof item !== "object") return acc;
+              const raw = item as {
+                id?: unknown;
+                title?: unknown;
+                url?: unknown;
+                snippet?: unknown;
+              };
+              const title = typeof raw.title === "string" ? raw.title : "";
+              const url = typeof raw.url === "string" ? raw.url : "";
+              if (!title || !url) return acc;
+              acc.push({
+                id:
+                  typeof raw.id === "string" && raw.id.trim()
+                    ? raw.id
+                    : `${event.run_id}-${event.seq}-${index}`,
+                title,
+                url,
+                snippet: typeof raw.snippet === "string" ? raw.snippet : undefined,
+              });
+              return acc;
+            }, [])
             : [];
         if (items.length === 0) break;
         appendSources({
@@ -461,10 +461,8 @@ export function SyncChatShell() {
   }, []);
 
   useEffect(() => {
-    if (selectedModel) return;
-    const fallback = models.find((model) => model.is_default)?.id ?? models[0]?.id;
-    if (!fallback) return;
-    setSelectedModel(fallback);
+    if (selectedModel && selectedModel !== "auto") return;
+    // Keep "auto" as the default — no need to forcibly pick a specific model
   }, [models, selectedModel]);
 
   useEffect(() => {
@@ -503,7 +501,13 @@ export function SyncChatShell() {
   ]);
 
   const mappedModels = useMemo(
-    () => models.map((model) => ({ id: model.id, label: model.label })),
+    () => models.map((model) => ({
+      id: model.id,
+      label: model.label,
+      provider: model.provider,
+      tier: model.tier,
+      reasoning_levels: model.reasoning_levels,
+    })),
     [models]
   );
 

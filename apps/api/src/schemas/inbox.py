@@ -5,7 +5,16 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 CaptureType = Literal["text", "voice", "photo", "link", "file", "share", "deeplink"]
-CaptureStatus = Literal["draft", "captured", "queued", "processing", "ready", "failed", "applied"]
+CaptureStatus = Literal[
+    "draft",
+    "captured",
+    "queued",
+    "processing",
+    "ready",
+    "failed",
+    "applied",
+    "archived",
+]
 CaptureActionType = Literal[
     "create_event",
     "create_task",
@@ -27,6 +36,7 @@ CaptureCategory = Literal[
 CaptureActor = Literal["user", "sync", "system"]
 CaptureBadgeKind = Literal["type", "category", "actor", "tag", "status"]
 ItemKind = Literal["note", "objective", "task", "resource"]
+TreatedBucket = Literal["untreated", "treated"]
 
 
 class CaptureActionSuggestionOut(BaseModel):
@@ -48,10 +58,16 @@ class CaptureBadgeOut(BaseModel):
 
 class InboxCaptureOut(BaseModel):
     id: uuid.UUID
+    item_id: uuid.UUID | None = None
     raw_content: str
     source: str | None = None
+    source_type: str = "text"
     capture_type: CaptureType
     status: CaptureStatus
+    pipeline_state: CaptureStatus = "captured"
+    treated_bucket: TreatedBucket = "untreated"
+    agent_hint: str | None = None
+    coming_soon_capabilities: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(
         alias="meta",
         serialization_alias="metadata",
@@ -60,7 +76,7 @@ class InboxCaptureOut(BaseModel):
     primary_action: CaptureActionSuggestionOut | None = None
     requires_review: bool = False
     archived: bool = False
-    archived_reason: Literal["applied", "deleted"] | None = None
+    archived_reason: Literal["applied", "deleted", "archived"] | None = None
     deleted_at: datetime | None = None
     category: CaptureCategory | None = None
     actor: CaptureActor = "user"
@@ -73,6 +89,7 @@ class InboxCaptureOut(BaseModel):
 
 class InboxListResponse(BaseModel):
     captures: list[InboxCaptureOut]
+    entries: list[InboxCaptureOut] = Field(default_factory=list)
 
 
 class CreateCaptureRequest(BaseModel):

@@ -10,7 +10,6 @@ import type {
   CaptureUploadResponse,
   CreateCaptureRequest,
   InboxListResponse,
-  ProcessCaptureResponse,
   ReprocessCaptureResponse,
 } from "@momentarise/shared";
 import {
@@ -24,19 +23,23 @@ import {
   captureUploadResponseSchema,
   createCaptureRequestSchema,
   inboxListResponseSchema,
-  processCaptureResponseSchema,
   reprocessCaptureResponseSchema,
 } from "@momentarise/shared";
 import { apiFetch, readApiError } from "@/lib/api";
 
-export function useInbox(options?: { includeArchived?: boolean }) {
+export type InboxBucket = "all" | "untreated" | "treated";
+
+export function useInbox(options?: { includeArchived?: boolean; bucket?: InboxBucket }) {
   const includeArchived = options?.includeArchived ?? false;
+  const bucket = options?.bucket ?? "all";
   return useQuery<InboxListResponse>({
-    queryKey: ["inbox", includeArchived],
+    queryKey: ["inbox", includeArchived, bucket],
     queryFn: async () => {
-      const res = await apiFetch(
-        `/api/v1/inbox?include_archived=${includeArchived ? "true" : "false"}`
-      );
+      const qs = new URLSearchParams({
+        include_archived: includeArchived ? "true" : "false",
+        bucket,
+      });
+      const res = await apiFetch(`/api/v1/inbox?${qs.toString()}`);
       if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch inbox"));
       const data = await res.json();
       return inboxListResponseSchema.parse(data) as InboxListResponse;
@@ -80,7 +83,7 @@ export function useCreateCapture() {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(await readApiError(res, "Failed to create capture"));
-      return res.json() as Promise<{ id: string }>;
+      return res.json() as Promise<{ id: string; item_id?: string }>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inbox"] });
@@ -192,28 +195,19 @@ export function useReprocessCapture() {
   });
 }
 
-export function useProcessCapture() {
+export function useArchiveCapture() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      captureId,
-      title,
-    }: {
-      captureId: string;
-      title: string;
-    }) => {
-      const res = await apiFetch(`/api/v1/inbox/${captureId}/process`, {
+    mutationFn: async ({ captureId }: { captureId: string }) => {
+      const res = await apiFetch(`/api/v1/inbox/${captureId}/archive`, {
         method: "POST",
-        body: JSON.stringify({ title }),
       });
-      if (!res.ok) throw new Error(await readApiError(res, "Failed to process capture"));
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to archive capture"));
       const data = await res.json();
-      return processCaptureResponseSchema.parse(data) as ProcessCaptureResponse;
+      return captureActionResponseSchema.parse(data) as CaptureActionResponse;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inbox"] });
-      queryClient.invalidateQueries({ queryKey: ["item"] });
-      queryClient.invalidateQueries({ queryKey: ["items"] });
     },
   });
 }
@@ -226,24 +220,6 @@ export function useDeleteCapture() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error(await readApiError(res, "Failed to delete capture"));
-      const data = await res.json();
-      return captureActionResponseSchema.parse(data) as CaptureActionResponse;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inbox"] });
-      queryClient.invalidateQueries({ queryKey: ["items"] });
-    },
-  });
-}
-
-export function useRestoreCapture() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ captureId }: { captureId: string }) => {
-      const res = await apiFetch(`/api/v1/inbox/${captureId}/restore`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error(await readApiError(res, "Failed to restore capture"));
       const data = await res.json();
       return captureActionResponseSchema.parse(data) as CaptureActionResponse;
     },

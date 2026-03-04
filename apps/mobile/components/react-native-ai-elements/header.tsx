@@ -3,11 +3,12 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Menu, Plus } from 'lucide-react-native';
 
 interface HeaderProps {
+    title?: string;
     onMenuPress?: () => void;
     onNewChatPress?: () => void;
 }
 
-export function Header({ onMenuPress, onNewChatPress }: HeaderProps) {
+export function Header({ title = "Chat", onMenuPress, onNewChatPress }: HeaderProps) {
     return (
         <View className="flex-row items-center justify-between px-4 py-3 border-b border-border/50 bg-background/80 relative z-10">
             {/* New Chat */}
@@ -17,7 +18,7 @@ export function Header({ onMenuPress, onNewChatPress }: HeaderProps) {
 
             {/* Title / Logo */}
             <Text className="text-[17px] font-semibold tracking-tight text-foreground">
-                Sync
+                {title}
             </Text>
 
             {/* History Menu */}

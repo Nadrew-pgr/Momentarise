@@ -50,6 +50,10 @@
         "title": "Photo",
         "subtitle": "Raw capture (placeholder)"
       },
+      "gallery": {
+        "title": "Gallery",
+        "subtitle": "Pick an existing image"
+      },
       "voice": {
         "title": "Voice",
         "subtitle": "Raw capture (placeholder)"
@@ -140,7 +144,23 @@
         "file": "File",
         "link": "Link"
       },
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "segmentUntreated": "Untreated",
+      "segmentTreated": "Treated",
+      "archive": "Archive",
+      "itemActions": "Actions",
+      "reviewApply": "Review / Apply",
+      "confirmDeleteTitle": "Delete this item?",
+      "confirmDeleteBody": "This action is final. Restore is disabled for inbox captures.",
+      "comingSoonContextResearchTitle": "Coming soon",
+      "comingSoonContextResearchBody": "Context research, web research, advanced enrichments, and connectors are coming soon.",
+      "menuDuplicate": "Duplicate",
+      "menuMoveTo": "Move to",
+      "menuCopyLink": "Copy link",
+      "menuVersionHistory": "Version history",
+      "menuNotifications": "Notifications",
+      "menuAnalytics": "Analytics",
+      "menuImportExport": "Import / Export"
     },
     "item": {
       "details": "Details",
@@ -214,6 +234,12 @@
         "rose": "Rose",
         "emerald": "Emerald",
         "orange": "Orange"
+      },
+      "momentFields": {
+        "project": "Project",
+        "selectProject": "Select a project",
+        "series": "Series",
+        "selectSeries": "Select a series"
       }
     },
     "onboarding": {

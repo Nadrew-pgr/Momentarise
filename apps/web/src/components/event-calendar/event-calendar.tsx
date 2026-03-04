@@ -211,97 +211,95 @@ export function EventCalendar({
           shortcutsEnabled={!isEventDialogOpen}
         />
 
-        <div className="flex flex-1 overflow-hidden relative">
-          <div className="flex flex-1 flex-col overflow-auto min-w-0">
-            {view === "month" && (
-              <MonthView
-                currentDate={currentDate}
-                events={events}
-                onEventCreate={handleEventCreate}
-                onEventSelect={handleEventSelect}
-              />
-            )}
-            {view === "week" && (
-              <WeekView
-                currentDate={currentDate}
-                events={events}
-                onEventCreate={handleEventCreate}
-                onEventSelect={handleEventSelect}
-                startHour={startHour}
-                endHour={endHour}
-              />
-            )}
-            {view === "day" && (
-              <DayView
-                currentDate={currentDate}
-                events={events}
-                onEventCreate={handleEventCreate}
-                onEventSelect={handleEventSelect}
-                startHour={startHour}
-                endHour={endHour}
-              />
-            )}
-            {view === "agenda" && (
-              <AgendaView
-                currentDate={currentDate}
-                events={events}
-                onEventSelect={handleEventSelect}
-              />
-            )}
-          </div>
-
-          <CalendarEventDialog
-            key={
-              selectedEvent
-                ? `${selectedEvent.id || "new"}-${new Date(selectedEvent.start).toISOString()}-${new Date(selectedEvent.end).toISOString()}`
-                : "event-dialog-empty"
-            }
-            event={selectedEvent}
-            isOpen={isEventDialogOpen}
-            onClose={() => {
-              setIsEventDialogOpen(false);
-              setSelectedEvent(null);
-            }}
-            onDelete={handleEventDelete}
-            onSave={handleEventSave}
-            onToggleTracking={
-              onEventStartTracking && onEventStopTracking
-                ? (eventId) => {
-                  const event = events.find((e) => e.id === eventId);
-                  if (!event) return;
-                  if (event.isTracking) {
-                    void Promise.resolve(onEventStopTracking(eventId)).then(() => {
-                      setSelectedEvent((prev) =>
-                        prev
-                          ? {
-                            ...prev,
-                            isTracking: false,
-                          }
-                          : prev
-                      );
-                    }).catch((error: unknown) => {
-                      toast.error(error instanceof Error ? error.message : "Failed to update tracking");
-                    });
-                  } else {
-                    void Promise.resolve(onEventStartTracking(eventId)).then(() => {
-                      setSelectedEvent((prev) =>
-                        prev
-                          ? {
-                            ...prev,
-                            isTracking: true,
-                          }
-                          : prev
-                      );
-                    }).catch((error: unknown) => {
-                      toast.error(error instanceof Error ? error.message : "Failed to update tracking");
-                    });
-                  }
-                }
-                : undefined
-            }
-            isTrackingActionPending={isMutating}
-          />
+        <div className="flex flex-1 flex-col">
+          {view === "month" && (
+            <MonthView
+              currentDate={currentDate}
+              events={events}
+              onEventCreate={handleEventCreate}
+              onEventSelect={handleEventSelect}
+            />
+          )}
+          {view === "week" && (
+            <WeekView
+              currentDate={currentDate}
+              events={events}
+              onEventCreate={handleEventCreate}
+              onEventSelect={handleEventSelect}
+              startHour={startHour}
+              endHour={endHour}
+            />
+          )}
+          {view === "day" && (
+            <DayView
+              currentDate={currentDate}
+              events={events}
+              onEventCreate={handleEventCreate}
+              onEventSelect={handleEventSelect}
+              startHour={startHour}
+              endHour={endHour}
+            />
+          )}
+          {view === "agenda" && (
+            <AgendaView
+              currentDate={currentDate}
+              events={events}
+              onEventSelect={handleEventSelect}
+            />
+          )}
         </div>
+
+        <CalendarEventDialog
+          key={
+            selectedEvent
+              ? `${selectedEvent.id || "new"}-${new Date(selectedEvent.start).toISOString()}-${new Date(selectedEvent.end).toISOString()}`
+              : "event-dialog-empty"
+          }
+          event={selectedEvent}
+          isOpen={isEventDialogOpen}
+          onClose={() => {
+            setIsEventDialogOpen(false);
+            setSelectedEvent(null);
+          }}
+          onDelete={handleEventDelete}
+          onSave={handleEventSave}
+          onToggleTracking={
+            onEventStartTracking && onEventStopTracking
+              ? (eventId) => {
+                const event = events.find((e) => e.id === eventId);
+                if (!event) return;
+                if (event.isTracking) {
+                  void Promise.resolve(onEventStopTracking(eventId)).then(() => {
+                    setSelectedEvent((prev) =>
+                      prev
+                        ? {
+                          ...prev,
+                          isTracking: false,
+                        }
+                        : prev
+                    );
+                  }).catch((error: unknown) => {
+                    toast.error(error instanceof Error ? error.message : "Failed to update tracking");
+                  });
+                } else {
+                  void Promise.resolve(onEventStartTracking(eventId)).then(() => {
+                    setSelectedEvent((prev) =>
+                      prev
+                        ? {
+                          ...prev,
+                          isTracking: true,
+                        }
+                        : prev
+                    );
+                  }).catch((error: unknown) => {
+                    toast.error(error instanceof Error ? error.message : "Failed to update tracking");
+                  });
+                }
+              }
+              : undefined
+          }
+          isTrackingActionPending={isMutating}
+        />
       </CalendarDndProvider>
     </div>
   );

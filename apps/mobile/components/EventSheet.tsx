@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { ProjectSeriesSelector } from "@/components/ProjectSeriesSelector";
 
 const COLOR_OPTIONS: Array<{ value: EventColor; labelKey: string }> = [
   { value: "sky", labelKey: "pages.timeline.color.sky" },
@@ -89,6 +90,8 @@ export function EventSheet() {
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [allDay, setAllDay] = useState(false);
   const [color, setColor] = useState<EventColor>("sky");
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [seriesId, setSeriesId] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [eventId, setEventId] = useState<string | null>(null);
@@ -170,6 +173,8 @@ export function EventSheet() {
     setEndDate(base.end ?? new Date());
     setAllDay(base.allDay ?? false);
     setColor(base.color ?? "sky");
+    setProjectId(base.projectId ?? null);
+    setSeriesId(base.seriesId ?? null);
     setIsTracking(!!base.isTracking);
     setEventId(base.id ?? null);
     setUpdatedAt(base.updatedAt ?? null);
@@ -228,6 +233,8 @@ export function EventSheet() {
             end_at: end.toISOString(),
             color,
             last_known_updated_at: updatedAt ?? undefined,
+            project_id: projectId ?? undefined,
+            series_id: seriesId ?? undefined,
           },
         });
       } else {
@@ -236,6 +243,8 @@ export function EventSheet() {
           start_at: start.toISOString(),
           end_at: end.toISOString(),
           color,
+          project_id: projectId ?? undefined,
+          series_id: seriesId ?? undefined,
         });
       }
       onClose();
@@ -247,6 +256,8 @@ export function EventSheet() {
     color,
     createEvent,
     eventId,
+    projectId,
+    seriesId,
     onClose,
     title,
     updateEvent,
@@ -316,112 +327,118 @@ export function EventSheet() {
               showsVerticalScrollIndicator={false}
             >
               <View className="gap-3">
-              <View>
-                <Label>{t("pages.timeline.eventSheet.title")}</Label>
-                <Input value={title} onChangeText={setTitle} />
-              </View>
-
-              <View>
-                <Label>{t("pages.timeline.eventSheet.description")}</Label>
-                <Textarea value={description} onChangeText={setDescription} />
-              </View>
-
-              <View className="flex-row gap-3">
-                <Pressable onPress={() => openPicker("startDate", startDate)} className="flex-1">
-                  <Label>{t("pages.timeline.eventSheet.startDate")}</Label>
-                  <View className="rounded-md border border-input px-3 py-2">
-                    <UiText className="text-foreground">{startDate.toDateString()}</UiText>
-                  </View>
-                </Pressable>
-                {!allDay ? (
-                  <Pressable onPress={() => openPicker("startTime", startDate)} className="flex-1">
-                    <Label>{t("pages.timeline.eventSheet.startTime")}</Label>
-                    <View className="rounded-md border border-input px-3 py-2">
-                      <UiText className="text-foreground">
-                        {startDate.toLocaleTimeString(undefined, {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </UiText>
-                    </View>
-                  </Pressable>
-                ) : null}
-              </View>
-
-              <View className="flex-row gap-3">
-                <Pressable onPress={() => openPicker("endDate", endDate)} className="flex-1">
-                  <Label>{t("pages.timeline.eventSheet.endDate")}</Label>
-                  <View className="rounded-md border border-input px-3 py-2">
-                    <UiText className="text-foreground">{endDate.toDateString()}</UiText>
-                  </View>
-                </Pressable>
-                {!allDay ? (
-                  <Pressable onPress={() => openPicker("endTime", endDate)} className="flex-1">
-                    <Label>{t("pages.timeline.eventSheet.endTime")}</Label>
-                    <View className="rounded-md border border-input px-3 py-2">
-                      <UiText className="text-foreground">
-                        {endDate.toLocaleTimeString(undefined, {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </UiText>
-                    </View>
-                  </Pressable>
-                ) : null}
-              </View>
-
-              <View className="flex-row items-center justify-between rounded-lg border border-border px-3 py-2">
-                <View className="rounded-md border border-input px-3 py-2">
-                  <UiText className="text-foreground">
-                    {t("pages.timeline.eventSheet.allDay")}
-                  </UiText>
+                <View>
+                  <Label>{t("pages.timeline.eventSheet.title")}</Label>
+                  <Input value={title} onChangeText={setTitle} />
                 </View>
-                <Switch checked={allDay} onCheckedChange={(value) => setAllDay(value)} />
-              </View>
 
-              <View>
-                <Label>{t("pages.timeline.eventSheet.location")}</Label>
-                <Input value={location} onChangeText={setLocation} />
-              </View>
+                <View>
+                  <Label>{t("pages.timeline.eventSheet.description")}</Label>
+                  <Textarea value={description} onChangeText={setDescription} />
+                </View>
 
-              <View>
-                <Label>{t("pages.timeline.eventSheet.color")}</Label>
-                <View className="mt-2 flex-row flex-wrap gap-2">
-                  {COLOR_OPTIONS.map((option) => (
-                    <Pressable
-                      key={option.value}
-                      onPress={() => setColor(option.value)}
-                      className={`flex-row items-center gap-2 rounded-full border px-3 py-1.5 ${
-                        color === option.value ? "border-foreground" : "border-border"
-                      }`}
-                    >
-                      <View className={`h-3 w-3 rounded-full ${COLOR_CLASSES[option.value]}`} />
-                      <UiText className="text-xs text-foreground">
-                        {t(option.labelKey)}
-                      </UiText>
+                <View className="flex-row gap-3">
+                  <Pressable onPress={() => openPicker("startDate", startDate)} className="flex-1">
+                    <Label>{t("pages.timeline.eventSheet.startDate")}</Label>
+                    <View className="rounded-md border border-input px-3 py-2">
+                      <UiText className="text-foreground">{startDate.toDateString()}</UiText>
+                    </View>
+                  </Pressable>
+                  {!allDay ? (
+                    <Pressable onPress={() => openPicker("startTime", startDate)} className="flex-1">
+                      <Label>{t("pages.timeline.eventSheet.startTime")}</Label>
+                      <View className="rounded-md border border-input px-3 py-2">
+                        <UiText className="text-foreground">
+                          {startDate.toLocaleTimeString(undefined, {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </UiText>
+                      </View>
                     </Pressable>
-                  ))}
+                  ) : null}
                 </View>
-              </View>
 
-              {eventId ? (
-                <View className="flex-row items-center justify-between rounded-lg border border-border px-3 py-2">
-                  <UiText className="text-foreground">
-                    {isTracking ? t("pages.timeline.eventSheet.trackingOn") : t("pages.timeline.eventSheet.trackingOff")}
-                  </UiText>
-                  <Button
-                    variant={isTracking ? "destructive" : "default"}
-                    size="sm"
-                    onPress={toggleTracking}
-                    disabled={isBusy}
-                  >
-                    <UiText>
-                      {isTracking ? t("pages.timeline.stop") : t("pages.timeline.start")}
-                    </UiText>
-                  </Button>
+                <View className="flex-row gap-3">
+                  <Pressable onPress={() => openPicker("endDate", endDate)} className="flex-1">
+                    <Label>{t("pages.timeline.eventSheet.endDate")}</Label>
+                    <View className="rounded-md border border-input px-3 py-2">
+                      <UiText className="text-foreground">{endDate.toDateString()}</UiText>
+                    </View>
+                  </Pressable>
+                  {!allDay ? (
+                    <Pressable onPress={() => openPicker("endTime", endDate)} className="flex-1">
+                      <Label>{t("pages.timeline.eventSheet.endTime")}</Label>
+                      <View className="rounded-md border border-input px-3 py-2">
+                        <UiText className="text-foreground">
+                          {endDate.toLocaleTimeString(undefined, {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </UiText>
+                      </View>
+                    </Pressable>
+                  ) : null}
                 </View>
-              ) : null}
-            </View>
+
+                <View className="flex-row items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <View className="rounded-md border border-input px-3 py-2">
+                    <UiText className="text-foreground">
+                      {t("pages.timeline.eventSheet.allDay")}
+                    </UiText>
+                  </View>
+                  <Switch checked={allDay} onCheckedChange={(value) => setAllDay(value)} />
+                </View>
+
+                <View>
+                  <Label>{t("pages.timeline.eventSheet.location")}</Label>
+                  <Input value={location} onChangeText={setLocation} />
+                </View>
+
+                <ProjectSeriesSelector
+                  projectId={projectId}
+                  seriesId={seriesId}
+                  onProjectChange={setProjectId}
+                  onSeriesChange={setSeriesId}
+                />
+
+                <View>
+                  <Label>{t("pages.timeline.eventSheet.color")}</Label>
+                  <View className="mt-2 flex-row flex-wrap gap-2">
+                    {COLOR_OPTIONS.map((option) => (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setColor(option.value)}
+                        className={`flex-row items-center gap-2 rounded-full border px-3 py-1.5 ${color === option.value ? "border-foreground" : "border-border"
+                          }`}
+                      >
+                        <View className={`h-3 w-3 rounded-full ${COLOR_CLASSES[option.value]}`} />
+                        <UiText className="text-xs text-foreground">
+                          {t(option.labelKey)}
+                        </UiText>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
+                {eventId ? (
+                  <View className="flex-row items-center justify-between rounded-lg border border-border px-3 py-2">
+                    <UiText className="text-foreground">
+                      {isTracking ? t("pages.timeline.eventSheet.trackingOn") : t("pages.timeline.eventSheet.trackingOff")}
+                    </UiText>
+                    <Button
+                      variant={isTracking ? "destructive" : "default"}
+                      size="sm"
+                      onPress={toggleTracking}
+                      disabled={isBusy}
+                    >
+                      <UiText>
+                        {isTracking ? t("pages.timeline.stop") : t("pages.timeline.start")}
+                      </UiText>
+                    </Button>
+                  </View>
+                ) : null}
+              </View>
 
               <View className="mt-6 flex-row justify-between gap-2">
                 {eventId ? (

@@ -50,6 +50,10 @@
         "title": "Photo",
         "subtitle": "Capture brute (placeholder)"
       },
+      "gallery": {
+        "title": "Galerie",
+        "subtitle": "Choisir une image existante"
+      },
       "voice": {
         "title": "Audio",
         "subtitle": "Capture brute (placeholder)"
@@ -140,7 +144,23 @@
         "file": "Fichier",
         "link": "Lien"
       },
-      "cancel": "Annuler"
+      "cancel": "Annuler",
+      "segmentUntreated": "Non traitées",
+      "segmentTreated": "Traitées",
+      "archive": "Archiver",
+      "itemActions": "Actions",
+      "reviewApply": "Review / Apply",
+      "confirmDeleteTitle": "Supprimer cet élément ?",
+      "confirmDeleteBody": "Cette action est définitive. La restauration est désactivée pour les captures inbox.",
+      "comingSoonContextResearchTitle": "Bientôt",
+      "comingSoonContextResearchBody": "Recherche de contexte, recherche web, enrichissements avancés et connecteurs arrivent bientôt.",
+      "menuDuplicate": "Dupliquer",
+      "menuMoveTo": "Déplacer vers",
+      "menuCopyLink": "Copier le lien",
+      "menuVersionHistory": "Historique des versions",
+      "menuNotifications": "Notifications",
+      "menuAnalytics": "Analytics",
+      "menuImportExport": "Import / Export"
     },
     "item": {
       "details": "Détails",
@@ -214,6 +234,12 @@
         "rose": "Rose",
         "emerald": "Émeraude",
         "orange": "Orange"
+      },
+      "momentFields": {
+        "project": "Projet",
+        "selectProject": "Sélectionnez un projet",
+        "series": "Série",
+        "selectSeries": "Sélectionnez une série"
       }
     },
     "onboarding": {

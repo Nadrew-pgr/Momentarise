@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { View, Text, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator } from "react-native";
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from "react-native-reanimated"; import { MessageSquare, X, Clock3 } from "lucide-react-native";
-import { useSyncRuns } from "@/hooks/use-sync";
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from "react-native-reanimated";
+import { MessageSquare, X, Clock3 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface HistoryDrawerProps {
@@ -9,6 +9,8 @@ interface HistoryDrawerProps {
     onClose: () => void;
     onSelectRun: (runId: string) => void;
     currentRunId: string | null;
+    runs: any[];
+    isLoading?: boolean;
 }
 
 const { width } = Dimensions.get("window");
@@ -33,10 +35,9 @@ function runTitle(run: any): string {
     return run.id.slice(0, 8);
 }
 
-export function HistoryDrawer({ isOpen, onClose, onSelectRun, currentRunId }: HistoryDrawerProps) {
+export function HistoryDrawer({ isOpen, onClose, onSelectRun, currentRunId, runs = [], isLoading = false }: HistoryDrawerProps) {
     const insets = useSafeAreaInsets();
     const translateX = useSharedValue(DRAWER_WIDTH);
-    const { data: runs, isLoading } = useSyncRuns(50);
 
     useEffect(() => {
         translateX.value = withTiming(isOpen ? 0 : DRAWER_WIDTH, {

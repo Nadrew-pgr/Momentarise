@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     CAPTURE_AUTO_APPLY_ENABLED: bool = False
     CAPTURE_MISTRAL_PIPELINE_ENABLED: bool = True
     CAPTURE_SYNC_SUBAGENT_ENABLED: bool = True
+    CAPTURE_SUBAGENT_ROUTING_ENABLED: bool = True
+    CAPTURE_CONTEXT_ENRICHMENT_ENABLED: bool = False
+    CAPTURE_WEB_RESEARCH_ENABLED: bool = False
     CAPTURE_BADGES_V2_ENABLED: bool = True
 
     # Capture storage

@@ -25,8 +25,9 @@ AutomationStatus = Literal["draft", "active", "paused"]
 class SyncModelCapabilities(BaseModel):
     supports_tools: bool
     supports_vision: bool
-    supports_json_schema: bool
-    max_context: int | None = None
+    supports_reasoning: bool = False
+    supports_json_schema: bool = True
+    context_window: int | None = Field(None, alias="max_context")
     cost_hint: str | None = None
 
 
@@ -34,6 +35,9 @@ class SyncModelOut(BaseModel):
     id: str
     provider: str
     label: str
+    tier: str = "free"  # free | pro | ultra
+    features: list[str] = Field(default_factory=list)
+    reasoning_levels: list[str] | None = None  # e.g. ["low", "medium", "high"]
     is_default: bool = False
     capabilities: SyncModelCapabilities
 

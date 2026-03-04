@@ -25,16 +25,18 @@ async function parseApiError(res: Response, fallback: string): Promise<Error> {
 }
 
 export function useCalendarPreferences() {
-  return useQuery<CalendarPreferencesResponse>({
+  return useQuery<CalendarPreferencesResponse | null>({
     queryKey: ["calendar-preferences"],
     queryFn: async () => {
       const res = await fetchWithAuth("/api/preferences/calendar");
+      if (res.status === 404) return null;
       if (!res.ok) {
         throw await parseApiError(res, "Failed to fetch calendar preferences");
       }
       const data = await res.json();
       return calendarPreferencesResponseSchema.parse(data);
     },
+    retry: false,
   });
 }
 

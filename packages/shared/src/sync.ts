@@ -19,8 +19,10 @@ export const syncRunStatusSchema = z.enum([
 export const syncModelCapabilitiesSchema = z.object({
   supports_tools: z.boolean(),
   supports_vision: z.boolean(),
-  supports_json_schema: z.boolean(),
-  max_context: z.number().int().positive().nullable(),
+  supports_reasoning: z.boolean().default(false),
+  supports_json_schema: z.boolean().default(true),
+  context_window: z.number().int().positive().nullable().optional(),
+  max_context: z.number().int().positive().nullable().optional(),
   cost_hint: z.string().nullable(),
 });
 
@@ -28,6 +30,9 @@ export const syncModelSchema = z.object({
   id: z.string(),
   provider: z.string(),
   label: z.string(),
+  tier: z.string().default("free"),
+  features: z.array(z.string()).default([]),
+  reasoning_levels: z.array(z.string()).nullable().default(null),
   is_default: z.boolean().default(false),
   capabilities: syncModelCapabilitiesSchema,
 });

@@ -34,11 +34,16 @@ function AlertDialogOverlay({
           }),
           className
         )}
-        {...props}>
+        {...props}
+        asChild={Platform.OS !== 'web'}>
         <NativeOnlyAnimatedView
-          entering={FadeIn.duration(200).delay(50)}
+          entering={FadeIn.duration(200)}
           exiting={FadeOut.duration(150)}>
-          <>{children}</>
+          <NativeOnlyAnimatedView
+            entering={FadeIn.duration(200).delay(50)}
+            exiting={FadeOut.duration(150)}>
+            <>{children}</>
+          </NativeOnlyAnimatedView>
         </NativeOnlyAnimatedView>
       </AlertDialogPrimitive.Overlay>
     </FullWindowOverlay>
@@ -48,10 +53,12 @@ function AlertDialogOverlay({
 function AlertDialogContent({
   className,
   portalHost,
+  children,
   ...props
 }: AlertDialogPrimitive.ContentProps &
   React.RefAttributes<AlertDialogPrimitive.ContentRef> & {
     portalHost?: string;
+    children?: React.ReactNode;
   }) {
   return (
     <AlertDialogPortal hostName={portalHost}>
@@ -64,8 +71,9 @@ function AlertDialogContent({
             }),
             className
           )}
-          {...props}
-        />
+          {...props}>
+          <>{children}</>
+        </AlertDialogPrimitive.Content>
       </AlertDialogOverlay>
     </AlertDialogPortal>
   );

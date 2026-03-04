@@ -336,17 +336,6 @@ def _build_action_suggestions(capture: InboxCapture, semantic_text: str) -> list
             )
         )
 
-    if capture.capture_type in {"voice", "photo", "file", "link"}:
-        suggestions.append(
-            ActionSuggestionInput(
-                type="summarize",
-                label="Summarize",
-                confidence=0.75,
-                requires_confirm=False,
-                payload={"source_text": text[:4000]},
-            )
-        )
-
     if any(token in lowered for token in ["message", "reply", "répondre", "respond"]):
         suggestions.append(
             ActionSuggestionInput(
@@ -638,6 +627,8 @@ def _build_artifacts_summary(
                     key_clauses.append(snippet)
         if artifact.artifact_type == "vlm_analysis":
             vlm_text = artifact.content_json.get("text")
+            if isinstance(vlm_text, str) and vlm_text.strip() and not summary_text:
+                summary_text = vlm_text.strip()
             if isinstance(vlm_text, str) and "risk" in vlm_text.lower():
                 risks.append(vlm_text.strip()[:180])
 
@@ -711,7 +702,9 @@ async def store_upload_asset(
 def job_types_for_capture(capture_type: str) -> list[str]:
     if capture_type == "voice":
         return ["ingest", "transcribe_or_extract", "preprocess", "suggest_actions"]
-    if capture_type in {"photo", "file"}:
+    if capture_type == "photo":
+        return ["ingest", "vlm_enrich", "transcribe_or_extract", "preprocess", "suggest_actions"]
+    if capture_type == "file":
         return ["ingest", "transcribe_or_extract", "vlm_enrich", "preprocess", "suggest_actions"]
     return ["ingest", "preprocess", "suggest_actions"]
 
@@ -817,6 +810,86 @@ def _asset_file_name(asset: CaptureAsset) -> str:
     return Path(asset.storage_key).name
 
 
+_DOCUMENT_PHOTO_HINTS = (
+    "scan",
+    "document",
+    "doc",
+    "invoice",
+    "receipt",
+    "bill",
+    "contract",
+    "ticket",
+    "id",
+)
+
+
+_VLM_TEXT_PRESENT_HINTS = (
+    "text",
+    "document",
+    "invoice",
+    "receipt",
+    "contract",
+    "form",
+    "paragraph",
+    "table",
+    "letter",
+    "handwritten",
+    "statement",
+    "bill",
+)
+
+
+def _is_image_asset(asset: CaptureAsset) -> bool:
+    mime = (asset.mime_type or "").strip().lower()
+    return mime.startswith("image/")
+
+
+def _latest_artifact_text(artifacts: list[CaptureArtifact], artifact_type: str) -> str | None:
+    for artifact in reversed(artifacts):
+        if artifact.artifact_type != artifact_type:
+            continue
+        if not isinstance(artifact.content_json, dict):
+            continue
+        value = artifact.content_json.get("text")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _vlm_suggests_text(vlm_text: str | None) -> bool:
+    if not vlm_text:
+        return False
+    lowered = vlm_text.lower()
+    return any(token in lowered for token in _VLM_TEXT_PRESENT_HINTS)
+
+
+def _should_run_ocr_for_asset(
+    capture: InboxCapture,
+    asset: CaptureAsset,
+    *,
+    vlm_hint_text: str | None = None,
+) -> bool:
+    if capture.capture_type != "photo":
+        return True
+
+    mime = (asset.mime_type or "").strip().lower()
+    if mime in {"application/pdf", "image/tiff", "image/tif"}:
+        return True
+
+    meta = capture.meta if isinstance(capture.meta, dict) else {}
+    hint_values: list[str] = []
+    for key in ("intent", "channel", "photo_mode", "source_type", "source"):
+        value = meta.get(key)
+        if isinstance(value, str) and value.strip():
+            hint_values.append(value.strip().lower())
+
+    hint_values.append(_asset_file_name(asset).strip().lower())
+    joined = " ".join(hint_values)
+    if any(token in joined for token in _DOCUMENT_PHOTO_HINTS):
+        return True
+    return _vlm_suggests_text(vlm_hint_text)
+
+
 def _new_artifact(
     *,
     capture: InboxCapture,
@@ -865,6 +938,7 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
         provider_name = "heuristic"
         provider_model: str | None = None
         fallback_used: bool | None = None
+        job_detail: str | None = None
         try:
             job.status = "processing"
             job.started_at = job_started_at
@@ -885,6 +959,7 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
             elif job.job_type in {"transcribe_or_extract", "transcribe"}:
                 source_asset = assets[0] if assets else None
                 if source_asset is not None and capture.capture_type == "voice":
+                    job_detail = "voice:transcribe"
                     transcript_payload = transcribe_audio_file(
                         file_path=_asset_path(source_asset, settings.CAPTURE_STORAGE_DIR),
                         mime_type=source_asset.mime_type,
@@ -902,23 +977,44 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                         )
                     )
                 elif source_asset is not None:
-                    extract_payload = extract_text_from_file(
-                        file_path=_asset_path(source_asset, settings.CAPTURE_STORAGE_DIR),
-                        mime_type=source_asset.mime_type,
-                        file_name=_asset_file_name(source_asset),
-                        config=ocr_cfg,
+                    vlm_hint_text: str | None = None
+                    if capture.capture_type == "photo":
+                        artifacts = await _active_artifacts(db, capture)
+                        vlm_hint_text = _latest_artifact_text(artifacts, "vlm_analysis")
+                    run_ocr = _should_run_ocr_for_asset(
+                        capture,
+                        source_asset,
+                        vlm_hint_text=vlm_hint_text,
                     )
-                    provider_name = str(extract_payload.get("provider", "heuristic"))
-                    provider_model = str(extract_payload.get("model", "v0"))
-                    fallback_used = bool(extract_payload.get("fallback_used", False))
-                    db.add(
-                        _new_artifact(
-                            capture=capture,
-                            artifact_type="extracted_text",
-                            payload=extract_payload,
+                    if run_ocr:
+                        job_detail = (
+                            "photo_or_file:ocr_run_vlm_hint"
+                            if vlm_hint_text
+                            else "photo_or_file:ocr_run"
                         )
-                    )
+                        extract_payload = extract_text_from_file(
+                            file_path=_asset_path(source_asset, settings.CAPTURE_STORAGE_DIR),
+                            mime_type=source_asset.mime_type,
+                            file_name=_asset_file_name(source_asset),
+                            config=ocr_cfg,
+                        )
+                        provider_name = str(extract_payload.get("provider", "heuristic"))
+                        provider_model = str(extract_payload.get("model", "v0"))
+                        fallback_used = bool(extract_payload.get("fallback_used", False))
+                        db.add(
+                            _new_artifact(
+                                capture=capture,
+                                artifact_type="extracted_text",
+                                payload=extract_payload,
+                            )
+                        )
+                    else:
+                        job_detail = "photo_or_file:ocr_skip_non_document_photo"
+                        provider_name = "internal"
+                        provider_model = "ocr-skip-photo-v1"
+                        fallback_used = False
                 else:
+                    job_detail = "transcribe_or_extract:no_asset_fallback"
                     provider_name = "heuristic"
                     provider_model = "v0"
                     fallback_used = True
@@ -966,6 +1062,7 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
             elif job.job_type == "vlm_enrich":
                 source_asset = assets[0] if assets else None
                 if source_asset is None:
+                    job_detail = "vlm:no_asset_fallback"
                     provider_name = "heuristic"
                     provider_model = "v0"
                     fallback_used = True
@@ -982,7 +1079,13 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                             },
                         )
                     )
+                elif not _is_image_asset(source_asset):
+                    job_detail = "vlm:skip_non_image_asset"
+                    provider_name = "internal"
+                    provider_model = "vlm-skip-non-image-v1"
+                    fallback_used = False
                 else:
+                    job_detail = "vlm:analyze_image"
                     vlm_payload = analyze_visual_file(
                         file_path=_asset_path(source_asset, settings.CAPTURE_STORAGE_DIR),
                         mime_type=source_asset.mime_type,
@@ -1021,6 +1124,8 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                     fallback_used = False
 
                     analysis = await analyze_capture_with_sync_agent(
+                        db=db,
+                        capture=capture,
                         semantic_text=semantic_text,
                         capture_type=capture.capture_type,
                         metadata=capture.meta if isinstance(capture.meta, dict) else {},
@@ -1043,7 +1148,6 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                                     "create_item",
                                     "draft_reply",
                                     "pay_invoice",
-                                    "summarize",
                                     "review",
                                 }:
                                     continue
@@ -1093,6 +1197,14 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                                             },
                                             ensure_ascii=False,
                                         ),
+                                        "normalized_facts": analysis.get("normalized_facts", {}),
+                                        "questions_if_needed": analysis.get("questions_if_needed", []),
+                                        "agent_id": analysis.get("agent_id"),
+                                        "agent_name": analysis.get("agent_name"),
+                                        "modules": analysis.get("modules"),
+                                        "toolset_snapshot": analysis.get("toolset_snapshot"),
+                                        "retrieval_snapshot": analysis.get("retrieval_snapshot"),
+                                        "prompt_snapshot": analysis.get("prompt_snapshot"),
                                     },
                                     provider=str(analysis.get("provider", "sync")),
                                     model=str(analysis.get("model", settings.SYNC_MODEL_BALANCED)),
@@ -1130,6 +1242,22 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                         artifacts=artifacts,
                         analysis=analysis if settings.CAPTURE_SYNC_SUBAGENT_ENABLED else None,
                     ),
+                    "agent_trace": (
+                        {
+                            "agent_id": analysis.get("agent_id"),
+                            "agent_name": analysis.get("agent_name"),
+                            "modules": analysis.get("modules"),
+                            "toolset_snapshot": analysis.get("toolset_snapshot"),
+                            "retrieval_snapshot": analysis.get("retrieval_snapshot"),
+                        }
+                        if isinstance(analysis, dict)
+                        else current_meta.get("agent_trace")
+                    ),
+                    "agent_hint": (
+                        analysis.get("agent_name")
+                        if isinstance(analysis, dict) and isinstance(analysis.get("agent_name"), str)
+                        else current_meta.get("agent_hint")
+                    ),
                 }
             else:
                 provider_name = "internal"
@@ -1148,6 +1276,7 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                 model=provider_model,
                 duration_ms=duration_ms,
                 fallback_used=fallback_used,
+                detail=job_detail,
             )
             logger.info(
                 "capture.job.completed capture_id=%s job_id=%s job_type=%s provider=%s duration_ms=%s",

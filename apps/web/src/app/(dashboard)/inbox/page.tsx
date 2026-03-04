@@ -4,9 +4,10 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 import {
+  Archive,
   Camera,
+  Copy,
   FileText,
   Inbox as InboxIcon,
   Link2,
@@ -15,13 +16,14 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  WandSparkles,
 } from "lucide-react";
 import type { CaptureActionSuggestion, CaptureType } from "@momentarise/shared";
 import {
+  useArchiveCapture,
   useDeleteCapture,
   useInbox,
   useReprocessCapture,
-  useRestoreCapture,
 } from "@/hooks/use-inbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,14 +32,23 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type TypeFilterKey = "all" | "voice" | "photo" | "file" | "link";
 type SortKey = "newest" | "oldest" | "a2z" | "z2a";
 type SectionKey = "today" | "yesterday" | "earlier";
-type ViewMode = "active" | "archived";
+type InboxSegment = "untreated" | "treated";
 
 function captureIcon(type: CaptureType) {
   switch (type) {
@@ -86,37 +97,50 @@ function relativeTime(now: Date, date: Date, locale: string): string {
   return rtf.format(Math.round(deltaMs / 86400000), "day");
 }
 
+function actionableSuggestions(actions: CaptureActionSuggestion[]): CaptureActionSuggestion[] {
+  return actions.filter((action) => action.type !== "summarize");
+}
+
+function resolvePrimaryAction(capture: {
+  primary_action: CaptureActionSuggestion | null;
+  suggested_actions: CaptureActionSuggestion[];
+}): CaptureActionSuggestion | null {
+  const actions = actionableSuggestions(capture.suggested_actions);
+  if (!actions.length) return null;
+  if (capture.primary_action && capture.primary_action.type !== "summarize") {
+    const matched = actions.find((action) => action.key === capture.primary_action?.key);
+    if (matched) return matched;
+  }
+  return actions.find((action) => action.is_primary) ?? actions[0] ?? null;
+}
+
 export default function InboxPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilterKey>("all");
   const [sortOrder, setSortOrder] = useState<SortKey>("newest");
-  const [viewMode, setViewMode] = useState<ViewMode>("active");
-  const [showDeleted, setShowDeleted] = useState(false);
+  const [segment, setSegment] = useState<InboxSegment>("untreated");
+  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
 
   const { data: inboxData, isLoading, isError, error, refetch } = useInbox({
-    includeArchived: viewMode === "archived" || showDeleted,
+    includeArchived: false,
+    bucket: segment,
   });
   const reprocessCapture = useReprocessCapture();
+  const archiveCapture = useArchiveCapture();
   const deleteCapture = useDeleteCapture();
-  const restoreCapture = useRestoreCapture();
 
-  const captures = inboxData?.captures;
+  const captures = inboxData?.entries ?? inboxData?.captures ?? [];
 
   const filteredCaptures = useMemo(() => {
-    const source = captures ?? [];
     const query = search.trim().toLowerCase();
-    const list = source.filter((capture) => {
-      if (viewMode === "archived") {
-        if (!capture.archived) return false;
-      } else {
-        if (capture.archived && !(showDeleted && capture.archived_reason === "deleted")) return false;
-      }
+    const list = captures.filter((capture) => {
       if (typeFilter !== "all" && capture.capture_type !== typeFilter) return false;
 
       if (!query) return true;
-      const haystack = `${capture.raw_content} ${(capture.primary_action?.label ?? "").toString()}`;
+      const primaryAction = resolvePrimaryAction(capture);
+      const haystack = `${capture.raw_content} ${(primaryAction?.label ?? "").toString()}`;
       return haystack.toLowerCase().includes(query);
     });
     const cmp = (a: (typeof list)[0], b: (typeof list)[0]) => {
@@ -131,7 +155,7 @@ export default function InboxPage() {
     };
     list.sort(cmp);
     return list;
-  }, [captures, search, typeFilter, sortOrder, viewMode, showDeleted]);
+  }, [captures, search, sortOrder, typeFilter]);
 
   const grouped = useMemo(() => {
     const bySection: Record<SectionKey, typeof filteredCaptures> = {
@@ -152,8 +176,7 @@ export default function InboxPage() {
     [router]
   );
 
-  const isBusy =
-    reprocessCapture.isPending || deleteCapture.isPending || restoreCapture.isPending;
+  const isBusy = reprocessCapture.isPending || archiveCapture.isPending || deleteCapture.isPending;
   const inboxErrorMessage =
     error instanceof Error ? error.message : t("pages.inbox.loadError");
 
@@ -165,6 +188,20 @@ export default function InboxPage() {
         <div className="mb-4">
           <h1 className="text-2xl font-semibold tracking-tight">{t("pages.inbox.title")}</h1>
           <p className="text-muted-foreground mt-1 text-sm">{t("pages.inbox.subtitle")}</p>
+        </div>
+
+        <div className="mb-3 rounded-xl border border-border/70 bg-muted/40 px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("pages.inbox.comingSoonContextResearchTitle", {
+              defaultValue: "Coming soon",
+            })}
+          </p>
+          <p className="mt-1 text-sm text-foreground/85">
+            {t("pages.inbox.comingSoonContextResearchBody", {
+              defaultValue:
+                "Context research, web research, advanced enrichments, and connectors are coming soon.",
+            })}
+          </p>
         </div>
 
         <div className="relative mb-3">
@@ -181,20 +218,20 @@ export default function InboxPage() {
           <Button
             type="button"
             size="sm"
-            variant={viewMode === "active" ? "default" : "outline"}
+            variant={segment === "untreated" ? "default" : "outline"}
             className="shrink-0 rounded-full px-4"
-            onClick={() => setViewMode("active")}
+            onClick={() => setSegment("untreated")}
           >
-            {t("pages.inbox.viewActive")}
+            {t("pages.inbox.segmentUntreated", { defaultValue: "Untreated" })}
           </Button>
           <Button
             type="button"
             size="sm"
-            variant={viewMode === "archived" ? "default" : "outline"}
+            variant={segment === "treated" ? "default" : "outline"}
             className="shrink-0 rounded-full px-4"
-            onClick={() => setViewMode("archived")}
+            onClick={() => setSegment("treated")}
           >
-            {t("pages.inbox.viewArchived")}
+            {t("pages.inbox.segmentTreated", { defaultValue: "Treated" })}
           </Button>
           {(["all", "voice", "photo", "file", "link"] as TypeFilterKey[]).map((filter) => (
             <Button
@@ -215,7 +252,9 @@ export default function InboxPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <span className="text-muted-foreground px-2 py-1.5 text-xs font-medium">Sort</span>
+              <DropdownMenuLabel>
+                {t("pages.inbox.sortLabel", { defaultValue: "Sort" })}
+              </DropdownMenuLabel>
               <DropdownMenuItem onClick={() => setSortOrder("newest")}>
                 {t("pages.inbox.sortNewest")}
               </DropdownMenuItem>
@@ -227,10 +266,6 @@ export default function InboxPage() {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setSortOrder("z2a")}>
                 {t("pages.inbox.sortZ2A")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setShowDeleted((v) => !v)}>
-                {showDeleted ? t("pages.inbox.hideDeleted") : t("pages.inbox.showDeleted")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -279,9 +314,9 @@ export default function InboxPage() {
                         t("pages.inbox.captureFallbackTitle", { type: capture.capture_type });
                       const subtitle =
                         previewText(capture.raw_content) || t("pages.inbox.emptyCapture");
-                      const suggestions = capture.suggested_actions.slice(0, 3);
                       const createdAt = new Date(capture.created_at);
-                      const canActOnCapture = !capture.archived && viewMode === "active";
+                      const primaryAction = resolvePrimaryAction(capture);
+                      const canActOnCapture = !capture.archived;
                       return (
                         <article
                           key={capture.id}
@@ -318,16 +353,11 @@ export default function InboxPage() {
                                       {badge.label}
                                     </Badge>
                                   ))}
-                                  {capture.status === "applied" ? (
-                                    <Badge variant="secondary" className="inline-flex items-center leading-tight">
-                                      {t("pages.inbox.badgeApplied")}
-                                    </Badge>
-                                  ) : null}
-                                  {capture.archived_reason === "deleted" ? (
-                                    <Badge variant="outline" className="inline-flex items-center leading-tight">
-                                      {t("pages.inbox.badgeDeleted")}
-                                    </Badge>
-                                  ) : null}
+                                  <Badge variant="outline" className="inline-flex items-center leading-tight">
+                                    {capture.treated_bucket === "treated"
+                                      ? t("pages.inbox.segmentTreated", { defaultValue: "Treated" })
+                                      : t("pages.inbox.segmentUntreated", { defaultValue: "Untreated" })}
+                                  </Badge>
                                 </div>
                               </div>
                             </div>
@@ -336,7 +366,7 @@ export default function InboxPage() {
                             </p>
                           </div>
 
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <Button
                               size="sm"
                               variant="outline"
@@ -345,68 +375,96 @@ export default function InboxPage() {
                             >
                               {t("pages.inbox.openCapture")}
                             </Button>
-                            {canActOnCapture
-                              ? suggestions.map((action) => (
-                                <Button
-                                  key={action.key}
-                                  size="sm"
-                                  variant={action.is_primary ? "default" : "outline"}
-                                  onClick={() => handleCtaClick(capture.id, action)}
-                                  disabled={isBusy}
-                                >
-                                  {action.label}
+                            {canActOnCapture && primaryAction ? (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleCtaClick(capture.id, primaryAction)}
+                                disabled={isBusy}
+                              >
+                                <WandSparkles className="mr-1 h-3.5 w-3.5" />
+                                {primaryAction.label}
+                              </Button>
+                            ) : null}
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" disabled={isBusy}>
+                                  <MoreHorizontal className="h-4 w-4" />
                                 </Button>
-                              ))
-                              : null}
-
-                            {canActOnCapture && capture.status === "failed" ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => reprocessCapture.mutate({ captureId: capture.id })}
-                                disabled={isBusy}
-                              >
-                                <RefreshCw className="mr-1 h-3.5 w-3.5" />
-                                {t("pages.inbox.reprocess")}
-                              </Button>
-                            ) : null}
-
-                            {canActOnCapture ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                  deleteCapture.mutate(
-                                    { captureId: capture.id },
-                                    {
-                                      onSuccess: () => {
-                                        toast(t("pages.item.deleted"), {
-                                          action: {
-                                            label: t("pages.item.undoDelete"),
-                                            onClick: () =>
-                                              restoreCapture.mutate({ captureId: capture.id }),
-                                          },
-                                        });
-                                      },
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>
+                                  {t("pages.inbox.itemActions", { defaultValue: "Actions" })}
+                                </DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => router.push(`/inbox/captures/${capture.id}`)}>
+                                  {t("pages.inbox.openCapture")}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    if (primaryAction) {
+                                      handleCtaClick(capture.id, primaryAction);
                                     }
-                                  )
-                                }
-                                disabled={isBusy}
-                              >
-                                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                {t("pages.item.delete")}
-                              </Button>
-                            ) : null}
-                            {viewMode === "archived" && capture.archived_reason === "deleted" ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => restoreCapture.mutate({ captureId: capture.id })}
-                                disabled={isBusy}
-                              >
-                                {t("pages.item.undoDelete")}
-                              </Button>
-                            ) : null}
+                                  }}
+                                  disabled={!primaryAction || !canActOnCapture}
+                                >
+                                  {t("pages.inbox.reviewApply", { defaultValue: "Review / Apply" })}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => reprocessCapture.mutate({ captureId: capture.id })}
+                                  disabled={!canActOnCapture || capture.status !== "failed"}
+                                >
+                                  <RefreshCw className="mr-1 h-3.5 w-3.5" />
+                                  {t("pages.inbox.reprocess")}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => archiveCapture.mutate({ captureId: capture.id })}
+                                  disabled={!canActOnCapture}
+                                >
+                                  <Archive className="mr-1 h-3.5 w-3.5" />
+                                  {t("pages.inbox.archive", { defaultValue: "Archive" })}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setDeleteCandidateId(capture.id)}
+                                  disabled={!canActOnCapture}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                  {t("pages.item.delete")}
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator />
+
+                                <DropdownMenuItem disabled className="opacity-60">
+                                  {t("pages.inbox.menuDuplicate", { defaultValue: "Duplicate" })}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled className="opacity-60">
+                                  {t("pages.inbox.menuMoveTo", { defaultValue: "Move to" })}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled className="opacity-60">
+                                  <Copy className="mr-1 h-3.5 w-3.5" />
+                                  {t("pages.inbox.menuCopyLink", { defaultValue: "Copy link" })}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled className="opacity-60">
+                                  {t("pages.inbox.menuVersionHistory", {
+                                    defaultValue: "Version history",
+                                  })}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled className="opacity-60">
+                                  {t("pages.inbox.menuNotifications", {
+                                    defaultValue: "Notifications",
+                                  })}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled className="opacity-60">
+                                  {t("pages.inbox.menuAnalytics", { defaultValue: "Analytics" })}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled className="opacity-60">
+                                  {t("pages.inbox.menuImportExport", {
+                                    defaultValue: "Import / Export",
+                                  })}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </article>
                       );
@@ -418,6 +476,41 @@ export default function InboxPage() {
           </div>
         )}
       </main>
+
+      <Dialog open={Boolean(deleteCandidateId)} onOpenChange={(open) => !open && setDeleteCandidateId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t("pages.inbox.confirmDeleteTitle", { defaultValue: "Delete this item?" })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("pages.inbox.confirmDeleteBody", {
+                defaultValue: "This action is final. Restore is disabled for inbox captures.",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteCandidateId(null)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!deleteCandidateId) return;
+                deleteCapture.mutate(
+                  { captureId: deleteCandidateId },
+                  {
+                    onSettled: () => setDeleteCandidateId(null),
+                  }
+                );
+              }}
+              disabled={isBusy}
+            >
+              {t("pages.item.delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

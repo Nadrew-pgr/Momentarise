@@ -11,7 +11,7 @@ import {
 import { useSegments } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { BlurView } from "expo-blur";
-import { Bot, Calendar, Camera, FileText, Link2, Mic, X } from "lucide-react-native";
+import { Bot, Calendar, Camera, FileImage, FileText, Link2, Mic, X } from "lucide-react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -32,7 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-const ACTION_KEYS = ["note", "voice", "photo", "file", "link", "event", "sync"] as const;
+const ACTION_KEYS = ["note", "voice", "photo", "gallery", "file", "link", "event", "sync"] as const;
 const RADIUS = 110;
 const BUTTON_SIZE = 56;
 const STAGGER_MS = 15;
@@ -104,6 +104,7 @@ export function CaptureFab() {
     openEvent,
     openFileCapture,
     openPhotoCapture,
+    openPhotoLibraryCapture,
     handleVoiceCapture,
     submitLinkCapture,
     isBusy,
@@ -162,6 +163,11 @@ export function CaptureFab() {
         close();
         return;
       }
+      if (key === "gallery") {
+        void openPhotoLibraryCapture();
+        close();
+        return;
+      }
       if (key === "file") {
         void openFileCapture();
         close();
@@ -187,6 +193,7 @@ export function CaptureFab() {
       openFileCapture,
       openNoteCapture,
       openPhotoCapture,
+      openPhotoLibraryCapture,
       openSync,
     ]
   );
@@ -203,6 +210,7 @@ export function CaptureFab() {
     note: t("create.options.note.title"),
     voice: isRecording ? (fr ? "Arrêter" : "Stop") : t("create.options.voice.title"),
     photo: t("create.options.photo.title"),
+    gallery: t("create.options.gallery.title"),
     file: t("create.options.file.title"),
     link: t("create.options.link.title"),
     event: t("create.options.event.title"),
@@ -213,6 +221,7 @@ export function CaptureFab() {
     note: <FileText size={24} color="#171717" />,
     voice: <Mic size={24} color="#171717" />,
     photo: <Camera size={24} color="#171717" />,
+    gallery: <FileImage size={24} color="#171717" />,
     file: <FileText size={24} color="#171717" />,
     link: <Link2 size={24} color="#171717" />,
     event: <Calendar size={24} color="#171717" />,
