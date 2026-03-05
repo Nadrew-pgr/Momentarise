@@ -3,7 +3,11 @@
   "private": true,
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "lane:check": "node scripts/check-lane-boundary.mjs"
+    "lane:check": "node scripts/check-lane-boundary.mjs",
+    "mobile:start": "npm run start -w apps/mobile",
+    "mobile:ios": "npm run ios -w apps/mobile",
+    "mobile:android": "npm run android -w apps/mobile",
+    "mobile:web": "npm run web -w apps/mobile"
   },
   "devDependencies": {
     "tailwindcss": "^4"
