@@ -27,6 +27,7 @@ import {
   usePreviewCapture,
   useReprocessCapture,
 } from "@/hooks/use-inbox";
+import { useItem } from "@/hooks/use-item";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+const NOTE_SUMMARY_MIN_CHARS = 180;
 
 function captureIcon(type: string) {
   switch (type) {
@@ -80,15 +83,69 @@ function readArtifactText(artifact: CaptureArtifactOut): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function pickSummary(artifacts: CaptureArtifactOut[]): string {
-  const preferred = ["summary", "transcript", "extracted_text"];
+function findLatestArtifact(artifacts: CaptureArtifactOut[], artifactType: string): CaptureArtifactOut | null {
+  for (let index = artifacts.length - 1; index >= 0; index -= 1) {
+    const artifact = artifacts[index];
+    if (artifact.artifact_type === artifactType) {
+      return artifact;
+    }
+  }
+  return null;
+}
+
+function pickAiSummaryText(artifacts: CaptureArtifactOut[]): string {
+  const preferred = ["summary", "preprocess_summary", "vlm_analysis"];
   for (const artifactType of preferred) {
-    const found = artifacts.find((artifact) => artifact.artifact_type === artifactType);
-    if (!found) continue;
-    const text = readArtifactText(found);
+    const artifact = findLatestArtifact(artifacts, artifactType);
+    if (!artifact) continue;
+    const text = readArtifactText(artifact);
     if (text) return text;
   }
   return "";
+}
+
+function pickTranscriptText(artifacts: CaptureArtifactOut[]): string {
+  const transcript = findLatestArtifact(artifacts, "transcript");
+  if (!transcript) return "";
+  return readArtifactText(transcript);
+}
+
+function extractRichText(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+  const current = node as Record<string, unknown>;
+  const ownText = typeof current.text === "string" ? current.text : "";
+  const children = Array.isArray(current.content)
+    ? current.content.map((child) => extractRichText(child)).join(" ")
+    : "";
+  return `${ownText} ${children}`.trim();
+}
+
+function blocksPreview(blocks: unknown): string {
+  const compact = blocksPlainText(blocks);
+  if (!compact) return "";
+  return compact.length > 220 ? `${compact.slice(0, 220)}...` : compact;
+}
+
+function blocksPlainText(blocks: unknown): string {
+  if (!Array.isArray(blocks)) return "";
+  return blocks
+    .map((entry) => extractRichText(entry))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function captureLooksLikeNote(capture: {
+  capture_type: string;
+  source?: string | null;
+  metadata?: Record<string, unknown>;
+}): boolean {
+  if (capture.capture_type !== "text") return false;
+  const source = String(capture.source || "").trim().toLowerCase();
+  const metadata = capture.metadata ?? {};
+  const intent = String(metadata.intent ?? "").trim().toLowerCase();
+  const channel = String(metadata.channel ?? "").trim().toLowerCase();
+  return source === "note" || intent === "note" || channel === "note" || metadata.note_intent === true;
 }
 
 function formatBytes(value: number): string {
@@ -132,12 +189,15 @@ export default function InboxCaptureDetailPage() {
   const reprocessCapture = useReprocessCapture();
 
   const capture = data?.capture ?? null;
-  const assets = data?.assets ?? [];
-  const artifacts = data?.artifacts ?? [];
-  const pipelineTrace = data?.pipeline_trace ?? [];
-  const artifactsSummary = data?.artifacts_summary ?? {};
-  const summary = useMemo(() => pickSummary(artifacts), [artifacts]);
+  const assets = useMemo(() => data?.assets ?? [], [data?.assets]);
+  const artifacts = useMemo(() => data?.artifacts ?? [], [data?.artifacts]);
+  const pipelineTrace = useMemo(() => data?.pipeline_trace ?? [], [data?.pipeline_trace]);
+  const artifactsSummary = useMemo(() => data?.artifacts_summary ?? {}, [data?.artifacts_summary]);
+  const summary = useMemo(() => pickAiSummaryText(artifacts), [artifacts]);
+  const transcript = useMemo(() => pickTranscriptText(artifacts), [artifacts]);
   const createdAt = capture ? new Date(capture.created_at) : null;
+  const linkedItemId = capture?.item_id ?? null;
+  const { data: linkedItem } = useItem(linkedItemId);
 
   const [selectedActionKey, setSelectedActionKey] = useState<string | null>(null);
   const [manualTitle, setManualTitle] = useState("");
@@ -148,7 +208,7 @@ export default function InboxCaptureDetailPage() {
 
   const filteredActions = useMemo(() => {
     if (!capture) return [];
-    return capture.suggested_actions.filter((action) => action.type !== "summarize");
+    return capture.suggested_actions;
   }, [capture]);
   const transcriptionLimited = useMemo(() => {
     for (const entry of pipelineTrace) {
@@ -163,12 +223,14 @@ export default function InboxCaptureDetailPage() {
     }
     return false;
   }, [artifacts, pipelineTrace]);
+  const isNoteCapture = useMemo(() => (capture ? captureLooksLikeNote(capture) : false), [capture]);
+  const notePlainText = useMemo(() => blocksPlainText(linkedItem?.blocks), [linkedItem]);
+  const notePreview = useMemo(() => blocksPreview(linkedItem?.blocks), [linkedItem]);
 
   useEffect(() => {
     if (!capture) return;
     const defaultActionKey =
       (capture.primary_action &&
-      capture.primary_action.type !== "summarize" &&
       filteredActions.some((action) => action.key === capture.primary_action?.key)
         ? capture.primary_action.key
         : null) ??
@@ -180,6 +242,7 @@ export default function InboxCaptureDetailPage() {
       urlKey && filteredActions.some((a) => a.key === urlKey)
         ? urlKey
         : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedActionKey((current) => {
       if (validKey) return validKey;
       if (current && filteredActions.some((action) => action.key === current)) {
@@ -239,7 +302,9 @@ export default function InboxCaptureDetailPage() {
     captureId,
     manualDescription,
     manualTitle,
+    projectId,
     router,
+    seriesId,
     selectedAction,
   ]);
 
@@ -300,6 +365,17 @@ export default function InboxCaptureDetailPage() {
       (item): item is string => typeof item === "string" && item.trim().length > 0
     )
     : [];
+  const summaryText =
+    summary ||
+    (typeof artifactsSummary.summary === "string" ? artifactsSummary.summary.trim() : "") ||
+    (typeof artifactsSummary.headline === "string" ? artifactsSummary.headline.trim() : "");
+  const isCaptureQueuedOrProcessing =
+    capture.status === "queued" || capture.status === "processing";
+  const hideSummaryForShortNote =
+    isNoteCapture && notePlainText.trim().length < NOTE_SUMMARY_MIN_CHARS;
+  const showSummaryLoading =
+    isCaptureQueuedOrProcessing ||
+    (!summaryText && capture.status !== "failed");
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 py-2">
@@ -446,52 +522,132 @@ export default function InboxCaptureDetailPage() {
         </div>
       </div>
 
-      <section className="rounded-2xl border border-border/70 bg-card/90 p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold uppercase tracking-wide">{t("pages.inbox.aiSummary")}</h2>
-        </div>
-        {(capture.status === "queued" || capture.status === "processing" || (!summary && capture.status !== "failed")) ? (
-          <div className="space-y-2">
-            <div className="bg-muted/50 h-3 w-full animate-pulse rounded" />
-            <div className="bg-muted/50 h-3 w-11/12 animate-pulse rounded" />
-            <div className="bg-muted/50 h-3 w-[80%] animate-pulse rounded" />
+      {isCaptureQueuedOrProcessing ? (
+        <section className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+          <div className="flex items-start gap-3">
+            <RefreshCw className="mt-0.5 h-4 w-4 animate-spin text-primary" />
+            <div>
+              <h2 className="text-sm font-semibold text-primary">
+                {t("pages.inbox.processingTitle", { defaultValue: "Traitement en cours" })}
+              </h2>
+              <p className="mt-1 text-sm text-foreground/85">
+                {capture.status === "queued"
+                  ? t("pages.inbox.processingBodyQueued", {
+                    defaultValue:
+                        "Votre capture est en file d'attente. Vous pouvez continuer à naviguer, la page se mettra à jour automatiquement.",
+                  })
+                  : t("pages.inbox.processingBodyProcessing", {
+                    defaultValue:
+                        "Votre capture est en cours d'analyse. Cela peut prendre quelques secondes selon le type de fichier.",
+                  })}
+              </p>
+            </div>
           </div>
-        ) : (
-          <p className="text-sm leading-relaxed text-foreground/90">
-            {summary || capture.raw_content || t("pages.inbox.emptyCapture")}
+        </section>
+      ) : null}
+
+      {!hideSummaryForShortNote ? (
+        <section className="rounded-2xl border border-border/70 bg-card/90 p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide">{t("pages.inbox.aiSummary")}</h2>
+          </div>
+          {showSummaryLoading ? (
+            <div className="space-y-2">
+              <div className="bg-muted/50 h-3 w-full animate-pulse rounded" />
+              <div className="bg-muted/50 h-3 w-11/12 animate-pulse rounded" />
+              <div className="bg-muted/50 h-3 w-[80%] animate-pulse rounded" />
+            </div>
+          ) : (
+            <p className="text-sm leading-relaxed text-foreground/90">
+              {summaryText || t("pages.inbox.emptyCapture")}
+            </p>
+          )}
+          {capture.capture_type === "voice" && transcriptionLimited ? (
+            <Badge variant="secondary" className="mt-2 inline-flex">
+              {t("pages.inbox.transcriptionLimited")}
+            </Badge>
+          ) : null}
+        </section>
+      ) : null}
+
+      {keyClauses.length || potentialRisks.length ? (
+        <section className="rounded-2xl border border-border/70 bg-card/90 p-4">
+          {keyClauses.length ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Key Clauses</p>
+              <ul className="mt-1 space-y-1">
+                {keyClauses.slice(0, 6).map((entry) => (
+                  <li key={entry} className="text-sm text-foreground/85">
+                    - {entry}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {potentialRisks.length ? (
+            <div className={keyClauses.length ? "mt-4" : ""}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Potential Risks</p>
+              <ul className="mt-1 space-y-1">
+                {potentialRisks.slice(0, 3).map((entry) => (
+                  <li key={entry} className="text-sm text-foreground/85">
+                    - {entry}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {capture.capture_type === "voice" ? (
+        <section className="rounded-2xl border border-border/70 bg-card/90 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide">
+            {t("pages.inbox.fullTranscription", { defaultValue: "Full transcription" })}
+          </h2>
+          {capture.status === "queued" || capture.status === "processing" ? (
+            <div className="mt-2 space-y-2">
+              <div className="bg-muted/50 h-3 w-full animate-pulse rounded" />
+              <div className="bg-muted/50 h-3 w-11/12 animate-pulse rounded" />
+              <div className="bg-muted/50 h-3 w-[80%] animate-pulse rounded" />
+            </div>
+          ) : transcript ? (
+            <pre className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap rounded-xl border border-border bg-background/40 p-3 text-sm text-foreground/85">
+              {transcript}
+            </pre>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {capture.status === "failed"
+                ? t("pages.inbox.transcriptionLimited")
+                : t("pages.inbox.emptyCapture")}
+            </p>
+          )}
+        </section>
+      ) : null}
+
+      {isNoteCapture ? (
+        <section className="rounded-2xl border border-border/70 bg-card/90 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide">
+            {t("pages.inbox.noteFallbackTitle", { defaultValue: "Linked note" })}
+          </h2>
+          <p className="text-muted-foreground mt-2 text-sm">
+            {notePreview || t("pages.inbox.emptyCapture")}
           </p>
-        )}
-        {capture.capture_type === "voice" && transcriptionLimited ? (
-          <Badge variant="secondary" className="mt-2 inline-flex">
-            {t("pages.inbox.transcriptionLimited")}
-          </Badge>
-        ) : null}
-        {keyClauses.length ? (
           <div className="mt-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Key Clauses</p>
-            <ul className="mt-1 space-y-1">
-              {keyClauses.slice(0, 3).map((entry) => (
-                <li key={entry} className="text-sm text-foreground/85">
-                  - {entry}
-                </li>
-              ))}
-            </ul>
+            <Button asChild size="sm" variant="outline">
+              <Link
+                href={
+                  linkedItemId
+                    ? `/inbox/captures/${capture.id}/note?item_id=${encodeURIComponent(linkedItemId)}`
+                    : `/inbox/captures/${capture.id}/note`
+                }
+              >
+                {t("pages.inbox.openNoteEditor", { defaultValue: "Open editor" })}
+              </Link>
+            </Button>
           </div>
-        ) : null}
-        {potentialRisks.length ? (
-          <div className="mt-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Potential Risks</p>
-            <ul className="mt-1 space-y-1">
-              {potentialRisks.slice(0, 3).map((entry) => (
-                <li key={entry} className="text-sm text-foreground/85">
-                  - {entry}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </section>
+        </section>
+      ) : null}
 
       {capture.capture_type === "link" && !assets.length ? (
         <section className="rounded-2xl border border-border/70 bg-card/90 p-4">
@@ -530,6 +686,11 @@ export default function InboxCaptureDetailPage() {
         </div>
 
         <div className="space-y-2">
+          {!filteredActions.length ? (
+            <p className="text-sm text-muted-foreground">
+              {t("pages.inbox.noSuggestedActions", { defaultValue: "Aucune action suggérée." })}
+            </p>
+          ) : null}
           {filteredActions.map((action) => {
             const selected = selectedActionKey === action.key;
             return (
@@ -603,8 +764,7 @@ export default function InboxCaptureDetailPage() {
             disabled={
               !selectedAction ||
               isBusy ||
-              capture.archived ||
-              (selectedAction.type === "review" && !manualTitle.trim())
+              capture.archived
             }
           >
             {t("pages.inbox.applySelected")}
@@ -621,6 +781,20 @@ export default function InboxCaptureDetailPage() {
               {preview.suggested_kind} · {(preview.confidence * 100).toFixed(0)}%
             </p>
             <p className="mt-2 text-sm text-foreground/80">{preview.reason}</p>
+            {preview.missing_fields.length ? (
+              <div className="mt-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">
+                  {t("pages.inbox.missingFields", { defaultValue: "Missing fields" })}
+                </p>
+                <ul className="mt-1 space-y-1">
+                  {preview.missing_fields.map((entry) => (
+                    <li key={entry} className="text-sm text-foreground/85">
+                      - {entry}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </section>
@@ -666,24 +840,6 @@ export default function InboxCaptureDetailPage() {
                 </a>
               </Button>
             </div>
-          </div>
-        </section>
-      ) : null}
-
-      {pipelineTrace.length ? (
-        <section className="rounded-2xl border border-border/70 bg-card/90 p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide">Pipeline Trace</h2>
-          <div className="mt-2 space-y-2">
-            {pipelineTrace.slice(-6).map((entry, idx) => (
-              <div key={`${idx}-${String(entry.stage ?? "stage")}`} className="rounded-lg border border-border/60 p-2">
-                <p className="text-xs font-medium uppercase text-muted-foreground">
-                  {String(entry.stage ?? "stage")}
-                </p>
-                <p className="text-xs text-foreground/80">
-                  {String(entry.status ?? "unknown")} · {String(entry.provider ?? "n/a")} · {String(entry.model ?? "n/a")}
-                </p>
-              </div>
-            ))}
           </div>
         </section>
       ) : null}

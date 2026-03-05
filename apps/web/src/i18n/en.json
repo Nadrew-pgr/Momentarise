@@ -156,7 +156,14 @@
       "menuVersionHistory": "Version history",
       "menuNotifications": "Notifications",
       "menuAnalytics": "Analytics",
-      "menuImportExport": "Import / Export"
+      "menuImportExport": "Import / Export",
+      "missingFields": "Missing fields",
+      "fullTranscription": "Full transcription",
+      "noSuggestedActions": "No suggested actions.",
+      "openNoteEditor": "Open editor",
+      "processingTitle": "Processing capture",
+      "processingBodyQueued": "Your capture is queued. You can keep navigating, this page will refresh automatically.",
+      "processingBodyProcessing": "Your capture is being analyzed. This may take a few seconds depending on file type."
     },
     "item": {
       "details": "Details",
@@ -218,7 +225,9 @@
         "search": "Search conversations...",
         "empty": "No conversation found.",
         "lastUpdate": "Updated",
-        "model": "Model"
+        "model": "Model",
+        "loading": "Loading conversation...",
+        "loadingSlow": "Conversation loading is taking longer than expected."
       },
       "previewPlan": {
         "title": "Apply Plan",
@@ -233,7 +242,21 @@
         "summary": "Summary",
         "mutations": "Proposed mutations",
         "notes": "Notes",
-        "pending": "Pending"
+        "pending": "Pending",
+        "applying": "Applying...",
+        "schedule": "Schedule",
+        "linkedProject": "Linked project",
+        "linkedSeries": "Series/recurrence",
+        "targetEvent": "Target: Moment",
+        "targetItem": "Target: Item",
+        "descriptionPrefix": "Description"
+      },
+      "toast": {
+        "applied": "Change applied.",
+        "undo": "Undo",
+        "open": "Open",
+        "applyError": "Unable to apply the change.",
+        "undoError": "Unable to undo the change."
       },
       "status": {
         "streaming": "Sync is thinking...",
@@ -249,16 +272,16 @@
           "cancelled": "Cancelled"
         }
       },
-  "warning": {
-    "title": "Warning"
-  },
-  "activity": {
-    "title": "Agent activity",
-    "queueLabel": "actions"
-  },
-  "error": {
-    "title": "Error",
-    "generic": "Something went wrong. Please try again."
+      "warning": {
+        "title": "Warning"
+      },
+      "activity": {
+        "title": "Agent activity",
+        "queueLabel": "actions"
+      },
+      "error": {
+        "title": "Error",
+        "generic": "Something went wrong. Please try again."
       },
       "roles": {
         "assistant": "Sync",

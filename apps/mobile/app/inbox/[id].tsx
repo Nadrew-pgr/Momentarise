@@ -26,12 +26,15 @@ import {
   usePreviewCapture,
   useReprocessCapture,
 } from "@/hooks/use-inbox";
+import { useItem } from "@/hooks/use-item";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Text as UiText } from "@/components/ui/text";
 import { Textarea } from "@/components/ui/textarea";
+
+const NOTE_SUMMARY_MIN_CHARS = 180;
 
 function captureIcon(type: string) {
   switch (type) {
@@ -62,15 +65,69 @@ function readArtifactText(artifact: CaptureArtifactOut): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function findLatestArtifact(artifacts: CaptureArtifactOut[], artifactType: string): CaptureArtifactOut | null {
+  for (let index = artifacts.length - 1; index >= 0; index -= 1) {
+    const artifact = artifacts[index];
+    if (artifact.artifact_type === artifactType) {
+      return artifact;
+    }
+  }
+  return null;
+}
+
 function pickSummary(artifacts: CaptureArtifactOut[]): string {
-  const preferred = ["summary", "preprocess_summary", "vlm_analysis", "transcript", "extracted_text"];
+  const preferred = ["summary", "preprocess_summary", "vlm_analysis"];
   for (const artifactType of preferred) {
-    const found = artifacts.find((artifact) => artifact.artifact_type === artifactType);
+    const found = findLatestArtifact(artifacts, artifactType);
     if (!found) continue;
     const text = readArtifactText(found);
     if (text) return text;
   }
   return "";
+}
+
+function pickTranscript(artifacts: CaptureArtifactOut[]): string {
+  const transcript = findLatestArtifact(artifacts, "transcript");
+  if (!transcript) return "";
+  return readArtifactText(transcript);
+}
+
+function extractRichText(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+  const current = node as Record<string, unknown>;
+  const ownText = typeof current.text === "string" ? current.text : "";
+  const children = Array.isArray(current.content)
+    ? current.content.map((child) => extractRichText(child)).join(" ")
+    : "";
+  return `${ownText} ${children}`.trim();
+}
+
+function blocksPreview(blocks: unknown): string {
+  const compact = blocksPlainText(blocks);
+  if (!compact) return "";
+  return compact.length > 220 ? `${compact.slice(0, 220)}...` : compact;
+}
+
+function blocksPlainText(blocks: unknown): string {
+  if (!Array.isArray(blocks)) return "";
+  return blocks
+    .map((entry) => extractRichText(entry))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function captureLooksLikeNote(capture: {
+  capture_type: string;
+  source?: string | null;
+  metadata?: Record<string, unknown>;
+}): boolean {
+  if (capture.capture_type !== "text") return false;
+  const source = String(capture.source || "").trim().toLowerCase();
+  const metadata = capture.metadata ?? {};
+  const intent = String(metadata.intent ?? "").trim().toLowerCase();
+  const channel = String(metadata.channel ?? "").trim().toLowerCase();
+  return source === "note" || intent === "note" || channel === "note" || metadata.note_intent === true;
 }
 
 function readString(value: unknown): string {
@@ -119,10 +176,12 @@ export default function InboxCaptureDetailPage() {
   const capture = data?.capture ?? null;
   const assets = data?.assets ?? [];
   const artifacts = data?.artifacts ?? [];
-  const pipelineTrace = data?.pipeline_trace ?? [];
   const artifactsSummary = data?.artifacts_summary ?? {};
   const summary = useMemo(() => pickSummary(artifacts), [artifacts]);
+  const transcript = useMemo(() => pickTranscript(artifacts), [artifacts]);
   const createdAt = capture ? new Date(capture.created_at) : null;
+  const linkedItemId = capture?.item_id ?? null;
+  const { data: linkedItem } = useItem(linkedItemId);
 
   const [selectedActionKey, setSelectedActionKey] = useState<string | null>(null);
   const [manualTitle, setManualTitle] = useState("");
@@ -132,14 +191,16 @@ export default function InboxCaptureDetailPage() {
 
   const filteredActions = useMemo(() => {
     if (!capture) return [];
-    return capture.suggested_actions.filter((action) => action.type !== "summarize");
+    return capture.suggested_actions;
   }, [capture]);
+  const isNoteCapture = useMemo(() => (capture ? captureLooksLikeNote(capture) : false), [capture]);
+  const notePlainText = useMemo(() => blocksPlainText(linkedItem?.blocks), [linkedItem]);
+  const notePreview = useMemo(() => blocksPreview(linkedItem?.blocks), [linkedItem]);
 
   useEffect(() => {
     if (!capture) return;
     const defaultActionKey =
       (capture.primary_action &&
-      capture.primary_action.type !== "summarize" &&
       filteredActions.some((action) => action.key === capture.primary_action?.key)
         ? capture.primary_action.key
         : null) ??
@@ -286,9 +347,14 @@ export default function InboxCaptureDetailPage() {
   const summaryText =
     summary ||
     readString(artifactsSummary.summary) ||
-    readString(artifactsSummary.headline) ||
-    capture.raw_content ||
-    t("pages.inbox.emptyCapture");
+    readString(artifactsSummary.headline);
+  const isCaptureQueuedOrProcessing =
+    capture.status === "queued" || capture.status === "processing";
+  const hideSummaryForShortNote =
+    isNoteCapture && notePlainText.trim().length < NOTE_SUMMARY_MIN_CHARS;
+  const showSummaryLoading =
+    isCaptureQueuedOrProcessing ||
+    (!summaryText && capture.status !== "failed");
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
@@ -369,39 +435,139 @@ export default function InboxCaptureDetailPage() {
             </CardContent>
           </Card>
 
-          <Card className="mt-3 rounded-2xl border border-border bg-card p-3">
-            <CardContent className="p-0">
-              <View className="mb-2 flex-row items-center gap-2">
-                <Sparkles size={14} color="#2563eb" />
+          {isCaptureQueuedOrProcessing ? (
+            <Card className="mt-3 rounded-2xl border border-primary/40 bg-primary/5 p-3">
+              <CardContent className="p-0">
+                <View className="flex-row items-start gap-2">
+                  <ActivityIndicator size="small" color="#2563eb" />
+                  <View className="flex-1">
+                    <UiText className="text-sm font-semibold text-primary">
+                      {t("pages.inbox.processingTitle", { defaultValue: "Traitement en cours" })}
+                    </UiText>
+                    <UiText className="mt-1 text-sm text-foreground">
+                      {capture.status === "queued"
+                        ? t("pages.inbox.processingBodyQueued", {
+                          defaultValue:
+                              "Votre capture est en file d'attente. Vous pouvez continuer à naviguer, la page se mettra à jour automatiquement.",
+                        })
+                        : t("pages.inbox.processingBodyProcessing", {
+                          defaultValue:
+                              "Votre capture est en cours d'analyse. Cela peut prendre quelques secondes selon le type de fichier.",
+                        })}
+                    </UiText>
+                  </View>
+                </View>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {!hideSummaryForShortNote ? (
+            <Card className="mt-3 rounded-2xl border border-border bg-card p-3">
+              <CardContent className="p-0">
+                <View className="mb-2 flex-row items-center gap-2">
+                  <Sparkles size={14} color="#2563eb" />
+                  <UiText className="text-xs font-semibold uppercase text-foreground">
+                    {t("pages.inbox.aiSummary")}
+                  </UiText>
+                </View>
+                {showSummaryLoading ? (
+                  <View className="gap-2">
+                    <View className="h-2.5 rounded bg-muted/60" />
+                    <View className="h-2.5 w-11/12 rounded bg-muted/60" />
+                    <View className="h-2.5 w-4/5 rounded bg-muted/60" />
+                  </View>
+                ) : (
+                  <UiText className="text-sm leading-6 text-foreground">
+                    {summaryText || t("pages.inbox.emptyCapture")}
+                  </UiText>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {keyClauses.length || potentialRisks.length ? (
+            <Card className="mt-3 rounded-2xl border border-border bg-card p-3">
+              <CardContent className="p-0">
+                {keyClauses.length ? (
+                  <View>
+                    <UiText className="text-xs font-semibold uppercase text-primary">Key Clauses</UiText>
+                    {keyClauses.slice(0, 6).map((entry) => (
+                      <UiText key={entry} className="mt-1 text-sm text-foreground">
+                        - {entry}
+                      </UiText>
+                    ))}
+                  </View>
+                ) : null}
+                {potentialRisks.length ? (
+                  <View className={keyClauses.length ? "mt-3" : ""}>
+                    <UiText className="text-xs font-semibold uppercase text-amber-600">Potential Risks</UiText>
+                    {potentialRisks.slice(0, 3).map((entry) => (
+                      <UiText key={entry} className="mt-1 text-sm text-foreground">
+                        - {entry}
+                      </UiText>
+                    ))}
+                  </View>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {capture.capture_type === "voice" ? (
+            <Card className="mt-3 rounded-2xl border border-border bg-card p-3">
+              <CardContent className="p-0">
                 <UiText className="text-xs font-semibold uppercase text-foreground">
-                  {t("pages.inbox.aiSummary")}
+                  {t("pages.inbox.fullTranscription", { defaultValue: "Full transcription" })}
                 </UiText>
-              </View>
-              <UiText className="text-sm leading-6 text-foreground">
-                {summaryText}
-              </UiText>
-              {keyClauses.length ? (
+                {capture.status === "queued" || capture.status === "processing" ? (
+                  <View className="mt-2 gap-2">
+                    <View className="h-2.5 rounded bg-muted/60" />
+                    <View className="h-2.5 w-11/12 rounded bg-muted/60" />
+                    <View className="h-2.5 w-4/5 rounded bg-muted/60" />
+                  </View>
+                ) : transcript ? (
+                  <View className="mt-2 max-h-64 rounded-xl border border-border bg-background/40 p-3">
+                    <ScrollView nestedScrollEnabled>
+                      <UiText className="text-sm leading-6 text-foreground">{transcript}</UiText>
+                    </ScrollView>
+                  </View>
+                ) : (
+                  <UiText className="mt-2 text-sm text-muted-foreground">
+                    {capture.status === "failed"
+                      ? t("pages.inbox.transcriptionLimited")
+                      : t("pages.inbox.emptyCapture")}
+                  </UiText>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {isNoteCapture ? (
+            <Card className="mt-3 rounded-2xl border border-border bg-card p-3">
+              <CardContent className="p-0">
+                <UiText className="text-xs font-semibold uppercase text-foreground">
+                  {t("pages.inbox.noteFallbackTitle", { defaultValue: "Linked note" })}
+                </UiText>
+                <UiText className="mt-2 text-sm text-muted-foreground">
+                  {notePreview || t("pages.inbox.emptyCapture")}
+                </UiText>
                 <View className="mt-3">
-                  <UiText className="text-xs font-semibold uppercase text-primary">Key Clauses</UiText>
-                  {keyClauses.slice(0, 3).map((entry) => (
-                    <UiText key={entry} className="mt-1 text-sm text-foreground">
-                      - {entry}
-                    </UiText>
-                  ))}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onPress={() =>
+                      router.push(
+                        linkedItemId
+                          ? `/inbox/${capture.id}/note?item_id=${encodeURIComponent(linkedItemId)}`
+                          : `/inbox/${capture.id}/note`
+                      )
+                    }
+                  >
+                    <UiText>{t("pages.inbox.openNoteEditor", { defaultValue: "Open editor" })}</UiText>
+                  </Button>
                 </View>
-              ) : null}
-              {potentialRisks.length ? (
-                <View className="mt-3">
-                  <UiText className="text-xs font-semibold uppercase text-amber-600">Potential Risks</UiText>
-                  {potentialRisks.slice(0, 3).map((entry) => (
-                    <UiText key={entry} className="mt-1 text-sm text-foreground">
-                      - {entry}
-                    </UiText>
-                  ))}
-                </View>
-              ) : null}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card className="mt-3 rounded-2xl border border-border bg-card p-3">
             <CardContent className="p-0">
@@ -415,6 +581,11 @@ export default function InboxCaptureDetailPage() {
               </View>
 
               <View className="gap-2">
+                {!filteredActions.length ? (
+                  <UiText className="text-sm text-muted-foreground">
+                    {t("pages.inbox.noSuggestedActions", { defaultValue: "Aucune action suggérée." })}
+                  </UiText>
+                ) : null}
                 {filteredActions.map((action) => {
                   const selected = selectedActionKey === action.key;
                   return (
@@ -493,6 +664,18 @@ export default function InboxCaptureDetailPage() {
                     {preview.suggested_kind} · {(preview.confidence * 100).toFixed(0)}%
                   </UiText>
                   <UiText className="mt-2 text-sm text-foreground">{preview.reason}</UiText>
+                  {preview.missing_fields.length ? (
+                    <View className="mt-2">
+                      <UiText className="text-xs font-semibold uppercase text-amber-600">
+                        {t("pages.inbox.missingFields", { defaultValue: "Missing fields" })}
+                      </UiText>
+                      {preview.missing_fields.map((entry) => (
+                        <UiText key={entry} className="mt-1 text-sm text-foreground">
+                          - {entry}
+                        </UiText>
+                      ))}
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
             </CardContent>
@@ -511,31 +694,6 @@ export default function InboxCaptureDetailPage() {
                   <UiText className="text-xs text-muted-foreground">
                     {formatBytes(primaryAsset.size_bytes)} · {primaryAsset.mime_type}
                   </UiText>
-                </View>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {pipelineTrace.length ? (
-            <Card className="mb-6 mt-3 rounded-2xl border border-border bg-card p-3">
-              <CardContent className="p-0">
-                <UiText className="text-xs font-semibold uppercase text-foreground">
-                  Pipeline Trace
-                </UiText>
-                <View className="mt-2 gap-2">
-                  {pipelineTrace.slice(-6).map((entry, idx) => (
-                    <View
-                      key={`${idx}-${String(entry.stage ?? "stage")}`}
-                      className="rounded-lg border border-border/70 p-2"
-                    >
-                      <UiText className="text-xs font-semibold uppercase text-muted-foreground">
-                        {String(entry.stage ?? "stage")}
-                      </UiText>
-                      <UiText className="text-xs text-foreground">
-                        {String(entry.status ?? "unknown")} · {String(entry.provider ?? "n/a")} · {String(entry.model ?? "n/a")}
-                      </UiText>
-                    </View>
-                  ))}
                 </View>
               </CardContent>
             </Card>

@@ -3,7 +3,8 @@
     "appName": "Momentarise",
     "retry": "Retry",
     "cancel": "Cancel",
-    "save": "Save"
+    "save": "Save",
+    "ok": "OK"
   },
   "nav": {
     "today": "Today",
@@ -160,7 +161,14 @@
       "menuVersionHistory": "Version history",
       "menuNotifications": "Notifications",
       "menuAnalytics": "Analytics",
-      "menuImportExport": "Import / Export"
+      "menuImportExport": "Import / Export",
+      "missingFields": "Missing fields",
+      "fullTranscription": "Full transcription",
+      "noSuggestedActions": "No suggested actions.",
+      "openNoteEditor": "Open editor",
+      "processingTitle": "Processing capture",
+      "processingBodyQueued": "Your capture is queued. You can keep navigating, this page will refresh automatically.",
+      "processingBodyProcessing": "Your capture is being analyzed. This may take a few seconds depending on file type."
     },
     "item": {
       "details": "Details",
@@ -261,33 +269,50 @@
         }
       }
     },
-  "settings": {
-    "calendarTitle": "Calendar preferences",
-    "calendarStartHour": "Start hour",
-    "calendarEndHour": "End hour",
-    "aiTitle": "AI capture preferences",
-    "aiBehaviorSubtitle": "How the AI applies suggestions to captures",
-    "aiMode": "Automation mode",
-    "aiModeProposalOnly": "Proposal only",
-    "aiModeAutoApply": "Auto apply",
-    "aiModeHelp": "Proposal only: you confirm each action. Auto apply: actions above the threshold are applied automatically.",
-    "aiThreshold": "Auto apply threshold",
-    "aiThresholdHelp": "Confidence threshold for automatic application (0–1).",
-    "aiMaxActions": "Max actions per capture",
-    "aiMaxActionsHelp": "Maximum number of actions proposed or applied per capture.",
-    "captureProviders": "Capture providers",
-    "providerTranscription": "Transcription",
-    "providerOcr": "OCR",
-    "providerVlm": "VLM",
-    "fallbackOn": "Fallback on",
-    "fallbackOff": "Fallback off",
-    "fallbackLabel": "Fallback",
-    "saved": "Settings saved",
-    "modelPlaceholder": "{{type}} model"
-  },
+    "settings": {
+      "calendarTitle": "Calendar preferences",
+      "calendarStartHour": "Start hour",
+      "calendarEndHour": "End hour",
+      "aiTitle": "AI capture preferences",
+      "aiBehaviorSubtitle": "How the AI applies suggestions to captures",
+      "aiMode": "Automation mode",
+      "aiModeProposalOnly": "Proposal only",
+      "aiModeAutoApply": "Auto apply",
+      "aiModeHelp": "Proposal only: you confirm each action. Auto apply: actions above the threshold are applied automatically.",
+      "aiThreshold": "Auto apply threshold",
+      "aiThresholdHelp": "Confidence threshold for automatic application (0–1).",
+      "aiMaxActions": "Max actions per capture",
+      "aiMaxActionsHelp": "Maximum number of actions proposed or applied per capture.",
+      "captureProviders": "Capture providers",
+      "providerTranscription": "Transcription",
+      "providerOcr": "OCR",
+      "providerVlm": "VLM",
+      "fallbackOn": "Fallback on",
+      "fallbackOff": "Fallback off",
+      "fallbackLabel": "Fallback",
+      "saved": "Settings saved",
+      "modelPlaceholder": "{{type}} model"
+    },
     "sync": {
       "title": "Sync",
-      "placeholder": "Sync page ready for next iterations (chat, preview/apply, AI tools)."
+      "placeholder": "Sync page ready for next iterations (chat, preview/apply, AI tools).",
+      "actions": {
+        "applyPreview": "Apply preview",
+        "undo": "Undo"
+      },
+      "history": {
+        "loading": "Loading conversation...",
+        "loadingSlow": "Conversation loading is taking longer than expected.",
+        "loadError": "Unable to load this conversation."
+      },
+      "toast": {
+        "applied": "Change applied.",
+        "undone": "Change undone.",
+        "undo": "Undo",
+        "open": "Open",
+        "applyError": "Unable to apply the change.",
+        "undoError": "Unable to undo the change."
+      }
     },
     "me": {
       "title": "Me",

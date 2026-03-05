@@ -156,7 +156,14 @@
       "menuVersionHistory": "Historique des versions",
       "menuNotifications": "Notifications",
       "menuAnalytics": "Analytics",
-      "menuImportExport": "Import / Export"
+      "menuImportExport": "Import / Export",
+      "missingFields": "Champs manquants",
+      "fullTranscription": "Transcription complète",
+      "noSuggestedActions": "Aucune action suggérée.",
+      "openNoteEditor": "Ouvrir l'éditeur",
+      "processingTitle": "Traitement en cours",
+      "processingBodyQueued": "Votre capture est en file d'attente. Vous pouvez continuer à naviguer, la page se mettra à jour automatiquement.",
+      "processingBodyProcessing": "Votre capture est en cours d'analyse. Cela peut prendre quelques secondes selon le type de fichier."
     },
     "item": {
       "details": "Détails",
@@ -218,7 +225,9 @@
         "search": "Rechercher une conversation...",
         "empty": "Aucune conversation trouvée.",
         "lastUpdate": "Maj",
-        "model": "Modèle"
+        "model": "Modèle",
+        "loading": "Chargement de la conversation...",
+        "loadingSlow": "Le chargement de la conversation prend plus de temps que prévu."
       },
       "previewPlan": {
         "title": "Plan d'application",
@@ -233,7 +242,21 @@
         "summary": "Résumé",
         "mutations": "Mutations proposées",
         "notes": "Notes",
-        "pending": "En attente"
+        "pending": "En attente",
+        "applying": "Application...",
+        "schedule": "Horaire",
+        "linkedProject": "Projet lié",
+        "linkedSeries": "Série/Récurrence gérée",
+        "targetEvent": "Cible : Moment",
+        "targetItem": "Cible : Item",
+        "descriptionPrefix": "Description"
+      },
+      "toast": {
+        "applied": "Changement appliqué.",
+        "undo": "Annuler",
+        "open": "Ouvrir",
+        "applyError": "Impossible d'appliquer le changement.",
+        "undoError": "Impossible d'annuler le changement."
       },
       "status": {
         "streaming": "Sync réfléchit...",
@@ -249,16 +272,16 @@
           "cancelled": "Annulé"
         }
       },
-  "warning": {
-    "title": "Avertissement"
-  },
-  "activity": {
-    "title": "Activité agent",
-    "queueLabel": "actions"
-  },
-  "error": {
-    "title": "Erreur",
-    "generic": "Une erreur est survenue. Veuillez réessayer."
+      "warning": {
+        "title": "Avertissement"
+      },
+      "activity": {
+        "title": "Activité agent",
+        "queueLabel": "actions"
+      },
+      "error": {
+        "title": "Erreur",
+        "generic": "Une erreur est survenue. Veuillez réessayer."
       },
       "roles": {
         "assistant": "Sync",
