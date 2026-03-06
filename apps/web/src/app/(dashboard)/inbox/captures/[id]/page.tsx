@@ -351,6 +351,15 @@ export default function InboxCaptureDetailPage() {
   const primaryAsset = assets[0] ?? null;
   const actionCount = filteredActions.length;
   const preview = previewCapture.data;
+  const previewMissingFields = useMemo(() => {
+    const payload = preview?.preview_payload;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
+    const raw = (payload as Record<string, unknown>).missing_fields;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(
+      (entry): entry is string => typeof entry === "string" && entry.trim().length > 0
+    );
+  }, [preview?.preview_payload]);
   const requiresVoiceContext = capture.capture_type === "voice" && !capture.archived;
   const captureTypeLabel = t(`pages.inbox.filter.${capture.capture_type}`, {
     defaultValue: capture.capture_type,
@@ -781,13 +790,13 @@ export default function InboxCaptureDetailPage() {
               {preview.suggested_kind} · {(preview.confidence * 100).toFixed(0)}%
             </p>
             <p className="mt-2 text-sm text-foreground/80">{preview.reason}</p>
-            {preview.missing_fields.length ? (
+            {previewMissingFields.length ? (
               <div className="mt-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">
                   {t("pages.inbox.missingFields", { defaultValue: "Missing fields" })}
                 </p>
                 <ul className="mt-1 space-y-1">
-                  {preview.missing_fields.map((entry) => (
+                  {previewMissingFields.map((entry) => (
                     <li key={entry} className="text-sm text-foreground/85">
                       - {entry}
                     </li>
