@@ -1793,6 +1793,14 @@ class SyncOrchestrator:
                 "preview": preview,
             }
 
+        if tool_name == "ask_question":
+            question_data = ToolExecutor.build_ask_question(args)
+            return {
+                "summary": str(question_data.get("summary") or "Question asked"),
+                "result_json": question_data,
+                "question": question_data,
+            }
+
         raise SyncValidationError(f"Unsupported tool '{tool_name}'")
 
     async def _calendar_events_range(

@@ -181,6 +181,36 @@ class ToolExecutor:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "ask_question",
+                    "description": "Ask the user a specific question with multiple choice options. Use this for clarifying ambiguous requests (e.g. 'Which day?', 'Which project?') before proceeding with a plan.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {
+                                "type": "string",
+                                "description": "The question to ask the user.",
+                            },
+                            "options": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of up to 5 concise multiple choice options.",
+                            },
+                            "help_text": {
+                                "type": "string",
+                                "description": "Optional secondary text providing more context for the question.",
+                            },
+                            "key": {
+                                "type": "string",
+                                "description": "A unique identifier for this question within the conversation context.",
+                            },
+                        },
+                        "required": ["prompt", "key"],
+                    },
+                },
+            },
         ]
 
     @classmethod
@@ -347,6 +377,23 @@ class ToolExecutor:
         return {
             "summary": "Preview inbox transform",
             "mutation": mutation,
+        }
+
+    @classmethod
+    def build_ask_question(cls, args: dict[str, Any]) -> dict[str, Any]:
+        prompt = cls._as_string(args.get("prompt"))
+        options = args.get("options") if isinstance(args.get("options"), list) else []
+        help_text = cls._as_string(args.get("help_text"))
+        key = cls._as_string(args.get("key"))
+
+        return {
+            "summary": f"Question: {prompt}",
+            "question": {
+                "key": key,
+                "prompt": prompt,
+                "options": options[:5],
+                "help_text": help_text,
+            },
         }
 
     @classmethod
