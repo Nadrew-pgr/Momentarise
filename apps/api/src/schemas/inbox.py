@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+from src.schemas.item import EntityLinkOut
 
 CaptureType = Literal["text", "voice", "photo", "link", "file", "share", "deeplink"]
 CaptureStatus = Literal[
@@ -21,7 +22,6 @@ CaptureActionType = Literal[
     "create_item",
     "draft_reply",
     "pay_invoice",
-    "summarize",
     "review",
 ]
 CaptureCategory = Literal[
@@ -59,6 +59,7 @@ class CaptureBadgeOut(BaseModel):
 class InboxCaptureOut(BaseModel):
     id: uuid.UUID
     item_id: uuid.UUID | None = None
+    title: str | None = None
     raw_content: str
     source: str | None = None
     source_type: str = "text"
@@ -92,6 +93,24 @@ class InboxListResponse(BaseModel):
     entries: list[InboxCaptureOut] = Field(default_factory=list)
 
 
+class InboxSearchEntryOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    capture_type: CaptureType
+    status: CaptureStatus
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InboxSearchResponse(BaseModel):
+    captures: list[InboxSearchEntryOut]
+
+
+class CaptureLinksResponse(BaseModel):
+    links: list[EntityLinkOut]
+
+
 class CreateCaptureRequest(BaseModel):
     raw_content: str = ""
     source: str | None = "manual"
@@ -100,9 +119,17 @@ class CreateCaptureRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class UpdateCaptureRequest(BaseModel):
+    title: str | None = None
+
+
 class CaptureUploadResponse(BaseModel):
     id: uuid.UUID
     status: CaptureStatus
+    task_id: str | None = None
+    run_id: uuid.UUID | None = None
+    queue_state: Literal["enqueued", "not_enqueued"] | None = None
+    queue_name: str | None = None
 
 
 class CaptureAssetOut(BaseModel):
@@ -140,6 +167,9 @@ class CaptureArtifactOut(BaseModel):
 class CaptureJobOut(BaseModel):
     id: uuid.UUID
     job_type: str
+    run_id: uuid.UUID | None = None
+    queue_name: str | None = None
+    task_id: str | None = None
     status: str
     attempt_count: int
     last_error: str | None = None
@@ -185,6 +215,7 @@ class CapturePreviewResponse(BaseModel):
     confidence: float
     reason: str
     preview_payload: dict[str, Any] = Field(default_factory=dict)
+    missing_fields: list[str] = Field(default_factory=list)
 
 
 class ApplyCaptureRequest(BaseModel):
@@ -204,6 +235,17 @@ class ApplyCaptureResponse(BaseModel):
 class CaptureActionResponse(BaseModel):
     capture_id: uuid.UUID
     status: str
+    task_id: str | None = None
+    run_id: uuid.UUID | None = None
+    queue_state: Literal["enqueued", "not_enqueued"] | None = None
+    queue_name: str | None = None
+
+
+class NoteSummaryRefreshResponse(BaseModel):
+    capture_id: uuid.UUID
+    status: Literal["generated", "unchanged", "skipped_too_short"]
+    summary_updated: bool = False
+    source_hash: str | None = None
 
 
 class ExternalCaptureRequest(BaseModel):

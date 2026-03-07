@@ -58,7 +58,7 @@ class SyncEventSchemaTests(unittest.TestCase):
                 "title": "Tool run",
                 "status": "started",
                 "detail": "Running",
-                "tool_name": "item.preview",
+                "tool_name": "item_preview",
             },
         )
         queue_envelope = SyncEventEnvelope(
@@ -69,10 +69,29 @@ class SyncEventSchemaTests(unittest.TestCase):
             type="queue",
             payload={
                 "queue_id": "queue-1",
-                "label": "item.preview",
+                "label": "item_preview",
                 "status": "running",
                 "detail": "Running",
             },
         )
         self.assertEqual(task_envelope.type, "task")
         self.assertEqual(queue_envelope.type, "queue")
+
+    def test_undone_event_payload_is_valid(self) -> None:
+        envelope = SyncEventEnvelope(
+            seq=5,
+            run_id=uuid.uuid4(),
+            ts=datetime.now(UTC),
+            trace_id=None,
+            type="undone",
+            payload={
+                "run_id": str(uuid.uuid4()),
+                "source_change_id": str(uuid.uuid4()),
+                "undo_change_id": str(uuid.uuid4()),
+                "undone_at": datetime.now(UTC).isoformat(),
+                "open_target_kind": "timeline",
+                "open_target_id": None,
+                "open_target_date": "2026-02-16",
+            },
+        )
+        self.assertEqual(envelope.type, "undone")

@@ -17,10 +17,12 @@ from src.models.capture_tag import CaptureTag, CaptureTagLink
 from src.models.entity_link import EntityLink
 from src.models.enums import WorkspaceRole
 from src.models.event import Event
+from src.models.event_content_snapshot import EventContentSnapshot
 from src.models.inbox_capture import InboxCapture
 from src.models.item import Item
 from src.models.sync_memory_chunk import SyncMemoryChunk
 from src.models.sync_memory_doc import SyncMemoryDoc
+from src.models.queue_outbox_event import QueueOutboxEvent
 from src.models.user import User, UserIdentity
 from src.models.workspace import Workspace, WorkspaceMember
 from src.models.project import Project
@@ -36,6 +38,7 @@ __all__ = [
     "WorkspaceMember",
     "Item",
     "Event",
+    "EventContentSnapshot",
     "InboxCapture",
     "EntityLink",
     "AIChange",
@@ -58,6 +61,7 @@ __all__ = [
     "CaptureActionSuggestion",
     "CaptureTag",
     "CaptureTagLink",
+    "QueueOutboxEvent",
     "Project",
     "Series",
 ]

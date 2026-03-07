@@ -51,3 +51,4 @@ class InboxCapture(BaseMixin, Base):
     jobs: Mapped[list["CaptureJob"]] = relationship(back_populates="capture")  # noqa: F821
     action_suggestions: Mapped[list["CaptureActionSuggestion"]] = relationship(back_populates="capture")  # noqa: F821
     tag_links: Mapped[list["CaptureTagLink"]] = relationship(back_populates="capture")  # noqa: F821
+    queue_outbox_events: Mapped[list["QueueOutboxEvent"]] = relationship(back_populates="capture")  # noqa: F821

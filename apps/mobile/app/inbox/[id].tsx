@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, View } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,14 +17,21 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react-native";
-import type { CaptureActionSuggestion, CaptureAssetOut, CaptureArtifactOut } from "@momentarise/shared";
+import {
+  businessBlockTypeValues,
+  type CaptureActionSuggestion,
+  type CaptureAssetOut,
+  type CaptureArtifactOut,
+} from "@momentarise/shared";
 import {
   useApplyCapture,
   useArchiveCapture,
   useCaptureDetail,
   useDeleteCapture,
   usePreviewCapture,
+  useRefreshNoteSummary,
   useReprocessCapture,
+  useUpdateCapture,
 } from "@/hooks/use-inbox";
 import { useItem } from "@/hooks/use-item";
 import { Button } from "@/components/ui/button";
@@ -35,6 +42,7 @@ import { Text as UiText } from "@/components/ui/text";
 import { Textarea } from "@/components/ui/textarea";
 
 const NOTE_SUMMARY_MIN_CHARS = 180;
+const BUSINESS_BLOCK_TYPE_SET = new Set<string>(businessBlockTypeValues);
 
 function captureIcon(type: string) {
   switch (type) {
@@ -110,6 +118,41 @@ function blocksPreview(blocks: unknown): string {
 
 function blocksPlainText(blocks: unknown): string {
   if (!Array.isArray(blocks)) return "";
+  const isBusinessBlocks = blocks.length > 0 && blocks.every((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const block = entry as Record<string, unknown>;
+    return (
+      typeof block.type === "string" &&
+      BUSINESS_BLOCK_TYPE_SET.has(block.type) &&
+      !!block.payload &&
+      typeof block.payload === "object"
+    );
+  });
+  if (isBusinessBlocks) {
+    return blocks
+      .map((entry) => {
+        const block = entry as Record<string, unknown>;
+        const payload = block.payload as Record<string, unknown>;
+        if (block.type === "text_block") return String(payload.text ?? "").trim();
+        if (block.type === "checklist_block") {
+          const items = Array.isArray(payload.items) ? payload.items : [];
+          return items
+            .map((item) => (item && typeof item === "object" ? String((item as Record<string, unknown>).text ?? "") : ""))
+            .join(" ");
+        }
+        if (block.type === "set_block") return String(payload.exercise_name ?? "").trim();
+        if (block.type === "inbox_block") {
+          const refs = Array.isArray(payload.capture_refs) ? payload.capture_refs : [];
+          return refs
+            .map((ref) => (ref && typeof ref === "object" ? String((ref as Record<string, unknown>).title ?? "") : ""))
+            .join(" ");
+        }
+        return "";
+      })
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
   return blocks
     .map((entry) => extractRichText(entry))
     .join(" ")
@@ -159,6 +202,11 @@ function defaultTitle(raw: string, fallback: string): string {
   return first || fallback;
 }
 
+function fallbackTimestampedTitle(captureType: string, createdAt: Date | null): string {
+  const stamp = (createdAt ?? new Date()).toLocaleString();
+  return `${captureType} - ${stamp}`;
+}
+
 export default function InboxCaptureDetailPage() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -172,6 +220,8 @@ export default function InboxCaptureDetailPage() {
   const deleteCapture = useDeleteCapture();
   const previewCapture = usePreviewCapture();
   const reprocessCapture = useReprocessCapture();
+  const updateCapture = useUpdateCapture();
+  const refreshNoteSummary = useRefreshNoteSummary();
 
   const capture = data?.capture ?? null;
   const assets = data?.assets ?? [];
@@ -188,6 +238,7 @@ export default function InboxCaptureDetailPage() {
   const [manualDescription, setManualDescription] = useState("");
   const [actionsDialogOpen, setActionsDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const noteRefreshKeyRef = useRef<string | null>(null);
 
   const filteredActions = useMemo(() => {
     if (!capture) return [];
@@ -196,6 +247,12 @@ export default function InboxCaptureDetailPage() {
   const isNoteCapture = useMemo(() => (capture ? captureLooksLikeNote(capture) : false), [capture]);
   const notePlainText = useMemo(() => blocksPlainText(linkedItem?.blocks), [linkedItem]);
   const notePreview = useMemo(() => blocksPreview(linkedItem?.blocks), [linkedItem]);
+  const resolvedTitle = useMemo(() => {
+    if (!capture) return "";
+    const existing = typeof capture.title === "string" ? capture.title.trim() : "";
+    if (existing) return existing;
+    return fallbackTimestampedTitle(capture.capture_type, createdAt);
+  }, [capture, createdAt]);
 
   useEffect(() => {
     if (!capture) return;
@@ -214,14 +271,20 @@ export default function InboxCaptureDetailPage() {
       return defaultActionKey;
     });
     if (!manualTitle.trim()) {
-      setManualTitle(
-        defaultTitle(
-          capture.raw_content,
-          t("pages.inbox.captureFallbackTitle", { type: capture.capture_type })
-        )
-      );
+      setManualTitle(resolvedTitle);
     }
-  }, [capture, manualTitle, t, filteredActions]);
+  }, [capture, manualTitle, t, filteredActions, resolvedTitle]);
+
+  useEffect(() => {
+    if (!captureId || !capture || !isNoteCapture || !linkedItem) return;
+    if (capture.archived || capture.status !== "ready") return;
+    if (notePlainText.trim().length < NOTE_SUMMARY_MIN_CHARS) return;
+    if (refreshNoteSummary.isPending) return;
+    const refreshKey = `${captureId}:${notePlainText}`;
+    if (noteRefreshKeyRef.current === refreshKey) return;
+    noteRefreshKeyRef.current = refreshKey;
+    refreshNoteSummary.mutate({ captureId });
+  }, [captureId, capture, isNoteCapture, linkedItem, notePlainText, refreshNoteSummary]);
 
   const selectedAction: CaptureActionSuggestion | null = useMemo(() => {
     if (!capture || !selectedActionKey) return null;
@@ -233,7 +296,8 @@ export default function InboxCaptureDetailPage() {
     archiveCapture.isPending ||
     deleteCapture.isPending ||
     previewCapture.isPending ||
-    reprocessCapture.isPending;
+    reprocessCapture.isPending ||
+    updateCapture.isPending;
 
   const navigateToInbox = useCallback(() => {
     if (typeof navigation.canGoBack === "function" && navigation.canGoBack()) {
@@ -354,7 +418,7 @@ export default function InboxCaptureDetailPage() {
     isNoteCapture && notePlainText.trim().length < NOTE_SUMMARY_MIN_CHARS;
   const showSummaryLoading =
     isCaptureQueuedOrProcessing ||
-    (!summaryText && capture.status !== "failed");
+    (isNoteCapture ? refreshNoteSummary.isPending : (!summaryText && capture.status !== "failed"));
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
@@ -407,10 +471,7 @@ export default function InboxCaptureDetailPage() {
               <View className="flex-row items-start justify-between gap-3">
                 <View className="min-w-0 flex-1">
                   <UiText className="text-lg font-semibold text-foreground" numberOfLines={1}>
-                    {defaultTitle(
-                      capture.raw_content,
-                      t("pages.inbox.captureFallbackTitle", { type: capture.capture_type })
-                    )}
+                    {resolvedTitle}
                   </UiText>
                   <View className="mt-2 flex-row flex-wrap items-center gap-2">
                     <View className={`rounded-full border px-2 py-0.5 ${statusClass}`}>
@@ -568,6 +629,34 @@ export default function InboxCaptureDetailPage() {
               </CardContent>
             </Card>
           ) : null}
+
+          <Card className="mt-3 rounded-2xl border border-border bg-card p-3">
+            <CardContent className="p-0">
+              <View className="gap-2 rounded-xl border border-border bg-background/40 p-3">
+                <Label>{t("pages.inbox.captureTitle", { defaultValue: "Capture title" })}</Label>
+                <Input
+                  value={manualTitle}
+                  onChangeText={setManualTitle}
+                  placeholder={resolvedTitle}
+                  maxLength={160}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onPress={() => {
+                    if (!captureId) return;
+                    updateCapture.mutate({
+                      captureId,
+                      payload: { title: manualTitle.trim() || null },
+                    });
+                  }}
+                  disabled={isBusy}
+                >
+                  <UiText>{t("pages.inbox.saveTitle", { defaultValue: "Save title" })}</UiText>
+                </Button>
+              </View>
+            </CardContent>
+          </Card>
 
           <Card className="mt-3 rounded-2xl border border-border bg-card p-3">
             <CardContent className="p-0">

@@ -5,15 +5,25 @@ import { TypingIndicator } from './typing-indicator';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { ArrowDown } from 'lucide-react-native';
 import { ChatMessage } from './types';
+import type { SyncPreview } from "@momentarise/shared";
 
 interface ConversationProps {
     messages: ChatMessage[];
     isStreaming: boolean;
     streamingText: string;
     emptyState?: React.ReactElement;
+    bottomInset?: number;
+    renderPlanPreview?: (preview: SyncPreview) => React.ReactNode;
 }
 
-export function Conversation({ messages, isStreaming, streamingText, emptyState }: ConversationProps) {
+export function Conversation({
+    messages,
+    isStreaming,
+    streamingText,
+    emptyState,
+    bottomInset = 96,
+    renderPlanPreview,
+}: ConversationProps) {
     const listRef = useRef<FlatList>(null);
     const contentHeight = useRef(0);
     const listHeight = useRef(0);
@@ -61,7 +71,10 @@ export function Conversation({ messages, isStreaming, streamingText, emptyState 
                 ref={listRef}
                 data={data}
                 keyExtractor={item => item.id}
-                contentContainerStyle={styles.contentContainerStyle}
+                contentContainerStyle={[
+                    styles.contentContainerStyle,
+                    { paddingBottom: Math.max(16, bottomInset + 16) },
+                ]}
                 indicatorStyle="white"
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="interactive"
@@ -76,10 +89,21 @@ export function Conversation({ messages, isStreaming, streamingText, emptyState 
                     scrollToBottom();
                 }}
                 renderItem={({ item }) => (
-                    <Message
-                        message={item}
-                        isStreaming={isStreaming && item.id === "streaming-temp"}
-                    />
+                    <View>
+                        <Message
+                            message={item}
+                            isStreaming={isStreaming && item.id === "streaming-temp"}
+                        />
+                        {item.planPreviews && item.planPreviews.length > 0 && renderPlanPreview ? (
+                            <View className="mb-6 px-4">
+                                {item.planPreviews.map((preview: SyncPreview) => (
+                                    <View key={`preview-${item.id}-${preview.id}`} className="mb-3">
+                                        {renderPlanPreview(preview)}
+                                    </View>
+                                ))}
+                            </View>
+                        ) : null}
+                    </View>
                 )}
                 ListEmptyComponent={emptyState}
                 ListFooterComponent={
@@ -97,7 +121,8 @@ export function Conversation({ messages, isStreaming, streamingText, emptyState 
                 <Animated.View
                     entering={FadeIn}
                     exiting={FadeOut}
-                    className="absolute bottom-[110px] self-center"
+                    className="absolute self-center"
+                    style={{ bottom: Math.max(24, bottomInset + 12) }}
                 >
                     <TouchableOpacity
                         onPress={scrollToBottom}
@@ -115,6 +140,5 @@ export function Conversation({ messages, isStreaming, streamingText, emptyState 
 const styles = StyleSheet.create({
     contentContainerStyle: {
         paddingTop: 24,
-        paddingBottom: 80, // Must clear the absolute floating composer
     }
 });

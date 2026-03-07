@@ -9,7 +9,6 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/
 os.environ.setdefault("JWT_SECRET", "test-secret")
 
 from src.models.ai_change import AIChange
-from src.core.config import settings
 from src.schemas.sync import SyncEventEnvelope
 from src.sync.orchestrator import SyncOrchestrator
 from src.sync.sync_mutation_engine import MutationApplyResult
@@ -282,13 +281,17 @@ class StreamTestOrchestrator(SyncOrchestrator):
 
 
 class ApplyUndoOrchestrator(SyncOrchestrator):
+    def __init__(self, *args, **kwargs):  # noqa: ANN002, ANN003
+        super().__init__(*args, **kwargs)
+        self.recorded_plain_events: list[SyncEventEnvelope] = []
+
     async def _next_seq(self, run):  # noqa: ANN001
         run.last_seq += 1
         return run.last_seq
 
     async def _record_plain_event(self, *, run, type_, payload):  # noqa: ANN001
         seq = await self._next_seq(run)
-        return SyncEventEnvelope(
+        envelope = SyncEventEnvelope(
             seq=seq,
             run_id=run.id,
             ts=datetime.now(UTC),
@@ -296,6 +299,8 @@ class ApplyUndoOrchestrator(SyncOrchestrator):
             type=type_,
             payload=payload,
         )
+        self.recorded_plain_events.append(envelope)
+        return envelope
 
 
 def make_run() -> SimpleNamespace:
@@ -320,34 +325,28 @@ def make_run() -> SimpleNamespace:
 
 class SyncOrchestratorTests(unittest.IsolatedAsyncioTestCase):
     def test_available_models_respects_provider(self) -> None:
-        previous_provider = settings.SYNC_LLM_PROVIDER
-        previous_small = settings.SYNC_MODEL_SMALL
-        previous_balanced = settings.SYNC_MODEL_BALANCED
-        previous_quality = settings.SYNC_MODEL_QUALITY
-        try:
-            settings.SYNC_LLM_PROVIDER = "openai"
-            settings.SYNC_MODEL_SMALL = "gpt-4.1-mini"
-            settings.SYNC_MODEL_BALANCED = "gpt-4.1"
-            settings.SYNC_MODEL_QUALITY = "o3"
+        mocked_models = [
+            {"id": "gpt-5-mini", "provider": "openai", "label": "GPT-5 Mini"},
+            {"id": "gemini/gemini-3-flash", "provider": "gemini", "label": "Gemini 3 Flash"},
+        ]
 
+        with (
+            patch("src.sync.orchestrator._registry_get_models", return_value=mocked_models.copy()),
+            patch("src.sync.orchestrator.resolve_auto_model", return_value="gpt-5-mini"),
+        ):
             models = SyncOrchestrator.available_models()
 
-            self.assertEqual(models[0]["provider"], "openai")
-            self.assertEqual(models[0]["id"], "gpt-4.1-mini")
-            self.assertEqual(models[1]["label"], "Balanced")
+        self.assertEqual(models[0]["provider"], "openai")
+        self.assertEqual(models[1]["provider"], "gemini")
+        self.assertTrue(models[0]["is_default"])
+        self.assertFalse(models[1]["is_default"])
 
-            settings.SYNC_LLM_PROVIDER = "gemini"
-            settings.SYNC_MODEL_SMALL = "gemini-2.5-flash-lite"
-            settings.SYNC_MODEL_BALANCED = "gemini-2.5-flash"
-            settings.SYNC_MODEL_QUALITY = "gemini-2.5-pro"
-            models = SyncOrchestrator.available_models()
-            self.assertEqual(models[0]["provider"], "gemini")
-            self.assertEqual(models[1]["id"], "gemini-2.5-flash")
-        finally:
-            settings.SYNC_LLM_PROVIDER = previous_provider
-            settings.SYNC_MODEL_SMALL = previous_small
-            settings.SYNC_MODEL_BALANCED = previous_balanced
-            settings.SYNC_MODEL_QUALITY = previous_quality
+    def test_preview_gating_mutation_intent_heuristic(self) -> None:
+        self.assertTrue(SyncOrchestrator._is_explicit_mutation_intent("Crée un moment demain à 9h"))
+        self.assertTrue(SyncOrchestrator._is_explicit_mutation_intent("Please update this item title"))
+        self.assertFalse(SyncOrchestrator._is_explicit_mutation_intent("Résume cette pièce jointe"))
+        self.assertFalse(SyncOrchestrator._is_explicit_mutation_intent("Brainstormons sur ce document"))
+        self.assertFalse(SyncOrchestrator._is_explicit_mutation_intent("Explique-moi ce plan"))
 
     async def test_stream_run_simple_final_answer(self) -> None:
         db = FakeDB()
@@ -436,6 +435,105 @@ class SyncOrchestratorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events, [])
         mocked_complete.assert_not_awaited()
 
+    async def test_stream_run_rejects_attachment_still_processing(self) -> None:
+        db = FakeDB()
+        orchestrator = StreamTestOrchestrator(
+            db=db,
+            workspace_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+        )
+        run = make_run()
+        capture_id = uuid.uuid4()
+        capture = SimpleNamespace(
+            id=capture_id,
+            status="processing",
+            capture_type="file",
+            raw_content="",
+            meta={},
+        )
+
+        with patch.object(
+            orchestrator,
+            "_load_capture_for_workspace",
+            new=AsyncMock(return_value=capture),
+        ):
+            events = await orchestrator.stream_run(
+                run=run,
+                message="use this attachment",
+                attachments=[{"capture_id": str(capture_id), "source": "upload"}],
+            )
+
+        self.assertEqual(run.status, "failed")
+        self.assertEqual([event.type for event in events], ["error", "done"])
+        self.assertEqual(events[0].payload["code"], "validation_error")
+        self.assertIn("attachment", events[0].payload["message"].lower())
+
+    async def test_stream_run_with_item_reference_emits_metadata_and_sources(self) -> None:
+        db = FakeDB()
+        orchestrator = StreamTestOrchestrator(
+            db=db,
+            workspace_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+        )
+        run = make_run()
+        item_id = uuid.uuid4()
+        item = SimpleNamespace(
+            id=item_id,
+            title="Referenced Item",
+            kind="task",
+            status="active",
+            blocks=[{"type": "paragraph", "content": [{"text": "Item context"}]}],
+        )
+
+        with (
+            patch.object(
+                orchestrator,
+                "_load_item_for_workspace",
+                new=AsyncMock(return_value=item),
+            ),
+            patch.object(
+                orchestrator,
+                "_item_exists_any_workspace",
+                new=AsyncMock(return_value=False),
+            ),
+            patch("src.sync.orchestrator.RetrievalService.search", new=AsyncMock(return_value=[])),
+            patch(
+                "src.sync.orchestrator.LiteLLMClient.complete",
+                new=AsyncMock(
+                    return_value={
+                        "content": "I used the reference.",
+                        "provider": "mistral",
+                        "model": "mistral-medium-latest",
+                        "usage": {"input_tokens": 3, "output_tokens": 5, "total_tokens": 8, "cost_usd": None},
+                        "tool_calls": [],
+                        "warning": None,
+                    }
+                ),
+            ),
+        ):
+            events = await orchestrator.stream_run(
+                run=run,
+                message="plan based on this",
+                references=[{"kind": "item", "id": str(item_id), "label": "Backlog item"}],
+            )
+
+        event_types = [event.type for event in events]
+        self.assertIn("sources", event_types)
+        user_message_event = next(
+            event
+            for event in events
+            if event.type == "message" and event.payload.get("role") == "user"
+        )
+        metadata = (
+            user_message_event.payload.get("content_json", {})
+            .get("metadata", {})
+            .get("sync_context", {})
+        )
+        resolved = metadata.get("resolved", [])
+        self.assertEqual(len(resolved), 1)
+        self.assertEqual(resolved[0]["kind"], "item")
+        self.assertEqual(resolved[0]["id"], str(item_id))
+
     async def test_stream_run_tool_call_loop_emits_preview_and_ready_to_apply(self) -> None:
         db = FakeDB()
         orchestrator = StreamTestOrchestrator(
@@ -459,7 +557,7 @@ class SyncOrchestratorTests(unittest.IsolatedAsyncioTestCase):
                             "tool_calls": [
                                 {
                                     "id": "call_1",
-                                    "name": "item.preview",
+                                    "name": "item_preview",
                                     "arguments": {"title": "Write project recap"},
                                 }
                             ],
@@ -580,6 +678,9 @@ class SyncOrchestratorTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(apply_out.preview_id, preview_id)
+        self.assertEqual(apply_out.open_target_kind, "item")
+        self.assertEqual(apply_out.open_target_id, mutation_entity_id)
+        self.assertIsNone(apply_out.open_target_date)
         self.assertEqual(run.status, "applied")
         self.assertIsNotNone(preview.applied_change_id)
 
@@ -611,6 +712,178 @@ class SyncOrchestratorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(undo_out.undone)
         self.assertEqual(run.status, "done")
+        self.assertFalse(applied_change.undoable)
+        event_types = [event.type for event in orchestrator.recorded_plain_events]
+        self.assertIn("undone", event_types)
+        self.assertIn("done", event_types)
+        undone_event = next(
+            event for event in orchestrator.recorded_plain_events if event.type == "undone"
+        )
+        self.assertEqual(undone_event.payload["source_change_id"], str(applied_change.id))
+        self.assertEqual(undone_event.payload["open_target_kind"], "item")
+
+    async def test_apply_preview_returns_open_target_metadata_for_item_event_and_transform(self) -> None:
+        run = make_run()
+        run.status = "ready_to_apply"
+
+        cases = [
+            {
+                "name": "item",
+                "mutation": MutationApplyResult(
+                    entity_type="item",
+                    entity_id=uuid.uuid4(),
+                    action="item.update",
+                    before_payload={"item": {"id": str(uuid.uuid4()), "title": "before"}},
+                    after_payload={"item": {"id": None, "title": "after"}},
+                    undoable=True,
+                ),
+                "expected_kind": "item",
+                "expected_date": None,
+            },
+            {
+                "name": "event",
+                "mutation": MutationApplyResult(
+                    entity_type="event",
+                    entity_id=uuid.uuid4(),
+                    action="event.update",
+                    before_payload={},
+                    after_payload={
+                        "event": {
+                            "id": None,
+                            "start_at": "2026-02-16T09:30:00+00:00",
+                        }
+                    },
+                    undoable=True,
+                ),
+                "expected_kind": "event",
+                "expected_date": "2026-02-16",
+            },
+            {
+                "name": "event-before-fallback",
+                "mutation": MutationApplyResult(
+                    entity_type="event",
+                    entity_id=uuid.uuid4(),
+                    action="event.update",
+                    before_payload={
+                        "event": {
+                            "id": None,
+                            "start_at": "2026-03-01T10:00:00+00:00",
+                        }
+                    },
+                    after_payload={"event": {"id": None}},
+                    undoable=True,
+                ),
+                "expected_kind": "event",
+                "expected_date": "2026-03-01",
+            },
+            {
+                "name": "inbox-transform-item",
+                "mutation": MutationApplyResult(
+                    entity_type="capture",
+                    entity_id=uuid.uuid4(),
+                    action="inbox.transform",
+                    before_payload={},
+                    after_payload={"item": {"id": str(uuid.uuid4())}, "event": None},
+                    undoable=True,
+                ),
+                "expected_kind": "item",
+                "expected_date": None,
+            },
+            {
+                "name": "inbox-transform-event",
+                "mutation": MutationApplyResult(
+                    entity_type="capture",
+                    entity_id=uuid.uuid4(),
+                    action="inbox.transform",
+                    before_payload={},
+                    after_payload={
+                        "item": {"id": str(uuid.uuid4())},
+                        "event": {
+                            "id": str(uuid.uuid4()),
+                            "start_at": "2026-02-17T14:00:00+00:00",
+                        },
+                    },
+                    undoable=True,
+                ),
+                "expected_kind": "event",
+                "expected_date": "2026-02-17",
+            },
+        ]
+
+        for case in cases:
+            preview_id = uuid.uuid4()
+            preview = SimpleNamespace(
+                id=preview_id,
+                run_id=run.id,
+                kind="preview",
+                body_json={"mutation": {"kind": "item.update", "args": {}}},
+                expires_at=datetime.now(UTC) + timedelta(minutes=10),
+                undoable=True,
+                applied_change_id=None,
+            )
+            db = FakeDB(execute_values=[None, preview])
+            orchestrator = ApplyUndoOrchestrator(
+                db=db,
+                workspace_id=run.workspace_id,
+                user_id=run.created_by_user_id,
+            )
+            mutation = case["mutation"]
+            # Keep entity ids stable across expected assertions.
+            if mutation.entity_type == "item":
+                mutation.after_payload = {
+                    "item": {
+                        "id": str(mutation.entity_id),
+                        "title": "after",
+                    }
+                }
+            if case["name"] == "event":
+                mutation.after_payload = {
+                    "event": {
+                        "id": str(mutation.entity_id),
+                        "start_at": "2026-02-16T09:30:00+00:00",
+                    }
+                }
+
+            with self.subTest(case=case["name"]):
+                with patch(
+                    "src.sync.orchestrator.SyncMutationEngine.apply_preview_payload",
+                    new=AsyncMock(return_value=mutation),
+                ):
+                    out = await orchestrator.apply_preview(
+                        run=run,
+                        preview_id=preview_id,
+                        idempotency_key=f"idem-{case['name']}",
+                    )
+
+                self.assertEqual(out.open_target_kind, case["expected_kind"])
+                self.assertEqual(out.entity_type, mutation.entity_type)
+                if case["expected_kind"] == "item":
+                    item_id = mutation.after_payload["item"]["id"]  # type: ignore[index]
+                    self.assertEqual(out.open_target_id, uuid.UUID(str(item_id)))
+                if case["expected_kind"] == "event":
+                    after_event = (
+                        mutation.after_payload.get("event")
+                        if isinstance(mutation.after_payload, dict)
+                        else None
+                    )
+                    before_event = (
+                        mutation.before_payload.get("event")
+                        if isinstance(mutation.before_payload, dict)
+                        else None
+                    )
+                    expected_event_id = None
+                    if isinstance(after_event, dict):
+                        expected_event_id = after_event.get("id")
+                    if not expected_event_id and isinstance(before_event, dict):
+                        expected_event_id = before_event.get("id")
+                    if not expected_event_id:
+                        expected_event_id = mutation.entity_id
+                    self.assertEqual(out.open_target_id, uuid.UUID(str(expected_event_id)))
+                expected_date = case["expected_date"]
+                if expected_date is None:
+                    self.assertIsNone(out.open_target_date)
+                else:
+                    self.assertEqual(out.open_target_date.isoformat(), expected_date)
 
     async def test_apply_preview_idempotency_returns_existing_change(self) -> None:
         run = make_run()
@@ -699,4 +972,5 @@ class SyncOrchestratorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(out.undone)
         self.assertEqual(out.undone_at, existing_undo.created_at)
+        self.assertFalse(source_change.undoable)
         mocked_undo.assert_not_awaited()

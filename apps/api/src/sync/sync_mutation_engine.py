@@ -363,20 +363,32 @@ class SyncMutationEngine:
     async def _apply_event_create(self, mutation_kind: str, args: dict[str, Any]) -> MutationApplyResult:
         title = self._require_string(args.get("title"), "event.create title")
         item_id = self._maybe_uuid(args.get("item_id"))
+        description = args.get("description")
 
         created_item: Item | None = None
         if item_id is not None:
             item = await self._get_item(item_id, include_deleted=False)
             if item is None:
                 raise SyncMutationNotFoundError("Item not found for event.create")
+            # Description for event.create is now stored in item.meta["description"]
+            # instead of being written into blocks for this specific mutation.
+            if isinstance(description, str) and description.strip():
+                meta = dict(item.meta or {})
+                meta.setdefault("source", "sync")
+                meta["description"] = description.strip()
+                item.meta = meta
         else:
+            meta: dict[str, Any] = {"source": "sync"}
+            if isinstance(description, str) and description.strip():
+                meta["description"] = description.strip()
             created_item = Item(
                 workspace_id=self.workspace_id,
                 title=title,
                 kind="task",
                 status="ready",
-                meta={"source": "sync"},
-                blocks=[],
+                meta=meta,
+                # blocks reserved for future rich-text usage on event.create
+                # blocks=blocks,
             )
             self.db.add(created_item)
             await self.db.flush()
@@ -395,6 +407,7 @@ class SyncMutationEngine:
         event = Event(
             workspace_id=self.workspace_id,
             item_id=item.id,
+            description=description.strip() if isinstance(description, str) and description.strip() else None,
             start_at=start_at,
             end_at=end_at,
             estimated_time_seconds=estimated_time_seconds,

@@ -16,6 +16,8 @@ export interface CalendarEvent {
   parentEventId?: string;
   seriesId?: string;
   projectId?: string;
+  estimatedTimeSeconds?: number;
+  actualTimeAccSeconds?: number;
 }
 
 export type EventColor =

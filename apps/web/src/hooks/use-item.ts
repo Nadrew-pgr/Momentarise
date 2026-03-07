@@ -103,7 +103,7 @@ export function useUpdateItem(itemId: string | null) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to update item");
+      if (!res.ok) throw new Error(await readWebError(res, "Failed to update item"));
       const data = await res.json();
       return itemOutSchema.parse(data) as ItemOut;
     },
@@ -251,6 +251,25 @@ export function useCreateItemLink(itemId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["item-links", itemId] });
+    },
+  });
+}
+
+export function useDeleteItemLink(itemId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ linkId }: { linkId: string }) => {
+      if (!itemId) throw new Error("No item id");
+      const res = await fetchWithAuth(`/api/items/${itemId}/links/${linkId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(await readWebError(res, "Failed to delete link"));
+      const data = await res.json();
+      return itemActionResponseSchema.parse(data) as ItemActionResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["item-links", itemId] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
     },
   });
 }

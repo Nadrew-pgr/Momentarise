@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#059669", /* Bold Emerald Green */
+                        "background-light": "#fafaf9", /* Warm neutral/cream */
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<title>Moment Detail - Momentarise</title>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">
+<div class="relative flex min-h-screen w-full flex-col pb-32">
+<!-- Top App Bar -->
+<header class="sticky top-0 z-50 bg-background-light/80 backdrop-blur-md dark:bg-background-dark/80 px-4 py-3 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-primary/10 transition-colors">
+<span class="material-symbols-outlined text-slate-900 dark:text-slate-100">arrow_back_ios_new</span>
+</button>
+<h2 class="text-sm font-bold uppercase tracking-widest text-primary">Moment Detail</h2>
+</div>
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-primary/10 transition-colors">
+<span class="material-symbols-outlined text-slate-900 dark:text-slate-100">more_horiz</span>
+</button>
+</header>
+<main class="px-4 pt-4">
+<!-- Header Section -->
+<div class="mb-6">
+<h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 mb-3">Q4 Strategy Alignment</h1>
+<div class="flex gap-2 flex-wrap">
+<span class="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
+                        Project: Growth
+                    </span>
+<span class="inline-flex items-center px-3 py-1 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold">
+                        Series: Planning
+                    </span>
+</div>
+</div>
+<!-- Progress Horizontal Strip -->
+<div class="grid grid-cols-3 gap-3 mb-8">
+<div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center">
+<span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Status</span>
+<p class="text-lg font-extrabold text-primary">85%</p>
+<p class="text-[10px] text-slate-500 font-medium">Complete</p>
+</div>
+<div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center">
+<span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Est. Time</span>
+<p class="text-lg font-extrabold text-slate-900 dark:text-slate-100">4h</p>
+<p class="text-[10px] text-slate-500 font-medium">Remaining</p>
+</div>
+<div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center">
+<span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Momentum</span>
+<p class="text-lg font-extrabold text-slate-900 dark:text-slate-100">92</p>
+<div class="flex items-center text-[10px] text-emerald-500 font-bold">
+<span class="material-symbols-outlined text-[12px]">trending_up</span> 2%
+                    </div>
+</div>
+</div>
+<!-- Content Blocks -->
+<div class="space-y-4">
+<!-- 1. Objective Block -->
+<section class="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary text-xl">flag</span>
+<h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">Objective</h3>
+</div>
+<p class="text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                        Finalize the Q4 roadmap focusing on organic user acquisition and retention through optimized onboarding flows and premium tier restructuring.
+                    </p>
+</section>
+<!-- 2. Checklist Block -->
+<section class="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">checklist</span>
+<h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">Tasks</h3>
+</div>
+<span class="text-xs font-bold text-slate-500">3/4 Done</span>
+</div>
+<ul class="space-y-3">
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">check_circle</span>
+<span class="text-sm text-slate-500 line-through">Review user feedback logs</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">check_circle</span>
+<span class="text-sm text-slate-500 line-through">Competitor pricing analysis</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">check_circle</span>
+<span class="text-sm text-slate-500 line-through">Draft UI mockups for onboarding</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-300">radio_button_unchecked</span>
+<span class="text-sm text-slate-900 dark:text-slate-100 font-medium">Final sign-off from stakeholders</span>
+</li>
+</ul>
+</section>
+<!-- 3. Budget Table -->
+<section class="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary text-xl">payments</span>
+<h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">Budget Items</h3>
+</div>
+<div class="overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800">
+<table class="w-full text-left text-sm">
+<thead class="bg-slate-50 dark:bg-slate-800">
+<tr>
+<th class="px-4 py-2 font-bold text-slate-600 dark:text-slate-300">Item</th>
+<th class="px-4 py-2 font-bold text-slate-600 dark:text-slate-300 text-right">Cost</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<tr>
+<td class="px-4 py-3 text-slate-700 dark:text-slate-300">User Testing Pool</td>
+<td class="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100">$1,200</td>
+</tr>
+<tr>
+<td class="px-4 py-3 text-slate-700 dark:text-slate-300">Cloud Infrastructure</td>
+<td class="px-4 py-3 text-right font-bold text-slate-900 dark:text-slate-100">$850</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- 4. 1-10 Scale Block -->
+<section class="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">bolt</span>
+<h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">Confidence Level</h3>
+</div>
+<span class="text-xl font-black text-primary">8/10</span>
+</div>
+<div class="flex items-center justify-between gap-1">
+<!-- Scale indicators -->
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+<div class="h-2 flex-1 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+</div>
+</section>
+<!-- 5. Links List -->
+<section class="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary text-xl">link</span>
+<h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">Resources</h3>
+</div>
+<div class="space-y-3">
+<a class="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 hover:bg-primary/5 transition-colors" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400">public</span>
+<span class="text-sm font-medium">Design System Docs</span>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-sm">open_in_new</span>
+</a>
+<a class="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 hover:bg-primary/5 transition-colors" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400">description</span>
+<span class="text-sm font-medium">Market Research Spreadsheet</span>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-sm">open_in_new</span>
+</a>
+</div>
+</section>
+<!-- 6. Attachment Preview -->
+<section class="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary text-xl">attachment</span>
+<h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">Attachments</h3>
+</div>
+<div class="flex items-center gap-4 p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30">
+<div class="size-12 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-red-600 dark:text-red-400">picture_as_pdf</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-bold text-slate-900 dark:text-slate-100">Q4_Draft_v2.pdf</p>
+<p class="text-xs text-slate-500">2.4 MB • Updated 2h ago</p>
+</div>
+<button class="text-primary font-bold text-xs uppercase tracking-widest">View</button>
+</div>
+</section>
+</div>
+</main>
+<!-- Sticky Bottom Actions -->
+<div class="fixed bottom-0 left-0 right-0 p-4 bg-background-light/80 backdrop-blur-xl dark:bg-background-dark/80 border-t border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3 max-w-lg mx-auto">
+<button class="flex-1 h-12 flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl font-bold text-sm transition-transform active:scale-95">
+<span class="material-symbols-outlined text-[20px]">add</span>
+                    Block
+                </button>
+<button class="flex-1 h-12 flex items-center justify-center gap-2 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/20 transition-transform active:scale-95">
+<span class="material-symbols-outlined text-[20px]">edit_note</span>
+                    Log Update
+                </button>
+<button class="size-12 flex items-center justify-center bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl transition-transform active:scale-95">
+<span class="material-symbols-outlined">auto_awesome</span>
+</button>
+</div>
+</div>
+</div>
+</body></html>

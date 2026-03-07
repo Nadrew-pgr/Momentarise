@@ -137,6 +137,10 @@ class ToolExecutor:
                                 "type": "string",
                                 "enum": ["sky", "amber", "violet", "rose", "emerald", "orange"],
                             },
+                            "description": {
+                                "type": "string",
+                                "description": "A description of the event or the notes to attach to it.",
+                            },
                             "changes": {"type": "object", "additionalProperties": True},
                             "display_summary": {
                                 "type": "string",
@@ -253,12 +257,12 @@ class ToolExecutor:
             }
 
         if operation == "update":
-            changes = args.get("changes") if isinstance(args.get("changes"), dict) else {}
-            for key in ["title", "start_at", "end_at", "estimated_time_seconds", "color", "item_id"]:
+            changes: dict[str, Any] = args.get("changes") if isinstance(args.get("changes"), dict) else {}
+            for key in ["title", "start_at", "end_at", "estimated_time_seconds", "color", "item_id", "description"]:
                 if key in args and args.get(key) is not None:
                     changes[key] = args.get(key)
-            if "color" in changes:
-                changes["color"] = cls._normalize_event_color(changes.get("color"))
+            if "color" in changes and isinstance(changes["color"], str):
+                changes["color"] = cls._normalize_event_color(changes["color"])
 
             mutation = {
                 "kind": "event.update",
@@ -302,6 +306,7 @@ class ToolExecutor:
                 "end_at": end_at.isoformat(),
                 "estimated_time_seconds": estimated_time_seconds,
                 "color": color,
+                "description": cls._as_string(args.get("description")),
             },
         }
         if display_summary:

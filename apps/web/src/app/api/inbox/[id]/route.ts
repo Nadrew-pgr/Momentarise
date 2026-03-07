@@ -17,3 +17,16 @@ export async function DELETE(
     method: "DELETE",
   });
 }
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.text();
+  return proxyWithAuth(`/api/v1/inbox/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+}

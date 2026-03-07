@@ -2,6 +2,7 @@
 
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import type { ToolUIPart } from "ai";
+import type { SyncPreview } from "@momentarise/shared";
 
 import {
   Attachment,
@@ -75,6 +76,7 @@ import { toast } from "sonner";
 interface MessageType {
   key: string;
   from: "user" | "assistant";
+  planPreviews?: SyncPreview[];
   sources?: { href: string; title: string }[];
   versions: {
     id: string;
@@ -96,7 +98,7 @@ interface MessageType {
 
 /** Map Sync chat messages + latest reasoning/sources to UI MessageType */
 function syncMessagesToMessageTypes(
-  syncMessages: { id: string; role: string; content: string }[],
+  syncMessages: { id: string; role: string; content: string; planPreviews?: SyncPreview[] }[],
   latestReasoning: { content?: string; durationMs?: number } | null,
   latestSources: { items: { url: string; title: string }[] } | null
 ): MessageType[] {
@@ -117,6 +119,7 @@ function syncMessagesToMessageTypes(
       return {
         key: m.id,
         from: m.role as "user" | "assistant",
+        planPreviews: m.planPreviews,
         sources,
         reasoning,
         versions: [{ id: m.id, content: m.content }],
@@ -194,11 +197,9 @@ const SuggestionItem = ({
 
 const ModelItem = ({
   m,
-  isSelected,
   onSelect,
 }: {
   m: { id: string; label: string; provider: string };
-  isSelected: boolean;
   onSelect: (id: string) => void;
 }) => {
   const handleSelect = useCallback(() => {
@@ -232,6 +233,13 @@ const Example = () => {
   const selectedModelData = useMemo(
     () => sync.models.find((m) => m.id === sync.selectedModel),
     [sync.models, sync.selectedModel]
+  );
+  const renderedPreviewIds = useMemo(
+    () =>
+      new Set(
+        messages.flatMap((message) => (message.planPreviews ?? []).map((preview) => preview.id))
+      ),
+    [messages]
   );
 
   const handleSubmit = useCallback(
@@ -333,6 +341,42 @@ const Example = () => {
                       <MessageContent>
                         <MessageResponse>{version.content}</MessageResponse>
                       </MessageContent>
+                      {message.planPreviews?.map((preview) => (
+                        <div key={`preview-${preview.id}`} className="pt-2">
+                          <PreviewPlanCard
+                            preview={preview}
+                            canApply={!sync.isApplying && !sync.appliedPreviewIds.includes(preview.id)}
+                            canUndo={false}
+                            isApplying={sync.isApplying}
+                            isUndoing={sync.isUndoing}
+                            isApplied={sync.appliedPreviewIds.includes(preview.id)}
+                            onApply={() => sync.handleApply(preview.id)}
+                            onUndo={sync.handleUndo}
+                            labels={{
+                              title: t("pages.sync.previewPlan.title"),
+                              entityEvent: t("pages.sync.previewPlan.entityEvent"),
+                              entityItem: t("pages.sync.previewPlan.entityItem"),
+                              entityCapture: t("pages.sync.previewPlan.entityCapture"),
+                              entityTimeline: t("pages.sync.previewPlan.entityTimeline"),
+                              entityUnknown: t("pages.sync.previewPlan.entityUnknown"),
+                              summary: t("pages.sync.previewPlan.summary"),
+                              mutations: t("pages.sync.previewPlan.mutations"),
+                              notes: t("pages.sync.previewPlan.notes"),
+                              apply: t("pages.sync.actions.apply"),
+                              undo: t("pages.sync.actions.undo"),
+                              applied: t("pages.sync.status.run.applied"),
+                              pending: t("pages.sync.previewPlan.pending"),
+                              applying: t("pages.sync.previewPlan.applying"),
+                              schedule: t("pages.sync.previewPlan.schedule"),
+                              linkedProject: t("pages.sync.previewPlan.linkedProject"),
+                              linkedSeries: t("pages.sync.previewPlan.linkedSeries"),
+                              targetEvent: t("pages.sync.previewPlan.targetEvent"),
+                              targetItem: t("pages.sync.previewPlan.targetItem"),
+                              descriptionPrefix: t("pages.sync.previewPlan.descriptionPrefix"),
+                            }}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </Message>
                 ))}
@@ -346,24 +390,38 @@ const Example = () => {
               )}
             </MessageBranch>
           ))}
-          {sync.latestPreview ? (
+          {sync.latestPreview && !renderedPreviewIds.has(sync.latestPreview.id) ? (
             <div className="px-4 py-2">
               <PreviewPlanCard
                 preview={sync.latestPreview}
-                canApply={sync.canApply}
+                canApply={sync.canApply && !sync.appliedPreviewIds.includes(sync.latestPreview.id)}
                 canUndo={sync.canUndo}
                 isApplying={sync.isApplying}
                 isUndoing={sync.isUndoing}
-                onApply={sync.handleApply}
+                isApplied={sync.appliedPreviewIds.includes(sync.latestPreview.id)}
+                onApply={() => sync.handleApply(sync.latestPreview?.id)}
                 onUndo={sync.handleUndo}
                 labels={{
                   title: t("pages.sync.previewPlan.title"),
+                  entityEvent: t("pages.sync.previewPlan.entityEvent"),
+                  entityItem: t("pages.sync.previewPlan.entityItem"),
+                  entityCapture: t("pages.sync.previewPlan.entityCapture"),
+                  entityTimeline: t("pages.sync.previewPlan.entityTimeline"),
+                  entityUnknown: t("pages.sync.previewPlan.entityUnknown"),
                   summary: t("pages.sync.previewPlan.summary"),
                   mutations: t("pages.sync.previewPlan.mutations"),
                   notes: t("pages.sync.previewPlan.notes"),
                   apply: t("pages.sync.actions.apply"),
                   undo: t("pages.sync.actions.undo"),
+                  applied: t("pages.sync.status.run.applied"),
                   pending: t("pages.sync.previewPlan.pending"),
+                  applying: t("pages.sync.previewPlan.applying"),
+                  schedule: t("pages.sync.previewPlan.schedule"),
+                  linkedProject: t("pages.sync.previewPlan.linkedProject"),
+                  linkedSeries: t("pages.sync.previewPlan.linkedSeries"),
+                  targetEvent: t("pages.sync.previewPlan.targetEvent"),
+                  targetItem: t("pages.sync.previewPlan.targetItem"),
+                  descriptionPrefix: t("pages.sync.previewPlan.descriptionPrefix"),
                 }}
               />
             </div>
@@ -437,7 +495,6 @@ const Example = () => {
                       <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
                       {sync.models.map((m) => (
                         <ModelItem
-                          isSelected={sync.selectedModel === m.id}
                           key={m.id}
                           m={m}
                           onSelect={handleModelSelect}

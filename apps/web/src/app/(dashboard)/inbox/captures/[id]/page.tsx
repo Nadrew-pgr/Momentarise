@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -18,14 +18,21 @@ import {
   Trash2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { CaptureActionSuggestion, CaptureAssetOut, CaptureArtifactOut } from "@momentarise/shared";
+import {
+  businessBlockTypeValues,
+  type CaptureActionSuggestion,
+  type CaptureAssetOut,
+  type CaptureArtifactOut,
+} from "@momentarise/shared";
 import {
   useApplyCapture,
   useArchiveCapture,
   useCaptureDetail,
   useDeleteCapture,
   usePreviewCapture,
+  useRefreshNoteSummary,
   useReprocessCapture,
+  useUpdateCapture,
 } from "@/hooks/use-inbox";
 import { useItem } from "@/hooks/use-item";
 import { Button } from "@/components/ui/button";
@@ -52,6 +59,7 @@ import {
 } from "@/components/ui/dialog";
 
 const NOTE_SUMMARY_MIN_CHARS = 180;
+const BUSINESS_BLOCK_TYPE_SET = new Set<string>(businessBlockTypeValues);
 
 function captureIcon(type: string) {
   switch (type) {
@@ -128,6 +136,41 @@ function blocksPreview(blocks: unknown): string {
 
 function blocksPlainText(blocks: unknown): string {
   if (!Array.isArray(blocks)) return "";
+  const isBusinessBlocks = blocks.length > 0 && blocks.every((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const block = entry as Record<string, unknown>;
+    return (
+      typeof block.type === "string" &&
+      BUSINESS_BLOCK_TYPE_SET.has(block.type) &&
+      !!block.payload &&
+      typeof block.payload === "object"
+    );
+  });
+  if (isBusinessBlocks) {
+    return blocks
+      .map((entry) => {
+        const block = entry as Record<string, unknown>;
+        const payload = block.payload as Record<string, unknown>;
+        if (block.type === "text_block") return String(payload.text ?? "").trim();
+        if (block.type === "checklist_block") {
+          const items = Array.isArray(payload.items) ? payload.items : [];
+          return items
+            .map((item) => (item && typeof item === "object" ? String((item as Record<string, unknown>).text ?? "") : ""))
+            .join(" ");
+        }
+        if (block.type === "set_block") return String(payload.exercise_name ?? "").trim();
+        if (block.type === "inbox_block") {
+          const refs = Array.isArray(payload.capture_refs) ? payload.capture_refs : [];
+          return refs
+            .map((ref) => (ref && typeof ref === "object" ? String((ref as Record<string, unknown>).title ?? "") : ""))
+            .join(" ");
+        }
+        return "";
+      })
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
   return blocks
     .map((entry) => extractRichText(entry))
     .join(" ")
@@ -174,6 +217,14 @@ function defaultTitle(raw: string, fallback: string): string {
   return first || fallback;
 }
 
+function fallbackTimestampedTitle(captureType: string, createdAt: Date | null, locale: string): string {
+  const timestamp = (createdAt ?? new Date()).toLocaleString(locale || "en-US", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+  return `${captureType} - ${timestamp}`;
+}
+
 export default function InboxCaptureDetailPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -187,6 +238,8 @@ export default function InboxCaptureDetailPage() {
   const deleteCapture = useDeleteCapture();
   const previewCapture = usePreviewCapture();
   const reprocessCapture = useReprocessCapture();
+  const updateCapture = useUpdateCapture();
+  const refreshNoteSummary = useRefreshNoteSummary();
 
   const capture = data?.capture ?? null;
   const assets = useMemo(() => data?.assets ?? [], [data?.assets]);
@@ -205,6 +258,7 @@ export default function InboxCaptureDetailPage() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [seriesId, setSeriesId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const noteRefreshKeyRef = useRef<string | null>(null);
 
   const filteredActions = useMemo(() => {
     if (!capture) return [];
@@ -226,6 +280,12 @@ export default function InboxCaptureDetailPage() {
   const isNoteCapture = useMemo(() => (capture ? captureLooksLikeNote(capture) : false), [capture]);
   const notePlainText = useMemo(() => blocksPlainText(linkedItem?.blocks), [linkedItem]);
   const notePreview = useMemo(() => blocksPreview(linkedItem?.blocks), [linkedItem]);
+  const resolvedTitle = useMemo(() => {
+    if (!capture) return "";
+    const existing = typeof capture.title === "string" ? capture.title.trim() : "";
+    if (existing) return existing;
+    return fallbackTimestampedTitle(capture.capture_type, createdAt, i18n.language || "en-US");
+  }, [capture, createdAt, i18n.language]);
 
   useEffect(() => {
     if (!capture) return;
@@ -251,9 +311,27 @@ export default function InboxCaptureDetailPage() {
       return defaultActionKey;
     });
     if (!manualTitle.trim()) {
-      setManualTitle(defaultTitle(capture.raw_content, t("pages.inbox.captureFallbackTitle", { type: capture.capture_type })));
+      setManualTitle(resolvedTitle);
     }
-  }, [capture, actionKeyFromUrl, manualTitle, t, filteredActions]);
+  }, [capture, actionKeyFromUrl, manualTitle, t, filteredActions, resolvedTitle]);
+
+  useEffect(() => {
+    if (!captureId || !capture || !isNoteCapture || !linkedItem) return;
+    if (capture.archived || capture.status !== "ready") return;
+    if (notePlainText.trim().length < NOTE_SUMMARY_MIN_CHARS) return;
+    if (refreshNoteSummary.isPending) return;
+    const refreshKey = `${captureId}:${notePlainText}`;
+    if (noteRefreshKeyRef.current === refreshKey) return;
+    noteRefreshKeyRef.current = refreshKey;
+    refreshNoteSummary.mutate({ captureId });
+  }, [
+    captureId,
+    capture,
+    isNoteCapture,
+    linkedItem,
+    notePlainText,
+    refreshNoteSummary,
+  ]);
 
   const selectedAction: CaptureActionSuggestion | null = useMemo(() => {
     if (!capture || !selectedActionKey) return null;
@@ -265,7 +343,8 @@ export default function InboxCaptureDetailPage() {
     archiveCapture.isPending ||
     deleteCapture.isPending ||
     previewCapture.isPending ||
-    reprocessCapture.isPending;
+    reprocessCapture.isPending ||
+    updateCapture.isPending;
 
   const handlePreview = useCallback(() => {
     if (!captureId || !selectedAction) return;
@@ -351,15 +430,6 @@ export default function InboxCaptureDetailPage() {
   const primaryAsset = assets[0] ?? null;
   const actionCount = filteredActions.length;
   const preview = previewCapture.data;
-  const previewMissingFields = useMemo(() => {
-    const payload = preview?.preview_payload;
-    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
-    const raw = (payload as Record<string, unknown>).missing_fields;
-    if (!Array.isArray(raw)) return [];
-    return raw.filter(
-      (entry): entry is string => typeof entry === "string" && entry.trim().length > 0
-    );
-  }, [preview?.preview_payload]);
   const requiresVoiceContext = capture.capture_type === "voice" && !capture.archived;
   const captureTypeLabel = t(`pages.inbox.filter.${capture.capture_type}`, {
     defaultValue: capture.capture_type,
@@ -384,7 +454,7 @@ export default function InboxCaptureDetailPage() {
     isNoteCapture && notePlainText.trim().length < NOTE_SUMMARY_MIN_CHARS;
   const showSummaryLoading =
     isCaptureQueuedOrProcessing ||
-    (!summaryText && capture.status !== "failed");
+    (isNoteCapture ? refreshNoteSummary.isPending : (!summaryText && capture.status !== "failed"));
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 py-2">
@@ -495,7 +565,7 @@ export default function InboxCaptureDetailPage() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-lg font-semibold">
-              {defaultTitle(capture.raw_content, t("pages.inbox.captureFallbackTitle", { type: capture.capture_type }))}
+              {resolvedTitle}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <span className={`rounded-full border px-2 py-0.5 font-medium ${statusClass}`}>
@@ -687,6 +757,31 @@ export default function InboxCaptureDetailPage() {
       ) : null}
 
       <section className="rounded-2xl border border-border/70 bg-card/90 p-4">
+        <div className="mb-4 grid gap-2 rounded-xl border border-border bg-background/40 p-3">
+          <Label htmlFor="capture-title">{t("pages.inbox.captureTitle", { defaultValue: "Capture title" })}</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="capture-title"
+              value={manualTitle}
+              onChange={(event) => setManualTitle(event.target.value)}
+              maxLength={160}
+              placeholder={resolvedTitle}
+            />
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!captureId) return;
+                updateCapture.mutate({
+                  captureId,
+                  payload: { title: manualTitle.trim() || null },
+                });
+              }}
+              disabled={isBusy}
+            >
+              {t("pages.inbox.saveTitle", { defaultValue: "Save title" })}
+            </Button>
+          </div>
+        </div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide">{t("pages.inbox.suggestedActions")}</h2>
           <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
@@ -790,13 +885,13 @@ export default function InboxCaptureDetailPage() {
               {preview.suggested_kind} · {(preview.confidence * 100).toFixed(0)}%
             </p>
             <p className="mt-2 text-sm text-foreground/80">{preview.reason}</p>
-            {previewMissingFields.length ? (
+            {preview.missing_fields.length ? (
               <div className="mt-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">
                   {t("pages.inbox.missingFields", { defaultValue: "Missing fields" })}
                 </p>
                 <ul className="mt-1 space-y-1">
-                  {previewMissingFields.map((entry) => (
+                  {preview.missing_fields.map((entry) => (
                     <li key={entry} className="text-sm text-foreground/85">
                       - {entry}
                     </li>

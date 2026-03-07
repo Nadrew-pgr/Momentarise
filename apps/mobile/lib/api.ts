@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { useAuthStore } from "@/lib/store";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 const TOKEN_KEY = "access_token";
 
 function extractErrorMessage(payload: unknown): string | null {

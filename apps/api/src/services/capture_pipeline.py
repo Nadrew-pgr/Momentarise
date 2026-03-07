@@ -21,16 +21,17 @@ from src.models.capture_asset import CaptureAsset
 from src.models.capture_job import CaptureJob
 from src.models.inbox_capture import InboxCapture
 from src.models.workspace import Workspace, WorkspaceMember
-from src.services.capture_ai_service import analyze_capture_with_sync_agent
+from src.services.capture_ai_service import (
+    generate_capture_summary_with_subagent,
+    suggest_capture_actions_with_subagent,
+)
 from src.services.maps_provider import estimate_travel_minutes
 from src.services.ocr_provider import extract_text_from_file
 from src.services.provider_config import (
     load_ocr_provider_config,
-    load_summarization_provider_config,
     load_transcription_provider_config,
     load_vlm_provider_config,
 )
-from src.services.summarization_provider import summarize_text
 from src.services.transcription_provider import transcribe_audio_file
 from src.services.vlm_provider import analyze_visual_file
 
@@ -40,7 +41,6 @@ CaptureActionType = Literal[
     "create_item",
     "draft_reply",
     "pay_invoice",
-    "summarize",
     "review",
 ]
 
@@ -358,17 +358,6 @@ def _build_action_suggestions(capture: InboxCapture, semantic_text: str) -> list
             )
         )
 
-    if not suggestions:
-        suggestions.append(
-            ActionSuggestionInput(
-                type="review",
-                label="Review",
-                confidence=1.0,
-                requires_confirm=False,
-                payload={"reason": "No high-confidence automation found"},
-            )
-        )
-
     # Stable ordering: highest confidence first and max 3, with dedupe.
     suggestions.sort(key=lambda s: s.confidence, reverse=True)
     deduped: list[ActionSuggestionInput] = []
@@ -380,19 +369,7 @@ def _build_action_suggestions(capture: InboxCapture, semantic_text: str) -> list
         seen.add(signature)
         deduped.append(suggestion)
 
-    selected = deduped[:3]
-    # Ensure Review fallback exists if every action is weak.
-    if selected and selected[0].confidence < 0.6:
-        selected = [
-            ActionSuggestionInput(
-                type="review",
-                label="Review",
-                confidence=1.0,
-                requires_confirm=False,
-                payload={"reason": "Low-confidence suggestions"},
-            )
-        ] + selected[:2]
-    return selected[:3]
+    return deduped[:3]
 
 
 def _derive_category_and_tags(
@@ -604,6 +581,19 @@ async def _upsert_capture_tags(
     await db.flush()
 
 
+def _is_placeholder_artifact_text(text: str) -> bool:
+    normalized = text.strip().lower()
+    if not normalized:
+        return True
+    placeholders = (
+        "transcribed from ",
+        "transcribed audio content.",
+        "extracted text from document/image.",
+        "no visual asset found for vlm enrichment.",
+    )
+    return normalized.startswith(placeholders)
+
+
 def _build_artifacts_summary(
     *,
     capture: InboxCapture,
@@ -613,18 +603,39 @@ def _build_artifacts_summary(
 ) -> dict[str, Any]:
     summary_text = ""
     risks: list[str] = []
-    key_clauses: list[str] = []
-    for artifact in artifacts:
+    summary_key_points: list[str] = []
+    key_clause_candidates: list[str] = []
+    ordered_artifacts = sorted(
+        artifacts,
+        key=lambda artifact: (
+            artifact.created_at if isinstance(artifact.created_at, datetime) else datetime.min.replace(tzinfo=UTC)
+        ),
+    )
+    for artifact in ordered_artifacts:
         if not isinstance(artifact.content_json, dict):
             continue
         text_value = artifact.content_json.get("text")
+        fallback_used = bool(artifact.content_json.get("fallback_used", False))
+        is_placeholder = (
+            isinstance(text_value, str)
+            and (_is_placeholder_artifact_text(text_value) or fallback_used)
+        )
         if isinstance(text_value, str) and text_value.strip():
-            if artifact.artifact_type == "summary":
+            if artifact.artifact_type in {"summary", "preprocess_summary"}:
                 summary_text = text_value.strip()
-            if artifact.artifact_type in {"extracted_text", "transcript"}:
+                raw_points = artifact.content_json.get("key_points")
+                if isinstance(raw_points, list):
+                    points = [
+                        str(item).strip()
+                        for item in raw_points
+                        if isinstance(item, str) and item.strip()
+                    ]
+                    if points:
+                        summary_key_points = points
+            if artifact.artifact_type in {"extracted_text", "transcript"} and not is_placeholder:
                 snippet = text_value.strip().splitlines()[0][:180]
-                if snippet and snippet not in key_clauses:
-                    key_clauses.append(snippet)
+                if snippet and snippet not in key_clause_candidates:
+                    key_clause_candidates.append(snippet)
         if artifact.artifact_type == "vlm_analysis":
             vlm_text = artifact.content_json.get("text")
             if isinstance(vlm_text, str) and vlm_text.strip() and not summary_text:
@@ -633,7 +644,14 @@ def _build_artifacts_summary(
                 risks.append(vlm_text.strip()[:180])
 
     if not summary_text:
-        summary_text = semantic_text[:240] if semantic_text else (capture.raw_content or "")[:240]
+        summary_text = (capture.raw_content or "").strip()[:240]
+
+    key_clauses: list[str] = []
+    for point in summary_key_points:
+        if point and point not in key_clauses:
+            key_clauses.append(point[:180])
+    if not key_clauses:
+        key_clauses = key_clause_candidates[:4]
 
     payload = {
         "headline": summary_text[:100],
@@ -709,13 +727,21 @@ def job_types_for_capture(capture_type: str) -> list[str]:
     return ["ingest", "preprocess", "suggest_actions"]
 
 
-async def enqueue_default_jobs(db: AsyncSession, capture: InboxCapture) -> list[CaptureJob]:
+async def enqueue_default_jobs(
+    db: AsyncSession,
+    capture: InboxCapture,
+    *,
+    run_id: uuid.UUID | None = None,
+    queue_name: str | None = None,
+) -> list[CaptureJob]:
     jobs: list[CaptureJob] = []
     for job_type in job_types_for_capture(capture.capture_type):
         job = CaptureJob(
             workspace_id=capture.workspace_id,
             capture_id=capture.id,
+            run_id=run_id,
             job_type=job_type,
+            queue_name=queue_name,
             status="queued",
             scheduled_at=datetime.now(UTC),
         )
@@ -740,7 +766,7 @@ async def _active_artifacts(db: AsyncSession, capture: InboxCapture) -> list[Cap
         select(CaptureArtifact).where(
             CaptureArtifact.capture_id == capture.id,
             CaptureArtifact.deleted_at.is_(None),
-        )
+        ).order_by(CaptureArtifact.created_at.asc())
     )
     return list(result.scalars().all())
 
@@ -898,25 +924,51 @@ def _new_artifact(
 ) -> CaptureArtifact:
     raw_confidence = payload.get("confidence")
     confidence = float(raw_confidence) if isinstance(raw_confidence, (int, float)) else None
+    content_json: dict[str, Any] = {"text": str(payload.get("text", "")).strip()}
+    for key in (
+        "description",
+        "key_points",
+        "missing_fields",
+        "normalized_facts",
+        "questions_if_needed",
+        "agent_id",
+        "agent_name",
+        "mode",
+        "modules",
+        "toolset_snapshot",
+        "retrieval_snapshot",
+        "prompt_snapshot",
+    ):
+        value = payload.get(key)
+        if value is None:
+            continue
+        content_json[key] = value
     return CaptureArtifact(
         workspace_id=capture.workspace_id,
         capture_id=capture.id,
         artifact_type=artifact_type,
-        content_json={"text": str(payload.get("text", "")).strip()},
+        content_json=content_json,
         provider=str(payload.get("provider", "heuristic")),
         model=str(payload.get("model", "v0")),
         confidence=confidence,
     )
 
 
-async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
+async def process_capture_jobs(
+    db: AsyncSession,
+    capture: InboxCapture,
+    *,
+    run_id: uuid.UUID | None = None,
+) -> None:
+    clauses = [
+        CaptureJob.capture_id == capture.id,
+        CaptureJob.deleted_at.is_(None),
+        CaptureJob.status.in_(["queued", "failed"]),
+    ]
+    if run_id is not None:
+        clauses.append(CaptureJob.run_id == run_id)
     result = await db.execute(
-        select(CaptureJob).where(
-            CaptureJob.capture_id == capture.id,
-            CaptureJob.deleted_at.is_(None),
-            CaptureJob.status.in_(["queued", "failed"]),
-        )
-        .order_by(CaptureJob.created_at.asc())
+        select(CaptureJob).where(*clauses).order_by(CaptureJob.created_at.asc())
     )
     jobs = list(result.scalars().all())
     if not jobs:
@@ -929,8 +981,8 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
     transcription_cfg = load_transcription_provider_config(provider_overrides)
     ocr_cfg = load_ocr_provider_config(provider_overrides)
     vlm_cfg = load_vlm_provider_config(provider_overrides)
-    summarization_cfg = load_summarization_provider_config(provider_overrides)
     had_failure = False
+    voice_transcription_blocked = False
 
     for job in jobs:
         start = perf_counter()
@@ -939,6 +991,23 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
         provider_model: str | None = None
         fallback_used: bool | None = None
         job_detail: str | None = None
+
+        if voice_transcription_blocked and job.job_type in {"preprocess", "summarize", "suggest_actions"}:
+            job.status = "skipped"
+            job.finished_at = datetime.now(UTC)
+            job.last_error = "blocked_by_voice_transcription_failure"
+            _append_pipeline_trace(
+                capture,
+                stage=job.job_type,
+                status="skipped",
+                provider="internal",
+                model="skip-v1",
+                duration_ms=0.0,
+                fallback_used=False,
+                detail=job.last_error,
+            )
+            continue
+
         try:
             job.status = "processing"
             job.started_at = job_started_at
@@ -969,6 +1038,8 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                     provider_name = str(transcript_payload.get("provider", "heuristic"))
                     provider_model = str(transcript_payload.get("model", "v0"))
                     fallback_used = bool(transcript_payload.get("fallback_used", False))
+                    if fallback_used or provider_name == "heuristic":
+                        raise RuntimeError("voice_transcription_provider_failed")
                     db.add(
                         _new_artifact(
                             capture=capture,
@@ -1015,21 +1086,21 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                         fallback_used = False
                 else:
                     job_detail = "transcribe_or_extract:no_asset_fallback"
+                    if capture.capture_type == "voice":
+                        provider_name = "internal"
+                        provider_model = "voice-missing-asset-v1"
+                        fallback_used = False
+                        raise RuntimeError("voice_transcription_missing_asset")
+
                     provider_name = "heuristic"
                     provider_model = "v0"
                     fallback_used = True
                     db.add(
                         _new_artifact(
                             capture=capture,
-                            artifact_type="transcript"
-                            if capture.capture_type == "voice"
-                            else "extracted_text",
+                            artifact_type="extracted_text",
                             payload={
-                                "text": (
-                                    "Transcribed audio content."
-                                    if capture.capture_type == "voice"
-                                    else "Extracted text from document/image."
-                                ),
+                                "text": "Extracted text from document/image.",
                                 "provider": "heuristic",
                                 "model": "v0",
                                 "confidence": 0.68,
@@ -1099,13 +1170,28 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
             elif job.job_type in {"preprocess", "summarize"}:
                 artifacts = await _active_artifacts(db, capture)
                 semantic_text = _semantic_text(capture, artifacts)
-                summary_payload = summarize_text(
-                    text=semantic_text,
-                    config=summarization_cfg,
+                summary_payload = await generate_capture_summary_with_subagent(
+                    db=db,
+                    capture=capture,
+                    semantic_text=semantic_text,
+                    capture_type=capture.capture_type,
+                    metadata=capture.meta if isinstance(capture.meta, dict) else {},
                 )
-                provider_name = str(summary_payload.get("provider", "heuristic"))
-                provider_model = str(summary_payload.get("model", "v0"))
+                provider_name = str(summary_payload.get("provider", "sync"))
+                provider_model = str(summary_payload.get("model", settings.SYNC_MODEL_SMALL))
                 fallback_used = bool(summary_payload.get("fallback_used", False))
+                current_meta = capture.meta if isinstance(capture.meta, dict) else {}
+                if current_meta.get("title_locked") is not True:
+                    model_title = (
+                        str(summary_payload.get("title")).strip()[:160]
+                        if isinstance(summary_payload.get("title"), str)
+                        else ""
+                    )
+                    if model_title:
+                        capture.meta = {
+                            **current_meta,
+                            "ai_title": model_title,
+                        }
                 db.add(
                     _new_artifact(
                         capture=capture,
@@ -1118,112 +1204,99 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                 semantic_text = _semantic_text(capture, artifacts)
                 analysis: dict[str, Any] | None = None
                 if settings.CAPTURE_AI_SUGGESTIONS_ENABLED:
-                    suggestions = _build_action_suggestions(capture, semantic_text)
-                    provider_name = "heuristic"
-                    provider_model = "heuristic-v2"
-                    fallback_used = False
-
-                    analysis = await analyze_capture_with_sync_agent(
+                    analysis = await suggest_capture_actions_with_subagent(
                         db=db,
                         capture=capture,
                         semantic_text=semantic_text,
                         capture_type=capture.capture_type,
                         metadata=capture.meta if isinstance(capture.meta, dict) else {},
                     )
-                    if isinstance(analysis, dict):
-                        provider_name = str(analysis.get("provider", "sync"))
-                        provider_model = str(analysis.get("model", settings.SYNC_MODEL_BALANCED))
-                        fallback_used = False
-                        ai_candidates_raw = analysis.get("action_candidates")
-                        ai_candidates: list[ActionSuggestionInput] = []
-                        if isinstance(ai_candidates_raw, list):
-                            for idx, candidate in enumerate(ai_candidates_raw):
-                                if not isinstance(candidate, dict):
-                                    continue
-                                action_type = candidate.get("type")
-                                label = candidate.get("label")
-                                if action_type not in {
-                                    "create_event",
-                                    "create_task",
-                                    "create_item",
-                                    "draft_reply",
-                                    "pay_invoice",
-                                    "review",
-                                }:
-                                    continue
-                                if not isinstance(label, str) or not label.strip():
-                                    continue
-                                confidence_value = candidate.get("confidence")
-                                confidence = (
-                                    float(confidence_value)
-                                    if isinstance(confidence_value, (int, float))
-                                    else 0.7
-                                )
-                                ai_candidates.append(
-                                    ActionSuggestionInput(
-                                        type=action_type,  # type: ignore[arg-type]
-                                        label=label.strip(),
-                                        confidence=max(0.0, min(1.0, confidence)),
-                                        requires_confirm=bool(candidate.get("requires_confirm", True)),
-                                        payload=(
-                                            candidate.get("payload")
-                                            if isinstance(candidate.get("payload"), dict)
-                                            else {}
-                                        ),
-                                    )
-                                )
-
-                        merged: list[ActionSuggestionInput] = []
-                        seen: set[str] = set()
-                        for candidate in ai_candidates + suggestions:
-                            signature = f"{candidate.type}:{candidate.label.strip().lower()}"
-                            if signature in seen:
+                    provider_name = str(analysis.get("provider", "sync"))
+                    provider_model = str(analysis.get("model", settings.SYNC_MODEL_BALANCED))
+                    fallback_used = False
+                    ai_candidates_raw = analysis.get("action_candidates")
+                    ai_candidates: list[ActionSuggestionInput] = []
+                    if isinstance(ai_candidates_raw, list):
+                        for candidate in ai_candidates_raw:
+                            if not isinstance(candidate, dict):
                                 continue
-                            seen.add(signature)
-                            merged.append(candidate)
-                        merged.sort(key=lambda item: item.confidence, reverse=True)
-                        suggestions = merged[:3] if merged else suggestions
-                        if analysis:
-                            db.add(
-                                CaptureArtifact(
-                                    workspace_id=capture.workspace_id,
-                                    capture_id=capture.id,
-                                    artifact_type="capture_analysis",
-                                    content_json={
-                                        "text": json.dumps(
-                                            {
-                                                "normalized_facts": analysis.get("normalized_facts", {}),
-                                                "questions_if_needed": analysis.get("questions_if_needed", []),
-                                            },
-                                            ensure_ascii=False,
-                                        ),
-                                        "normalized_facts": analysis.get("normalized_facts", {}),
-                                        "questions_if_needed": analysis.get("questions_if_needed", []),
-                                        "agent_id": analysis.get("agent_id"),
-                                        "agent_name": analysis.get("agent_name"),
-                                        "modules": analysis.get("modules"),
-                                        "toolset_snapshot": analysis.get("toolset_snapshot"),
-                                        "retrieval_snapshot": analysis.get("retrieval_snapshot"),
-                                        "prompt_snapshot": analysis.get("prompt_snapshot"),
-                                    },
-                                    provider=str(analysis.get("provider", "sync")),
-                                    model=str(analysis.get("model", settings.SYNC_MODEL_BALANCED)),
-                                    confidence=0.76,
+                            action_type = candidate.get("type")
+                            label = candidate.get("label")
+                            if action_type not in {
+                                "create_event",
+                                "create_task",
+                                "create_item",
+                                "draft_reply",
+                                "pay_invoice",
+                                "review",
+                            }:
+                                continue
+                            if not isinstance(label, str) or not label.strip():
+                                continue
+                            confidence_value = candidate.get("confidence")
+                            confidence = (
+                                float(confidence_value)
+                                if isinstance(confidence_value, (int, float))
+                                else 0.7
+                            )
+                            ai_candidates.append(
+                                ActionSuggestionInput(
+                                    type=action_type,  # type: ignore[arg-type]
+                                    label=label.strip(),
+                                    confidence=max(0.0, min(1.0, confidence)),
+                                    requires_confirm=bool(candidate.get("requires_confirm", True)),
+                                    payload=(
+                                        candidate.get("payload")
+                                        if isinstance(candidate.get("payload"), dict)
+                                        else {}
+                                    ),
                                 )
                             )
+                    ai_candidates.sort(key=lambda item: item.confidence, reverse=True)
+                    deduped: list[ActionSuggestionInput] = []
+                    seen: set[str] = set()
+                    for candidate in ai_candidates:
+                        signature = f"{candidate.type}:{candidate.label.strip().lower()}"
+                        if signature in seen:
+                            continue
+                        seen.add(signature)
+                        deduped.append(candidate)
+                    suggestions = deduped[:3]
+                    db.add(
+                        CaptureArtifact(
+                            workspace_id=capture.workspace_id,
+                            capture_id=capture.id,
+                            artifact_type="capture_analysis",
+                            content_json={
+                                "text": json.dumps(
+                                    {
+                                        "normalized_facts": analysis.get("normalized_facts", {}),
+                                        "questions_if_needed": analysis.get("questions_if_needed", []),
+                                        "missing_fields": analysis.get("missing_fields", []),
+                                    },
+                                    ensure_ascii=False,
+                                ),
+                                "normalized_facts": analysis.get("normalized_facts", {}),
+                                "questions_if_needed": analysis.get("questions_if_needed", []),
+                                "missing_fields": analysis.get("missing_fields", []),
+                                "agent_id": analysis.get("agent_id"),
+                                "agent_name": analysis.get("agent_name"),
+                                "mode": analysis.get("mode"),
+                                "modules": analysis.get("modules"),
+                                "toolset_snapshot": analysis.get("toolset_snapshot"),
+                                "retrieval_snapshot": analysis.get("retrieval_snapshot"),
+                                "prompt_snapshot": analysis.get("prompt_snapshot"),
+                            },
+                            provider=str(analysis.get("provider", "sync")),
+                            model=str(analysis.get("model", settings.SYNC_MODEL_BALANCED)),
+                            confidence=0.78,
+                        )
+                    )
                 else:
                     provider_name = "disabled"
                     provider_model = "disabled"
                     fallback_used = False
-                    suggestions = [
-                        ActionSuggestionInput(
-                            type="review",
-                            label="Review",
-                            confidence=1.0,
-                            requires_confirm=False,
-                            payload={"reason": "Suggestions disabled by feature flag"},
-                        )
-                    ]
+                    suggestions = []
                 await _upsert_suggestions(db, capture, suggestions)
                 category, tags = _derive_category_and_tags(capture, semantic_text, suggestions)
                 capture.category = category
@@ -1246,6 +1319,7 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
                         {
                             "agent_id": analysis.get("agent_id"),
                             "agent_name": analysis.get("agent_name"),
+                            "mode": analysis.get("mode"),
                             "modules": analysis.get("modules"),
                             "toolset_snapshot": analysis.get("toolset_snapshot"),
                             "retrieval_snapshot": analysis.get("retrieval_snapshot"),
@@ -1288,6 +1362,8 @@ async def process_capture_jobs(db: AsyncSession, capture: InboxCapture) -> None:
             )
         except Exception as exc:  # pragma: no cover - safety net
             had_failure = True
+            if capture.capture_type == "voice" and job.job_type in {"transcribe_or_extract", "transcribe"}:
+                voice_transcription_blocked = True
             job.status = "failed"
             job.finished_at = datetime.now(UTC)
             job.last_error = str(exc)[:500]

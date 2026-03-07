@@ -77,7 +77,12 @@
       "sectionYesterday": "Hier",
       "sectionEarlier": "Plus ancien",
       "captureFallbackTitle": "Capture {{type}}",
+      "captureFallbackTimestamped": "{{type}} - {{date}} {{time}}",
       "noteFallbackTitle": "Note",
+      "captureTitle": "Titre de la capture",
+      "saveTitle": "Enregistrer le titre",
+      "titleUpdated": "Titre mis à jour",
+      "titleUpdateError": "Impossible de mettre à jour le titre",
       "kindCapture": "Capture",
       "kindItem": "Élément",
       "openItem": "Ouvrir l'élément",
@@ -181,15 +186,65 @@
       "linkedTo": "Lié à",
       "emptyLinks": "Aucun lien pour cet élément.",
       "noLinksBadge": "Aucun lien",
-      "noItemSelected": "Sélectionnez une capture à transformer ou un élément."
+      "noItemSelected": "Sélectionnez une capture à transformer ou un élément.",
+      "noteHeader": {
+        "edited": "Modifié {{date}}",
+        "openCapture": "Ouvrir la capture source"
+      },
+      "noteMenu": {
+        "title": "Actions de note",
+        "openSourceCapture": "Ouvrir la capture source",
+        "rename": "Renommer",
+        "copyLink": "Copier le lien",
+        "copyLinkSuccess": "Lien copié.",
+        "copyLinkError": "Impossible de copier le lien.",
+        "delete": "Supprimer",
+        "duplicate": "Dupliquer",
+        "moveTo": "Déplacer vers",
+        "versionHistory": "Historique des versions",
+        "notifications": "Notifications",
+        "analytics": "Analytics",
+        "importExport": "Import / Export",
+        "favorite": "Ajouter aux favoris",
+        "unfavorite": "Retirer des favoris",
+        "favoriteError": "Impossible de mettre à jour le favori.",
+        "renamePromptTitle": "Renommer la note",
+        "renameEmpty": "Le titre ne peut pas être vide.",
+        "renameSuccess": "Note renommée.",
+        "renameError": "Impossible de renommer la note.",
+        "renamePartialError": "Renommage partiel: un élément n’a pas été mis à jour.",
+        "deleteConfirmBody": "La note et sa capture source seront supprimées.",
+        "deleteSuccess": "Note supprimée.",
+        "deleteError": "Impossible de supprimer la note.",
+        "deletePartialError": "Suppression partielle: un élément n’a pas pu être supprimé."
+      }
     },
     "sync": {
       "title": "Sync",
       "newChat": "Nouveau chat",
       "retry": "Réessayer",
+      "header": {
+        "newConversation": "Nouvelle conversation"
+      },
       "empty": {
         "title": "Sync est prêt",
         "subtitle": "Demandez à Sync d'organiser, modifier ou préparer quelque chose."
+      },
+      "menu": {
+        "title": "Actions Sync",
+        "openHistory": "Ouvrir l'historique",
+        "newChat": "Nouvelle conversation",
+        "renameCurrent": "Renommer la conversation",
+        "deleteCurrent": "Supprimer la conversation",
+        "delete": "Supprimer",
+        "renamePrompt": "Renommer la conversation",
+        "renameEmpty": "Le titre ne peut pas être vide.",
+        "renameSuccess": "Conversation renommée.",
+        "renameError": "Impossible de renommer la conversation.",
+        "deleteConfirmTitle": "Supprimer cette conversation ?",
+        "deleteConfirmBody": "Supprimer \"{{title}}\" ?",
+        "deleteError": "Impossible de supprimer la conversation.",
+        "deleted": "Conversation supprimée."
       },
       "composer": {
         "placeholder": "Demandez à Sync de planifier, modifier ou organiser quelque chose...",
@@ -197,7 +252,29 @@
         "stop": "Arrêter la génération",
         "model": "Choisir le modèle",
         "voiceSoon": "Entrée vocale bientôt disponible",
-        "attachSoon": "Pièces jointes bientôt disponibles"
+        "attachSoon": "Pièces jointes bientôt disponibles",
+        "attachLocal": "Ajouter un fichier",
+        "attachInbox": "Ajouter depuis l'Inbox",
+        "waitAttachments": "Attendez que toutes les pièces jointes soient prêtes avant d'envoyer.",
+        "attachLimitExceeded": "Maximum 5 éléments (pièces jointes + références) par message.",
+        "attachmentFailed": "Impossible de préparer une pièce jointe.",
+        "removeAttachment": "Retirer la pièce jointe",
+        "inboxPickerTitle": "Ajouter depuis l'Inbox",
+        "inboxPickerDescription": "Sélectionnez des captures ou des items à ajouter au contexte de Sync.",
+        "inboxPickerSearch": "Rechercher une capture ou un item...",
+        "inboxPickerLoading": "Recherche en cours...",
+        "inboxPickerEmpty": "Aucun résultat trouvé.",
+        "inboxPickerAdd": "Ajouter ({{count}})",
+        "mentionLoading": "Recherche de références...",
+        "mentionError": "Impossible de charger les références.",
+        "mentionEmpty": "Aucune capture ou item correspondant.",
+        "contextStatus": {
+          "uploading": "upload",
+          "processing": "analyse",
+          "ready": "prêt",
+          "failed": "erreur"
+        },
+        "mentionHint": "· @ pour citer une capture ou un item"
       },
       "actions": {
         "title": "Actions",
@@ -227,10 +304,20 @@
         "lastUpdate": "Maj",
         "model": "Modèle",
         "loading": "Chargement de la conversation...",
-        "loadingSlow": "Le chargement de la conversation prend plus de temps que prévu."
+        "loadingSlow": "Le chargement de la conversation prend plus de temps que prévu.",
+        "menu": {
+          "open": "Ouvrir",
+          "rename": "Renommer",
+          "delete": "Supprimer"
+        }
       },
       "previewPlan": {
-        "title": "Plan d'application",
+        "title": "Aperçu",
+        "entityEvent": "Moment",
+        "entityItem": "Item",
+        "entityCapture": "Capture",
+        "entityTimeline": "Timeline",
+        "entityUnknown": "Élément",
         "titleEventCreate": "Création d'un moment",
         "titleEventUpdate": "Modification d'un moment",
         "titleEventDelete": "Suppression d'un moment",
@@ -238,7 +325,7 @@
         "titleItemUpdate": "Modification d'un élément",
         "titleItemDelete": "Suppression d'un élément",
         "titleInboxTransform": "Transformation d'une capture",
-        "titleFallback": "Plan d'application",
+        "titleFallback": "Plan",
         "summary": "Résumé",
         "mutations": "Mutations proposées",
         "notes": "Notes",
@@ -273,7 +360,8 @@
         }
       },
       "warning": {
-        "title": "Avertissement"
+        "title": "Avertissement",
+        "legacyEventIgnored": "Certains événements historiques incompatibles ont été ignorés."
       },
       "activity": {
         "title": "Activité agent",
@@ -355,7 +443,10 @@
         "saving": "Enregistrement du contenu...",
         "saved": "Contenu enregistré",
         "saveError": "Échec de l'enregistrement du contenu",
-        "deferred": "Le contenu sera enregistré après la création du moment"
+        "deferred": "Le contenu sera enregistré après la création du moment",
+        "focusOpen": "Ouvrir le mode focus",
+        "focusTitle": "Contenu du moment",
+        "focusHint": "Utilisez toute la largeur pour éditer les blocks et le log plus proprement."
       },
       "coachPlaceholder": "L'onglet Coach arrive bientôt.",
       "actions": {

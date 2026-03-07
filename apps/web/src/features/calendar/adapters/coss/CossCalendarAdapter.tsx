@@ -38,6 +38,8 @@ function toCalendarEvent(event: EventOut): CalendarEvent {
     location: event.location ?? undefined,
     color: event.color,
     isTracking: event.is_tracking,
+    estimatedTimeSeconds: event.estimated_time_seconds,
+    actualTimeAccSeconds: event.actual_time_acc_seconds,
   };
 }
 

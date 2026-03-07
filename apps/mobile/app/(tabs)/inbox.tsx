@@ -46,16 +46,30 @@ function captureIcon(type: CaptureType) {
   }
 }
 
-function firstLine(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  return trimmed.split("\n")[0]?.trim() ?? "";
-}
-
 function previewText(value: string): string {
   const compact = value.replace(/\s+/g, " ").trim();
   if (!compact) return "";
   return compact.length > 120 ? `${compact.slice(0, 120)}...` : compact;
+}
+
+function fallbackTimestampedTitle(
+  captureType: string,
+  createdAt: string,
+  locale: string,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  const date = new Date(createdAt);
+  const datePart = date.toLocaleDateString(locale || "en-US");
+  const timePart = date.toLocaleTimeString(locale || "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return t("pages.inbox.captureFallbackTimestamped", {
+    type: captureType,
+    date: datePart,
+    time: timePart,
+    defaultValue: `${captureType} - ${datePart} ${timePart}`,
+  });
 }
 
 function resolveSectionKey(at: Date): SectionKey {
@@ -93,7 +107,7 @@ function relativeTime(now: Date, date: Date, locale: string): string {
 }
 
 function actionableSuggestions(actions: CaptureActionSuggestion[]): CaptureActionSuggestion[] {
-  return actions.filter((action) => action.type !== "summarize");
+  return actions;
 }
 
 function resolvePrimaryAction(capture: {
@@ -102,7 +116,7 @@ function resolvePrimaryAction(capture: {
 }): CaptureActionSuggestion | null {
   const actions = actionableSuggestions(capture.suggested_actions);
   if (!actions.length) return null;
-  if (capture.primary_action && capture.primary_action.type !== "summarize") {
+  if (capture.primary_action) {
     const matched = actions.find((action) => action.key === capture.primary_action?.key);
     if (matched) return matched;
   }
@@ -138,7 +152,7 @@ export default function InboxScreen() {
 
       if (!query) return true;
       const primaryAction = resolvePrimaryAction(capture);
-      const haystack = `${capture.raw_content} ${(primaryAction?.label ?? "").toString()}`;
+      const haystack = `${capture.title ?? ""} ${capture.raw_content} ${(primaryAction?.label ?? "").toString()}`;
       return haystack.toLowerCase().includes(query);
     });
     list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -333,8 +347,13 @@ export default function InboxScreen() {
                   <View className="gap-3">
                     {entries.map((capture) => {
                       const title =
-                        firstLine(capture.raw_content) ||
-                        t("pages.inbox.captureFallbackTitle", { type: capture.capture_type });
+                        capture.title?.trim() ||
+                        fallbackTimestampedTitle(
+                          capture.capture_type,
+                          capture.created_at,
+                          i18n.language || "en-US",
+                          t
+                        );
                       const subtitle =
                         previewText(capture.raw_content) || t("pages.inbox.emptyCapture");
                       const primaryAction = resolvePrimaryAction(capture);

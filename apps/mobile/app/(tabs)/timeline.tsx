@@ -138,6 +138,8 @@ export default function TimelineScreen() {
           color: found.color,
           isTracking: found.is_tracking,
           updatedAt: found.updated_at,
+          estimatedTimeSeconds: found.estimated_time_seconds,
+          actualTimeAccSeconds: found.actual_time_acc_seconds,
         });
         router.push(`/moment/${found.id}`);
       }

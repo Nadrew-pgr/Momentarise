@@ -109,7 +109,12 @@
       "sectionYesterday": "Hier",
       "sectionEarlier": "Plus ancien",
       "captureFallbackTitle": "Capture {{type}}",
+      "captureFallbackTimestamped": "{{type}} - {{date}} {{time}}",
       "noteFallbackTitle": "Note",
+      "captureTitle": "Titre de la capture",
+      "saveTitle": "Enregistrer le titre",
+      "titleUpdated": "Titre mis à jour",
+      "titleUpdateError": "Impossible de mettre à jour le titre",
       "kindCapture": "Capture",
       "kindItem": "Élément",
       "openCapture": "Ouvrir la capture",
@@ -188,7 +193,73 @@
       "linkedTo": "Lié à",
       "emptyLinks": "Aucun lien pour cet élément.",
       "noLinksBadge": "Aucun lien",
-      "noItemSelected": "Sélectionnez une capture à transformer ou un élément."
+      "noItemSelected": "Sélectionnez une capture à transformer ou un élément.",
+      "noteHeader": {
+        "edited": "Modifié {{date}}",
+        "openCapture": "Ouvrir la capture source"
+      },
+      "noteMenu": {
+        "title": "Actions de note",
+        "openSourceCapture": "Ouvrir la capture source",
+        "rename": "Renommer",
+        "copyLink": "Copier le lien",
+        "copyLinkSuccess": "Lien copié.",
+        "copyLinkError": "Impossible de copier le lien.",
+        "delete": "Supprimer",
+        "duplicate": "Dupliquer",
+        "moveTo": "Déplacer vers",
+        "versionHistory": "Historique des versions",
+        "notifications": "Notifications",
+        "analytics": "Analytics",
+        "importExport": "Import / Export",
+        "favorite": "Ajouter aux favoris",
+        "unfavorite": "Retirer des favoris",
+        "favoriteError": "Impossible de mettre à jour le favori.",
+        "renamePromptTitle": "Renommer la note",
+        "renamePromptPlaceholder": "Nouveau titre",
+        "renameEmpty": "Le titre ne peut pas être vide.",
+        "renameSuccess": "Note renommée.",
+        "renameError": "Impossible de renommer la note.",
+        "renamePartialError": "Renommage partiel: un élément n’a pas été mis à jour.",
+        "deleteConfirmTitle": "Supprimer cette note ?",
+        "deleteConfirmBody": "La note et sa capture source seront supprimées.",
+        "deleteSuccess": "Note supprimée.",
+        "deleteError": "Impossible de supprimer la note.",
+        "deletePartialError": "Suppression partielle: un élément n’a pas pu être supprimé."
+      },
+      "editorAi": {
+        "button": "IA",
+        "actions": {
+          "rewrite": {
+            "label": "Améliorer l'écriture",
+            "description": "Réécris avec une formulation plus claire et fluide."
+          },
+          "structuredRewrite": {
+            "label": "Réécriture structurée",
+            "description": "Réorganise en sections avec actions."
+          },
+          "shorter": {
+            "label": "Rendre plus court",
+            "description": "Réduit la longueur en gardant l'essentiel."
+          },
+          "longer": {
+            "label": "Rendre plus long",
+            "description": "Développe avec plus de contexte et de détails."
+          },
+          "summarize": {
+            "label": "Résumer",
+            "description": "Produit un résumé court."
+          },
+          "grammarFix": {
+            "label": "Corriger la grammaire",
+            "description": "Corrige les fautes d'orthographe et de grammaire."
+          },
+          "translateFrEn": {
+            "label": "Traduire FR -> EN",
+            "description": "Traduit le texte français en anglais."
+          }
+        }
+      }
     },
     "timeline": {
       "title": "Timeline",
@@ -296,14 +367,97 @@
     "sync": {
       "title": "Sync",
       "placeholder": "Page Sync prête pour les prochaines itérations (chat, preview/apply, outils IA).",
+      "header": {
+        "newConversation": "Nouvelle conversation"
+      },
+      "composer": {
+        "placeholder": "Demandez à Sync de planifier, modifier ou organiser quelque chose...",
+        "send": "Envoyer",
+        "stop": "Arrêter",
+        "addAttachment": "Ajouter une pièce jointe",
+        "waitAttachments": "Attendez que toutes les pièces jointes soient prêtes avant d'envoyer.",
+        "attachLimitExceeded": "Maximum 5 éléments (pièces jointes + références) par message.",
+        "attachmentFailed": "Impossible de préparer une pièce jointe.",
+        "removeAttachment": "Retirer la pièce jointe",
+        "photoPermissionDenied": "Autorisation photo refusée.",
+        "inboxPickerTitle": "Ajouter depuis l'Inbox",
+        "inboxPickerDescription": "Sélectionnez des captures ou des items à ajouter au contexte Sync.",
+        "inboxPickerSearch": "Rechercher une capture ou un item...",
+        "inboxPickerLoading": "Recherche en cours...",
+        "inboxPickerEmpty": "Aucun résultat trouvé.",
+        "inboxPickerAdd": "Ajouter ({{count}})",
+        "mentionLoading": "Recherche de références...",
+        "mentionError": "Impossible de charger les références.",
+        "mentionEmpty": "Aucune capture ou item correspondant.",
+        "plus": {
+          "photo": "Photo",
+          "file": "Fichier",
+          "voice": "Audio",
+          "inbox": "Inbox"
+        },
+        "contextStatus": {
+          "uploading": "upload",
+          "processing": "analyse",
+          "ready": "prêt",
+          "failed": "erreur"
+        },
+        "mentionHint": "· @ pour citer une capture ou un item"
+      },
+      "menu": {
+        "title": "Actions Sync",
+        "openHistory": "Ouvrir l'historique",
+        "newChat": "Nouveau chat",
+        "renameCurrent": "Renommer la conversation",
+        "deleteCurrent": "Supprimer la conversation en cours",
+        "runActionsTitle": "Actions de conversation",
+        "openConversation": "Ouvrir la conversation",
+        "rename": "Renommer",
+        "delete": "Supprimer",
+        "deleteConfirmTitle": "Supprimer cette conversation ?",
+        "deleteConfirmMessage": "Cette action est réversible uniquement via la base de données.",
+        "renamePromptTitle": "Renommer la conversation",
+        "renamePromptBody": "Choisissez un nouveau titre.",
+        "renameUnsupported": "Le renommage direct est disponible sur iOS pour l’instant.",
+        "renameEmpty": "Le titre ne peut pas être vide.",
+        "renameSuccess": "Conversation renommée.",
+        "renameError": "Impossible de renommer la conversation.",
+        "deleted": "Conversation supprimée."
+      },
       "actions": {
         "applyPreview": "Appliquer l'aperçu",
         "undo": "Annuler"
       },
       "history": {
+        "title": "Historique",
+        "empty": "Aucune conversation trouvée.",
         "loading": "Chargement de la conversation...",
         "loadingSlow": "Le chargement de la conversation prend plus de temps que prévu.",
         "loadError": "Impossible de charger cette conversation."
+      },
+      "previewPlan": {
+        "title": "Aperçu",
+        "entityEvent": "Moment",
+        "entityItem": "Item",
+        "entityCapture": "Capture",
+        "entityTimeline": "Timeline",
+        "entityUnknown": "Élément",
+        "titleFallback": "Plan",
+        "pending": "En attente",
+        "applying": "Application...",
+        "schedule": "Horaire",
+        "linkedProject": "Projet lié",
+        "linkedSeries": "Série/Récurrence gérée",
+        "targetEvent": "Cible : Moment",
+        "targetItem": "Cible : Item",
+        "descriptionPrefix": "Description"
+      },
+      "status": {
+        "run": {
+          "applied": "Appliqué"
+        }
+      },
+      "warning": {
+        "legacyEventIgnored": "Certains événements historiques incompatibles ont été ignorés."
       },
       "toast": {
         "applied": "Changement appliqué.",

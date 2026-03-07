@@ -230,3 +230,22 @@ export function useCreateItemLink(itemId: string | null) {
     },
   });
 }
+
+export function useDeleteItemLink(itemId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ linkId }: { linkId: string }) => {
+      if (!itemId) throw new Error("No item id");
+      const res = await apiFetch(`/api/v1/items/${itemId}/links/${linkId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to delete link"));
+      const data = await res.json();
+      return itemActionResponseSchema.parse(data) as ItemActionResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["item-links", itemId] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    },
+  });
+}

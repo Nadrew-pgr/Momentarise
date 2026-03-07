@@ -93,7 +93,7 @@ class LiteLLMClientTests(unittest.IsolatedAsyncioTestCase):
                             {
                                 "id": "call_1",
                                 "function": {
-                                    "name": "item.preview",
+                                    "name": "item_preview",
                                     "arguments": '{"title":"Plan week"}',
                                 },
                             }
@@ -125,14 +125,14 @@ class LiteLLMClientTests(unittest.IsolatedAsyncioTestCase):
             out = await LiteLLMClient.complete(
                 prompt="system",
                 user_message="hello",
-                tools=[{"type": "function", "function": {"name": "item.preview"}}],
+                tools=[{"type": "function", "function": {"name": "item_preview"}}],
             )
 
         self.assertEqual(out["provider"], "mistral")
         self.assertEqual(out["content"], "Done")
         self.assertEqual(out["usage"]["total_tokens"], 19)
         self.assertEqual(len(out["tool_calls"]), 1)
-        self.assertEqual(out["tool_calls"][0]["name"], "item.preview")
+        self.assertEqual(out["tool_calls"][0]["name"], "item_preview")
         self.assertEqual(out["tool_calls"][0]["arguments"]["title"], "Plan week")
         self.assertEqual(out["reasoning"]["summary"], "Reasoning")
         self.assertEqual(out["sources"][0]["url"], "https://example.com/spec")
@@ -159,6 +159,7 @@ class LiteLLMClientTests(unittest.IsolatedAsyncioTestCase):
         with patch_sync_settings(
             SYNC_LLM_PROVIDER="unsupported-provider",
             SYNC_ENABLE_FALLBACK=False,
+            SYNC_MODEL_BALANCED="unknown-model-for-provider-test",
         ):
             with self.assertRaises(LiteLLMClientError) as ctx:
                 await LiteLLMClient.complete(prompt="system", user_message="hello")
@@ -169,7 +170,7 @@ class LiteLLMClientTests(unittest.IsolatedAsyncioTestCase):
         with patch_sync_settings(
             SYNC_LLM_PROVIDER="unsupported-provider",
             SYNC_ENABLE_FALLBACK=True,
-            SYNC_MODEL_BALANCED="mistral-medium-latest",
+            SYNC_MODEL_BALANCED="unknown-model-for-provider-test",
         ):
             out = await LiteLLMClient.complete(prompt="system", user_message="hello")
 
@@ -264,7 +265,7 @@ class LiteLLMClientTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "type": "tool_use",
                     "id": "toolu_123",
-                    "name": "item.preview",
+                    "name": "item_preview",
                     "input": {"title": "Prepare summary"},
                 },
             ],
@@ -296,7 +297,7 @@ class LiteLLMClientTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "type": "function",
                         "function": {
-                            "name": "item.preview",
+                            "name": "item_preview",
                             "description": "Preview item",
                             "parameters": {"type": "object"},
                         },
@@ -306,7 +307,7 @@ class LiteLLMClientTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(out["provider"], "anthropic")
         self.assertEqual(out["content"], "Anthropic ok")
-        self.assertEqual(out["tool_calls"][0]["name"], "item.preview")
+        self.assertEqual(out["tool_calls"][0]["name"], "item_preview")
         self.assertEqual(out["tool_calls"][0]["arguments"]["title"], "Prepare summary")
         self.assertEqual(out["usage"]["total_tokens"], 20)
         self.assertEqual(out["reasoning"]["summary"], "Model reasoning")
@@ -357,7 +358,7 @@ class LiteLLMClientTests(unittest.IsolatedAsyncioTestCase):
                             {
                                 "id": "call_gemini_1",
                                 "function": {
-                                    "name": "item.preview",
+                                    "name": "item_preview",
                                     "arguments": '{"title":"Gemini action"}',
                                 },
                             }
@@ -390,7 +391,7 @@ class LiteLLMClientTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(out["provider"], "gemini")
         self.assertEqual(out["content"], "Gemini ok")
-        self.assertEqual(out["tool_calls"][0]["name"], "item.preview")
+        self.assertEqual(out["tool_calls"][0]["name"], "item_preview")
 
     async def test_complete_retries_then_succeeds(self) -> None:
         response = httpx.Response(

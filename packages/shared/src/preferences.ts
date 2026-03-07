@@ -39,7 +39,11 @@ export const aiPreferencesResponseSchema = z.object({
   capture_provider_preferences: captureProviderPreferencesSchema,
   capture_default_agent_id: z.string().uuid().nullable().optional(),
   capture_agent_routing_rules: z.record(z.string(), z.unknown()).default({}),
+  editor_default_agent_id: z.string().uuid().nullable().optional(),
+  editor_agent_routing_rules: z.record(z.string(), z.unknown()).default({}),
   capture_research_policy: captureResearchPolicySchema.default("proposal_only"),
+  sync_model: z.string().default("auto"),
+  sync_reasoning_level: z.string().nullable().optional(),
   updated_at: z.string().datetime(),
 });
 
@@ -50,7 +54,11 @@ export const aiPreferencesUpdateRequestSchema = z.object({
   capture_provider_preferences: captureProviderPreferencesSchema.optional(),
   capture_default_agent_id: z.string().uuid().nullable().optional(),
   capture_agent_routing_rules: z.record(z.string(), z.unknown()).optional(),
+  editor_default_agent_id: z.string().uuid().nullable().optional(),
+  editor_agent_routing_rules: z.record(z.string(), z.unknown()).optional(),
   capture_research_policy: captureResearchPolicySchema.optional(),
+  sync_model: z.string().optional(),
+  sync_reasoning_level: z.string().nullable().optional(),
   last_known_updated_at: z.string().datetime().optional(),
 });
 

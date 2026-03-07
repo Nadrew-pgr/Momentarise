@@ -9,7 +9,19 @@ export interface SyncChatMessage {
   content: string;
   createdAt: Date;
   imageData?: string;
+  planPreviews?: SyncPreview[];
+  contextLinks?: SyncMessageContextLink[];
   delivery?: "sent" | "pending" | "failed";
+}
+
+export interface SyncMessageContextLink {
+  kind: "capture" | "item";
+  id: string;
+  label: string;
+  internalPath: string;
+  source?: string;
+  status?: string;
+  captureType?: string;
 }
 
 export interface SyncToolTimelineEntry {
@@ -69,6 +81,8 @@ export interface SyncNotice {
   message: string;
   level: "warning" | "error";
 }
+
+export type SyncRunMode = "free" | "guided";
 
 export interface SyncActionsViewModel {
   latestPreview: SyncPreview | null;

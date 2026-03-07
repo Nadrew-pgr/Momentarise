@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { businessBlocksSchema } from "./business-blocks";
 
 export const eventColorSchema = z.enum([
   "sky",
@@ -75,6 +76,46 @@ export const eventDeleteResponseSchema = z.object({
   deleted: z.boolean(),
 });
 
+export const eventContentSchemaVersionSchema = z.literal("business_blocks_v1");
+
+export const eventContentResponseSchema = z.object({
+  event_id: z.string().uuid(),
+  item_id: z.string().uuid(),
+  schema_version: eventContentSchemaVersionSchema,
+  blocks: businessBlocksSchema,
+});
+
+export const eventContentUpdateRequestSchema = z.object({
+  schema_version: eventContentSchemaVersionSchema.default("business_blocks_v1"),
+  blocks: businessBlocksSchema,
+});
+
+export const eventAnalyticsMetricsSchema = z.object({
+  completion_rate: z.number(),
+  effort_seconds: z.number().int(),
+  training_volume: z.number(),
+  energy_score: z.number(),
+  inbox_refs_count: z.number().int(),
+  block_count: z.number().int(),
+});
+
+export const eventAnalyticsPeriodSchema = z.enum(["week", "month"]);
+export const eventAnalyticsCompareSchema = z.enum(["previous"]);
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const eventAnalyticsResponseSchema = z.object({
+  event_id: z.string().uuid(),
+  period: eventAnalyticsPeriodSchema,
+  compare: eventAnalyticsCompareSchema,
+  current: eventAnalyticsMetricsSchema,
+  previous: eventAnalyticsMetricsSchema,
+  delta: eventAnalyticsMetricsSchema,
+  current_start: isoDateSchema,
+  current_end: isoDateSchema,
+  previous_start: isoDateSchema,
+  previous_end: isoDateSchema,
+});
+
 export type EventOut = z.infer<typeof eventOutSchema>;
 export type TimelineResponse = z.infer<typeof timelineResponseSchema>;
 export type EventCreateRequest = z.input<typeof eventCreateRequestSchema>;
@@ -82,3 +123,7 @@ export type EventUpdateRequest = z.input<typeof eventUpdateRequestSchema>;
 export type EventsRangeResponse = z.infer<typeof eventsRangeResponseSchema>;
 export type EventDeleteResponse = z.infer<typeof eventDeleteResponseSchema>;
 export type EventColor = z.infer<typeof eventColorSchema>;
+export type EventContentResponse = z.infer<typeof eventContentResponseSchema>;
+export type EventContentUpdateRequest = z.input<typeof eventContentUpdateRequestSchema>;
+export type EventAnalyticsMetrics = z.infer<typeof eventAnalyticsMetricsSchema>;
+export type EventAnalyticsResponse = z.infer<typeof eventAnalyticsResponseSchema>;

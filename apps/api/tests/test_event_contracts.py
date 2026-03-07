@@ -8,6 +8,7 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/
 os.environ.setdefault("JWT_SECRET", "test-secret")
 
 from src.api.v1.events import _event_to_out
+from src.api.v1.events import _normalize_to_business_blocks, _to_metrics_payload
 from src.schemas.event import EventCreateRequest, EventUpdateRequest
 
 
@@ -60,12 +61,80 @@ class EventContractsTests(unittest.TestCase):
             color="sky",
             tracking_started_at=None,
             updated_at=now,
+            rrule=None,
+            parent_event_id=None,
+            series_id=None,
+            project_id=None,
         )
         out = _event_to_out(event)
         self.assertEqual(out.title, "Planning")
         self.assertEqual(out.description, "Weekly planning")
         self.assertFalse(out.all_day)
         self.assertEqual(out.location, "Home")
+
+    def test_normalize_legacy_blocks_wraps_into_text_block(self) -> None:
+        legacy = [
+            {
+                "type": "paragraph",
+                "content": [{"type": "text", "text": "Legacy note"}],
+            }
+        ]
+        blocks = _normalize_to_business_blocks(legacy)
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual(blocks[0]["type"], "text_block")
+        payload = blocks[0]["payload"]
+        self.assertIn("Legacy note", str(payload.get("text")))
+
+    def test_normalize_business_blocks_keeps_payload(self) -> None:
+        payload = [
+            {
+                "id": "blk-1",
+                "type": "task_block",
+                "payload": {"title": "Ship v1", "status": "todo"},
+            }
+        ]
+        blocks = _normalize_to_business_blocks(payload)
+        self.assertEqual(blocks, payload)
+
+    def test_metrics_payload_supports_sets_checklists_and_inbox_refs(self) -> None:
+        metrics = _to_metrics_payload(
+            [
+                {
+                    "id": "c1",
+                    "type": "checklist_block",
+                    "payload": {
+                        "items": [
+                            {"id": "a", "text": "A", "done": True},
+                            {"id": "b", "text": "B", "done": False},
+                        ]
+                    },
+                },
+                {
+                    "id": "s1",
+                    "type": "set_block",
+                    "payload": {
+                        "exercise_name": "Push-up",
+                        "sets": [
+                            {"reps": 10, "load": 20, "done": True},
+                            {"reps": 8, "load": 20, "done": False},
+                        ],
+                    },
+                },
+                {
+                    "id": "i1",
+                    "type": "inbox_block",
+                    "payload": {
+                        "capture_refs": [
+                            {"capture_id": str(uuid.uuid4()), "title": "Call notes"},
+                            {"capture_id": str(uuid.uuid4()), "title": "Screenshot"},
+                        ]
+                    },
+                },
+            ]
+        )
+        self.assertEqual(metrics["inbox_refs_count"], 2)
+        self.assertEqual(metrics["training_volume"], 360.0)
+        self.assertGreater(metrics["completion_rate"], 0.0)
 
 
 if __name__ == "__main__":

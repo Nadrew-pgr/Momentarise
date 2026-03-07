@@ -103,3 +103,71 @@ Demande explicite de préparer une structure de sous-agent Sync avec prompt buil
 - Activer les modules par feature flags (`CAPTURE_CONTEXT_ENRICHMENT_ENABLED`, `CAPTURE_WEB_RESEARCH_ENABLED`, `CAPTURE_SUBAGENT_ROUTING_ENABLED`).
 - Ajouter des tool adapters pour web/context/connecteurs avec policy stricte (`proposal_only` vs `auto_if_safe`).
 - Conserver des snapshots auditables (prompt/toolset/retrieval) pour chaque analyse capture.
+
+---
+
+## [FEAT-20260305-001] Journal de trading (discipline + performance) via Inbox/Timeline
+**Logged**: 2026-03-05T13:41:13+01:00
+**Priority**: high
+**Status**: pending
+**Area**: backend / frontend / analytics
+
+### Requested Capability
+Ajouter un cas d'usage "journal de trading" dans Momentarise pour suivre la discipline d'execution et la performance, avec saisie manuelle assistee par IA, support multi-marches (crypto, actions, forex, futures), et dashboard d'analytics avance.
+
+### User Context
+"idee de cas d'usage : journal de trading"
+
+### Suggested Implementation
+- Reutiliser Inbox pour capturer les entrees de trades (texte/voice/photo) avec extraction IA de champs structures (marche, instrument, side, entree/sortie, taille, stop, take profit, setup, emotion, erreurs).
+- Ajouter un type/categorie dedie dans le pipeline capture pour les journaux de trading et produire des suggestions d'actions (creer trade, planifier review, tagger erreur recurrente).
+- Reutiliser Timeline pour planifier et suivre les sessions (pre-market, execution window, post-trade review) et lier chaque session aux captures/trades associes.
+- Exposer un dashboard avance (winrate, expectancy, profit factor, drawdown, R moyen, filtres par marche/setup/heure/emotion) avec comparatifs de performance et discipline.
+- Garder V1 en saisie manuelle + IA, sans dependre d'integration broker API obligatoire.
+
+### Metadata
+- See Also: `project/docs/self-improvement.md`
+
+## [FEAT-20260306-001] Studio Moment > Contenu inspiré Stitch
+**Logged**: 2026-03-06T23:40:26+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Requested Capability
+Transformer `Moment > Contenu` en studio de création/édition de blocks métiers avec starter kits, quick update, fullscreen web et barre d'actions mobile.
+
+### User Context
+Demande explicite d'une refonte "plus belle/agréable/qui donnait envie de créer des moments", en s'appuyant réellement sur les écrans Stitch générés pour la structure de l'expérience.
+
+### Suggested Implementation
+- Web: onglet `Contenu` = preview compact puis ouverture d'un studio fullscreen avec header fort, tuiles analytics réelles, canvas de blocks et rail sticky de création.
+- Mobile: studio directement dans la page Moment avec header hiérarchisé, canvas compact, barre fixe basse `Add block` / `Quick update`, plus deux bottom sheets dédiés.
+- Shared: presets `LinkedIn Post`, `Workout Log`, `Weekly Review`, previews éditoriales, logique `Quick update` appliquée aux blocks existants.
+
+### Metadata
+- See Also: `LRN-20260306-007`
+---
+
+## [FEAT-20260307-001] Runtime logging depuis FAB et voix vers le Moment en cours
+**Logged**: 2026-03-07T11:44:00+01:00
+**Priority**: high
+**Status**: pending
+**Area**: frontend / mobile / ai / product
+
+### Requested Capability
+Permettre d’ajouter des logs et ajustements d’exécution d’un Moment depuis les entrypoints globaux (`FAB`, voix, capture rapide), pas seulement depuis le studio `Moment > Contenu`.
+
+### User Context
+"Et en vrai les logs devraient être permis depuis le FAB + avec la voix etc, par exemple j'ai prévu un moment revue de code d'une heure à 17h il est 17h30 j'estime qu'il faut qu'on ajoute une étape"
+
+### Suggested Implementation
+- Introduire un flow de `runtime update` accessible depuis le FAB web/mobile et depuis la capture vocale.
+- Au déclenchement, résoudre le `Moment` cible via priorité: moment en tracking > moment en cours temporellement > dernier moment ouvert > sélection explicite utilisateur.
+- La capture runtime ne crée pas un système parallèle: elle produit un patch sur les `BusinessBlock[]` du moment ciblé (`task_block`, `text_block`, `status_block`, `scale_block`, etc.).
+- Si l’intention détectée est structurelle (ex: "ajoute une étape de revue API"), créer/insérer un block; si elle est évaluative (ex: énergie, progrès, blocage), mettre à jour les blocks réservés du runtime.
+- La voix passe d’abord par transcription, puis par une étape d’interprétation légère pour proposer soit `patch current moment`, soit `create inbox capture`, soit `ask target moment` si ambigu.
+
+### Metadata
+- See Also: `FEAT-20260306-001`, `FEAT-20260302-003`
+---

@@ -2,17 +2,25 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  BusinessBlock,
   EventCreateRequest,
+  EventAnalyticsResponse,
+  EventContentResponse,
+  EventContentUpdateRequest,
   EventDeleteResponse,
   EventOut,
   EventUpdateRequest,
   EventsRangeResponse,
 } from "@momentarise/shared";
 import {
+  eventAnalyticsResponseSchema,
+  eventContentResponseSchema,
+  eventContentUpdateRequestSchema,
   eventCreateRequestSchema,
   eventDeleteResponseSchema,
   eventOutSchema,
   eventsRangeResponseSchema,
+  sanitizeBusinessBlocks,
   eventUpdateRequestSchema,
 } from "@momentarise/shared";
 import { fetchWithAuth } from "@/lib/bff-client";
@@ -111,6 +119,67 @@ export function useDeleteEvent() {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["timeline"] });
       queryClient.invalidateQueries({ queryKey: ["today"] });
+    },
+  });
+}
+
+export function useEventContent(eventId: string | null) {
+  return useQuery<EventContentResponse | null>({
+    queryKey: ["event-content", eventId],
+    enabled: !!eventId,
+    queryFn: async () => {
+      if (!eventId) return null;
+      const res = await fetchWithAuth(`/api/events/${eventId}/content`);
+      if (!res.ok) throw await parseApiError(res, "Failed to fetch moment content");
+      const data = await res.json();
+      return eventContentResponseSchema.parse(data) as EventContentResponse;
+    },
+  });
+}
+
+export function useUpdateEventContent(eventId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: EventContentUpdateRequest) => {
+      if (!eventId) throw new Error("No event id");
+      const sanitizedBlocks = sanitizeBusinessBlocks(payload.blocks as BusinessBlock[]);
+      const body = eventContentUpdateRequestSchema.parse({
+        ...payload,
+        blocks: sanitizedBlocks,
+      });
+      const res = await fetchWithAuth(`/api/events/${eventId}/content`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw await parseApiError(res, "Failed to update moment content");
+      const data = await res.json();
+      return eventContentResponseSchema.parse(data) as EventContentResponse;
+    },
+    onSuccess: (result) => {
+      queryClient.setQueryData(["event-content", eventId], result);
+      queryClient.invalidateQueries({ queryKey: ["event-analytics", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["item", result.item_id] });
+      queryClient.invalidateQueries({ queryKey: ["item-links", result.item_id] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    },
+  });
+}
+
+export function useEventAnalytics(
+  eventId: string | null,
+  period: "week" | "month" = "week"
+) {
+  return useQuery<EventAnalyticsResponse | null>({
+    queryKey: ["event-analytics", eventId, period, "previous"],
+    enabled: !!eventId,
+    queryFn: async () => {
+      if (!eventId) return null;
+      const qs = new URLSearchParams({ period, compare: "previous" });
+      const res = await fetchWithAuth(`/api/events/${eventId}/analytics?${qs.toString()}`);
+      if (!res.ok) throw await parseApiError(res, "Failed to fetch moment analytics");
+      const data = await res.json();
+      return eventAnalyticsResponseSchema.parse(data) as EventAnalyticsResponse;
     },
   });
 }

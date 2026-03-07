@@ -63,16 +63,30 @@ function captureIcon(type: CaptureType) {
   }
 }
 
-function firstLine(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  return trimmed.split("\n")[0]?.trim() ?? "";
-}
-
 function previewText(value: string): string {
   const compact = value.replace(/\s+/g, " ").trim();
   if (!compact) return "";
   return compact.length > 120 ? `${compact.slice(0, 120)}...` : compact;
+}
+
+function fallbackTimestampedTitle(
+  captureType: string,
+  createdAt: string,
+  locale: string,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  const date = new Date(createdAt);
+  const datePart = date.toLocaleDateString(locale || "en-US");
+  const timePart = date.toLocaleTimeString(locale || "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return t("pages.inbox.captureFallbackTimestamped", {
+    type: captureType,
+    date: datePart,
+    time: timePart,
+    defaultValue: `${captureType} - ${datePart} ${timePart}`,
+  });
 }
 
 function resolveSectionKey(at: Date): SectionKey {
@@ -98,7 +112,7 @@ function relativeTime(now: Date, date: Date, locale: string): string {
 }
 
 function actionableSuggestions(actions: CaptureActionSuggestion[]): CaptureActionSuggestion[] {
-  return actions.filter((action) => action.type !== "summarize");
+  return actions;
 }
 
 function resolvePrimaryAction(capture: {
@@ -107,7 +121,7 @@ function resolvePrimaryAction(capture: {
 }): CaptureActionSuggestion | null {
   const actions = actionableSuggestions(capture.suggested_actions);
   if (!actions.length) return null;
-  if (capture.primary_action && capture.primary_action.type !== "summarize") {
+  if (capture.primary_action) {
     const matched = actions.find((action) => action.key === capture.primary_action?.key);
     if (matched) return matched;
   }
@@ -140,7 +154,7 @@ export default function InboxPage() {
 
       if (!query) return true;
       const primaryAction = resolvePrimaryAction(capture);
-      const haystack = `${capture.raw_content} ${(primaryAction?.label ?? "").toString()}`;
+      const haystack = `${capture.title ?? ""} ${capture.raw_content} ${(primaryAction?.label ?? "").toString()}`;
       return haystack.toLowerCase().includes(query);
     });
     const cmp = (a: (typeof list)[0], b: (typeof list)[0]) => {
@@ -148,14 +162,18 @@ export default function InboxPage() {
       const tb = new Date(b.created_at).getTime();
       if (sortOrder === "newest") return tb - ta;
       if (sortOrder === "oldest") return ta - tb;
-      const titleA = firstLine(a.raw_content).toLowerCase();
-      const titleB = firstLine(b.raw_content).toLowerCase();
+      const titleA =
+        (a.title?.trim() ||
+          fallbackTimestampedTitle(a.capture_type, a.created_at, i18n.language || "en-US", t)).toLowerCase();
+      const titleB =
+        (b.title?.trim() ||
+          fallbackTimestampedTitle(b.capture_type, b.created_at, i18n.language || "en-US", t)).toLowerCase();
       if (sortOrder === "a2z") return titleA.localeCompare(titleB);
       return titleB.localeCompare(titleA);
     };
     list.sort(cmp);
     return list;
-  }, [captures, search, sortOrder, typeFilter]);
+  }, [captures, i18n.language, search, sortOrder, t, typeFilter]);
 
   const grouped = useMemo(() => {
     const bySection: Record<SectionKey, typeof filteredCaptures> = {
@@ -310,8 +328,13 @@ export default function InboxPage() {
                   <div className="space-y-3">
                     {entries.map((capture) => {
                       const title =
-                        firstLine(capture.raw_content) ||
-                        t("pages.inbox.captureFallbackTitle", { type: capture.capture_type });
+                        capture.title?.trim() ||
+                        fallbackTimestampedTitle(
+                          capture.capture_type,
+                          capture.created_at,
+                          i18n.language || "en-US",
+                          t
+                        );
                       const subtitle =
                         previewText(capture.raw_content) || t("pages.inbox.emptyCapture");
                       const createdAt = new Date(capture.created_at);

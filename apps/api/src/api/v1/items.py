@@ -92,7 +92,7 @@ async def create_item(
         status=body.status,
         meta=body.metadata,
         source_capture_id=body.source_capture_id,
-        blocks=[block.model_dump(exclude_none=True) for block in body.blocks],
+        blocks=body.blocks,
     )
     db.add(item)
     await db.commit()
@@ -119,7 +119,7 @@ async def update_item(
 ) -> ItemOut:
     item = await _get_item_or_404(db, workspace.workspace_id, item_id)
     if body.blocks is not None:
-        item.blocks = [block.model_dump(exclude_none=True) for block in body.blocks]
+        item.blocks = body.blocks
     if body.title is not None:
         item.title = body.title
     if body.kind is not None:
@@ -245,3 +245,37 @@ async def create_item_link(
     await db.commit()
     await db.refresh(link)
     return EntityLinkOut.model_validate(link)
+
+
+@router.delete("/{item_id}/links/{link_id}", response_model=ItemActionResponse)
+async def delete_item_link(
+    item_id: UUID,
+    link_id: UUID,
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> ItemActionResponse:
+    await _get_item_or_404(db, workspace.workspace_id, item_id)
+
+    result = await db.execute(
+        select(EntityLink).where(
+            EntityLink.id == link_id,
+            EntityLink.workspace_id == workspace.workspace_id,
+            EntityLink.deleted_at.is_(None),
+            or_(
+                (EntityLink.from_entity_type == "item")
+                & (EntityLink.from_entity_id == item_id),
+                (EntityLink.to_entity_type == "item")
+                & (EntityLink.to_entity_id == item_id),
+            ),
+        )
+    )
+    link = result.scalar_one_or_none()
+    if link is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Link not found",
+        )
+
+    link.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    return ItemActionResponse(item_id=item_id, status="link_deleted")

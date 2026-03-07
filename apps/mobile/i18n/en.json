@@ -109,7 +109,12 @@
       "sectionYesterday": "Yesterday",
       "sectionEarlier": "Earlier",
       "captureFallbackTitle": "{{type}} capture",
+      "captureFallbackTimestamped": "{{type}} - {{date}} {{time}}",
       "noteFallbackTitle": "Note",
+      "captureTitle": "Capture title",
+      "saveTitle": "Save title",
+      "titleUpdated": "Title updated",
+      "titleUpdateError": "Unable to update title",
       "kindCapture": "Capture",
       "kindItem": "Item",
       "openCapture": "Open capture",
@@ -188,7 +193,73 @@
       "linkedTo": "Linked to",
       "emptyLinks": "No links for this item.",
       "noLinksBadge": "No links",
-      "noItemSelected": "Select a capture to process or an item."
+      "noItemSelected": "Select a capture to process or an item.",
+      "noteHeader": {
+        "edited": "Edited {{date}}",
+        "openCapture": "Open source capture"
+      },
+      "noteMenu": {
+        "title": "Note actions",
+        "openSourceCapture": "Open source capture",
+        "rename": "Rename",
+        "copyLink": "Copy link",
+        "copyLinkSuccess": "Link copied.",
+        "copyLinkError": "Unable to copy link.",
+        "delete": "Delete",
+        "duplicate": "Duplicate",
+        "moveTo": "Move to",
+        "versionHistory": "Version history",
+        "notifications": "Notifications",
+        "analytics": "Analytics",
+        "importExport": "Import / Export",
+        "favorite": "Add to favorites",
+        "unfavorite": "Remove from favorites",
+        "favoriteError": "Unable to update favorite state.",
+        "renamePromptTitle": "Rename note",
+        "renamePromptPlaceholder": "New title",
+        "renameEmpty": "Title cannot be empty.",
+        "renameSuccess": "Note renamed.",
+        "renameError": "Unable to rename note.",
+        "renamePartialError": "Partial rename: one entity could not be updated.",
+        "deleteConfirmTitle": "Delete this note?",
+        "deleteConfirmBody": "The note and its source capture will be deleted.",
+        "deleteSuccess": "Note deleted.",
+        "deleteError": "Unable to delete note.",
+        "deletePartialError": "Partial delete: one entity could not be deleted."
+      },
+      "editorAi": {
+        "button": "AI",
+        "actions": {
+          "rewrite": {
+            "label": "Improve writing",
+            "description": "Rewrite with clearer wording and flow."
+          },
+          "structuredRewrite": {
+            "label": "Structured rewrite",
+            "description": "Rebuild with sections and action points."
+          },
+          "shorter": {
+            "label": "Make shorter",
+            "description": "Reduce length and keep essentials only."
+          },
+          "longer": {
+            "label": "Make longer",
+            "description": "Expand with more context and details."
+          },
+          "summarize": {
+            "label": "Summarize",
+            "description": "Generate a short summary."
+          },
+          "grammarFix": {
+            "label": "Fix grammar",
+            "description": "Correct spelling and grammar mistakes."
+          },
+          "translateFrEn": {
+            "label": "Translate FR -> EN",
+            "description": "Translate French text to English."
+          }
+        }
+      }
     },
     "timeline": {
       "title": "Timeline",
@@ -296,14 +367,97 @@
     "sync": {
       "title": "Sync",
       "placeholder": "Sync page ready for next iterations (chat, preview/apply, AI tools).",
+      "header": {
+        "newConversation": "New conversation"
+      },
+      "composer": {
+        "placeholder": "Ask Sync to plan, change, or organize something...",
+        "send": "Send",
+        "stop": "Stop",
+        "addAttachment": "Add attachment",
+        "waitAttachments": "Wait until all attachments are ready before sending.",
+        "attachLimitExceeded": "Maximum 5 elements (attachments + references) per message.",
+        "attachmentFailed": "Unable to prepare an attachment.",
+        "removeAttachment": "Remove attachment",
+        "photoPermissionDenied": "Photo permission denied.",
+        "inboxPickerTitle": "Attach from Inbox",
+        "inboxPickerDescription": "Select captures or items to include in Sync context.",
+        "inboxPickerSearch": "Search capture or item...",
+        "inboxPickerLoading": "Searching...",
+        "inboxPickerEmpty": "No result found.",
+        "inboxPickerAdd": "Add ({{count}})",
+        "mentionLoading": "Searching references...",
+        "mentionError": "Unable to load references.",
+        "mentionEmpty": "No matching capture or item.",
+        "plus": {
+          "photo": "Photo",
+          "file": "File",
+          "voice": "Audio",
+          "inbox": "Inbox"
+        },
+        "contextStatus": {
+          "uploading": "uploading",
+          "processing": "processing",
+          "ready": "ready",
+          "failed": "failed"
+        },
+        "mentionHint": "· @ to mention a capture or item"
+      },
+      "menu": {
+        "title": "Sync actions",
+        "openHistory": "Open history",
+        "newChat": "New chat",
+        "renameCurrent": "Rename conversation",
+        "deleteCurrent": "Delete current conversation",
+        "runActionsTitle": "Conversation actions",
+        "openConversation": "Open conversation",
+        "rename": "Rename",
+        "delete": "Delete",
+        "deleteConfirmTitle": "Delete this conversation?",
+        "deleteConfirmMessage": "This action is reversible only from the database.",
+        "renamePromptTitle": "Rename conversation",
+        "renamePromptBody": "Choose a new title.",
+        "renameUnsupported": "Direct rename is currently available on iOS only.",
+        "renameEmpty": "Title cannot be empty.",
+        "renameSuccess": "Conversation renamed.",
+        "renameError": "Unable to rename conversation.",
+        "deleted": "Conversation deleted."
+      },
       "actions": {
         "applyPreview": "Apply preview",
         "undo": "Undo"
       },
       "history": {
+        "title": "History",
+        "empty": "No conversation found.",
         "loading": "Loading conversation...",
         "loadingSlow": "Conversation loading is taking longer than expected.",
         "loadError": "Unable to load this conversation."
+      },
+      "previewPlan": {
+        "title": "Preview",
+        "entityEvent": "Moment",
+        "entityItem": "Item",
+        "entityCapture": "Capture",
+        "entityTimeline": "Timeline",
+        "entityUnknown": "Entity",
+        "titleFallback": "Plan",
+        "pending": "Pending",
+        "applying": "Applying...",
+        "schedule": "Schedule",
+        "linkedProject": "Linked project",
+        "linkedSeries": "Series/recurrence",
+        "targetEvent": "Target: Moment",
+        "targetItem": "Target: Item",
+        "descriptionPrefix": "Description"
+      },
+      "status": {
+        "run": {
+          "applied": "Applied"
+        }
+      },
+      "warning": {
+        "legacyEventIgnored": "Some incompatible legacy events were ignored."
       },
       "toast": {
         "applied": "Change applied.",

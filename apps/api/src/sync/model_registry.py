@@ -336,19 +336,16 @@ def get_available_models(
 ) -> list[dict[str, Any]]:
     """
     Return models filtered by:
-    - Available API keys (provider must have a key)
     - Optional feature filter (e.g. "sync", "capture_transcription")
     - include_specialised: if False, exclude models that are only for
       capture_transcription / capture_ocr / capture_vlm (not user-selectable)
-    """
-    providers = _available_providers()
-    # Always include mistral as it's the default/fallback provider
-    providers.add("mistral")
 
+    Important:
+    - The model catalog remains visible even when some provider keys are missing.
+    - Runtime key availability is handled later by the LLM client (with fallback).
+    """
     models: list[dict[str, Any]] = []
     for entry in _ALL_MODELS:
-        if entry.provider not in providers:
-            continue
         if feature and feature not in entry.features:
             continue
         if not include_specialised:
@@ -375,17 +372,30 @@ def resolve_auto_model(
     feature_routing = AUTO_ROUTING.get(feature, AUTO_ROUTING.get("sync", {}))
     model_id = feature_routing.get(user_tier) or feature_routing.get("free", "mistral-large-latest")
 
-    # Verify the provider for this model has an API key
     providers = _available_providers()
-    providers.add("mistral")  # Always available as fallback
 
-    for entry in _ALL_MODELS:
-        if entry.id == model_id and entry.provider in providers:
-            return model_id
+    def _provider_for(model_candidate: str | None) -> str | None:
+        if not model_candidate:
+            return None
+        for entry in _ALL_MODELS:
+            if entry.id == model_candidate:
+                return entry.provider
+        return None
 
-    # Fallback: return the free tier model for this feature
-    fallback = feature_routing.get("free", "mistral-large-latest")
-    return fallback
+    # 1) Preferred candidate for tier if provider key is available.
+    preferred_provider = _provider_for(model_id)
+    if preferred_provider and preferred_provider in providers:
+        return model_id
+
+    # 2) Try any routed tier candidate whose provider is available.
+    for tier in (user_tier, "pro", "free", "ultra"):
+        candidate = feature_routing.get(tier)
+        candidate_provider = _provider_for(candidate)
+        if candidate and candidate_provider and candidate_provider in providers:
+            return candidate
+
+    # 3) If nothing is key-routable, keep deterministic free fallback.
+    return feature_routing.get("free", "mistral-large-latest")
 
 
 def get_model_entry(model_id: str) -> ModelEntry | None:

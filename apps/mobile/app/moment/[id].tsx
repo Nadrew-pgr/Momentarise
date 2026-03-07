@@ -9,21 +9,42 @@ import {
     Text,
     TouchableWithoutFeedback,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTranslation } from "react-i18next";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { EventColor } from "@momentarise/shared";
-import type { ProseMirrorNode } from "@momentarise/shared";
-import { useCreateEvent, useDeleteEvent, useUpdateEvent } from "@/hooks/use-events";
+import {
+    BLOCK_DISPLAY_META,
+    QUICK_UPDATE_LABELS,
+    STARTER_KITS,
+    applyQuickUpdateDraft,
+    buildStarterKitBlocks,
+    businessBlockTypeValues,
+    createBusinessBlock,
+    eventContentResponseSchema,
+    eventContentUpdateRequestSchema,
+    insertBusinessBlocks,
+    sanitizeBusinessBlocks,
+    type BusinessBlock,
+} from "@momentarise/shared";
+import {
+    useCreateEvent,
+    useDeleteEvent,
+    useEventAnalytics,
+    useEventContent,
+    useUpdateEvent,
+} from "@/hooks/use-events";
+import { useProjects } from "@/hooks/use-projects";
+import { useSeries } from "@/hooks/use-series";
 import { useTracking } from "@/hooks/use-tracking";
-import { type DraftEvent, useEventSheet, useAppToast } from "@/lib/store";
+import { type DraftEvent, useEventSheet } from "@/lib/store";
+import { apiFetch, readApiError } from "@/lib/api";
 import { EndHour, StartHour } from "@/lib/calendar-constants";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { BlockEditor } from "@/components/BlockEditor";
-import { useItem, useUpdateItem } from "@/hooks/use-item";
+import { BusinessBlocksEditor } from "@/components/BusinessBlocksEditor";
 import { RecurrenceInput } from "@/components/RecurrenceInput";
 import { ProjectSeriesSelector } from "@/components/ProjectSeriesSelector";
 
@@ -79,19 +100,74 @@ function withTime(base: Date, nextTime: Date): Date {
 type TabKey = "details" | "content" | "coach";
 type SaveState = "idle" | "saving" | "saved" | "error";
 
+type QuickUpdateState = {
+    status: string;
+    energy: string;
+    progressDelta: string;
+    blockers: string;
+    nextAction: string;
+};
+
+function makeBlockId(): string {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+    return `blk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function formatSecondsCompact(value: number | null): string {
+    if (value == null || Number.isNaN(value)) return "--";
+    const seconds = Math.max(0, Math.round(value));
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) return `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
+    return `${minutes}m`;
+}
+
+function parseQuickNumber(value: string): number | null {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildQuickUpdateState(blocks: BusinessBlock[]): QuickUpdateState {
+    const statusBlock = blocks.find(
+        (block) => block.type === "status_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.status
+    );
+    const energyBlock = blocks.find(
+        (block) => block.type === "scale_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.energy
+    );
+    const progressBlock = blocks.find(
+        (block) => block.type === "metric_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.progressDelta
+    );
+    const blockersBlock = blocks.find(
+        (block) => block.type === "text_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.blockers
+    );
+    const nextActionBlock = blocks.find(
+        (block) => block.type === "task_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.nextAction
+    );
+
+    return {
+        status: statusBlock && statusBlock.type === "status_block" ? statusBlock.payload.state : "on_track",
+        energy: energyBlock && energyBlock.type === "scale_block" ? String(energyBlock.payload.value ?? "") : "",
+        progressDelta:
+            progressBlock && progressBlock.type === "metric_block" && progressBlock.payload.current != null
+                ? String(progressBlock.payload.current)
+                : "",
+        blockers: blockersBlock && blockersBlock.type === "text_block" ? blockersBlock.payload.text ?? "" : "",
+        nextAction:
+            nextActionBlock && nextActionBlock.type === "task_block" ? nextActionBlock.payload.title ?? "" : "",
+    };
+}
+
 export default function MomentDetailPage() {
     const { t } = useTranslation();
     const router = useRouter();
-    const params = useLocalSearchParams<{ id?: string | string[] }>();
-    const isNew = params.id === "new" || !params.id;
-
     const draftEvent = useEventSheet((s) => s.draftEvent);
 
     const createEvent = useCreateEvent();
     const updateEvent = useUpdateEvent();
     const deleteEvent = useDeleteEvent();
     const { startTracking, stopTracking, isStarting, isStopping } = useTracking();
-    const showToast = useAppToast((s) => s.show);
 
     const [activeTab, setActiveTab] = useState<TabKey>("details");
     const [title, setTitle] = useState("");
@@ -109,14 +185,29 @@ export default function MomentDetailPage() {
     const [eventId, setEventId] = useState<string | null>(null);
     const [itemId, setItemId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [activeContentBlockId, setActiveContentBlockId] = useState<string | null>(null);
+    const [showAddBlockSheet, setShowAddBlockSheet] = useState(false);
+    const [showQuickUpdateSheet, setShowQuickUpdateSheet] = useState(false);
+    const [quickUpdate, setQuickUpdate] = useState<QuickUpdateState>({
+        status: "on_track",
+        energy: "",
+        progressDelta: "",
+        blockers: "",
+        nextAction: "",
+    });
 
     const [activePicker, setActivePicker] = useState<
         "startDate" | "startTime" | "endDate" | "endTime" | null
     >(null);
     const [pickerValue, setPickerValue] = useState<Date>(new Date());
 
-    const { data: item } = useItem(itemId);
-    const updateItem = useUpdateItem(itemId);
+    const { data: eventContent } = useEventContent(eventId);
+    const { data: eventAnalytics } = useEventAnalytics(eventId, "week");
+    const { data: projects = [] } = useProjects();
+    const { data: allSeries = [] } = useSeries();
+    const [blocks, setBlocks] = useState<BusinessBlock[]>([]);
+    const [contentDirty, setContentDirty] = useState(false);
+    const [blocksHydrated, setBlocksHydrated] = useState(false);
     const [blocksSaveState, setBlocksSaveState] = useState<SaveState>("idle");
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -126,33 +217,141 @@ export default function MomentDetailPage() {
         };
     }, []);
 
+    useEffect(() => {
+        if (!eventContent || !eventId || blocksHydrated || contentDirty) {
+            return;
+        }
+        setBlocks(eventContent.blocks ?? []);
+        if (eventContent.item_id !== itemId) {
+            setItemId(eventContent.item_id);
+        }
+        setBlocksHydrated(true);
+    }, [blocksHydrated, contentDirty, eventContent, eventId, itemId]);
+
+    useEffect(() => {
+        setQuickUpdate(buildQuickUpdateState(blocks));
+    }, [blocks]);
+
+    const persistBlocks = useCallback(
+        async (targetEventId: string, nextBlocks: BusinessBlock[]) => {
+            const sanitizedBlocks = sanitizeBusinessBlocks(nextBlocks);
+            const body = eventContentUpdateRequestSchema.parse({
+                schema_version: "business_blocks_v1",
+                blocks: sanitizedBlocks,
+            });
+            const res = await apiFetch(`/api/v1/events/${targetEventId}/content`, {
+                method: "PATCH",
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                throw new Error(await readApiError(res, "Failed to save moment content"));
+            }
+            const payload = eventContentResponseSchema.parse(await res.json());
+            if (payload.item_id !== itemId) {
+                setItemId(payload.item_id);
+            }
+        },
+        [itemId]
+    );
+
     const scheduleSaveBlocks = useCallback(
-        (blocks: ProseMirrorNode[]) => {
-            if (!itemId) return;
+        (nextBlocks: BusinessBlock[]) => {
+            const sanitizedBlocks = sanitizeBusinessBlocks(nextBlocks);
+            setBlocks(sanitizedBlocks);
+            setContentDirty(true);
+            if (!eventId) {
+                setBlocksSaveState("idle");
+                return;
+            }
             setBlocksSaveState("saving");
 
             if (debounceRef.current) clearTimeout(debounceRef.current);
 
             debounceRef.current = setTimeout(() => {
-                updateItem.mutate(
-                    { blocks },
-                    {
-                        onSuccess: () => setBlocksSaveState("saved"),
-                        onError: () => setBlocksSaveState("error"),
-                    }
-                );
+                void persistBlocks(eventId, sanitizedBlocks)
+                    .then(() => {
+                        setBlocksSaveState("saved");
+                        setContentDirty(false);
+                    })
+                    .catch(() => {
+                        setBlocksSaveState("error");
+                    });
             }, 700);
         },
-        [itemId, updateItem]
+        [eventId, persistBlocks]
     );
 
     const blocksSaveLabel = useMemo(() => {
         if (blocksSaveState === "saving") return t("pages.calendar.momentContent.saving");
         if (blocksSaveState === "saved") return t("pages.calendar.momentContent.saved");
         if (blocksSaveState === "error") return t("pages.calendar.momentContent.saveError");
-        if (!itemId) return t("pages.calendar.momentContent.deferred");
+        if (!eventId) return t("pages.calendar.momentContent.deferred");
         return null;
-    }, [blocksSaveState, itemId, t]);
+    }, [blocksSaveState, eventId, t]);
+
+    const selectedProject = useMemo(
+        () => projects.find((project) => project.id === projectId) ?? null,
+        [projectId, projects]
+    );
+    const selectedSeries = useMemo(
+        () => allSeries.find((series) => series.id === seriesId) ?? null,
+        [allSeries, seriesId]
+    );
+    const completionPercent = Math.round((eventAnalytics?.current.completion_rate ?? 0) * 100);
+    const energyScore = eventAnalytics?.current.energy_score;
+    const energyDelta = eventAnalytics?.delta.energy_score ?? 0;
+    const timeLeftSeconds = useMemo(() => {
+        const estimated =
+            draftEvent?.estimatedTimeSeconds ??
+            Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 1000));
+        const actual = draftEvent?.actualTimeAccSeconds ?? 0;
+        return Math.max(estimated - actual, 0);
+    }, [draftEvent?.actualTimeAccSeconds, draftEvent?.estimatedTimeSeconds, endDate, startDate]);
+
+    const insertSingleBusinessBlock = useCallback(
+        (type: (typeof businessBlockTypeValues)[number]) => {
+            const next = sanitizeBusinessBlocks(
+                insertBusinessBlocks(blocks, [createBusinessBlock(type, makeBlockId())], activeContentBlockId)
+            );
+            scheduleSaveBlocks(next);
+            setShowAddBlockSheet(false);
+        },
+        [activeContentBlockId, blocks, scheduleSaveBlocks]
+    );
+
+    const applyStarterKit = useCallback(
+        (key: (typeof STARTER_KITS)[number]["key"]) => {
+            const next = sanitizeBusinessBlocks(
+                insertBusinessBlocks(blocks, buildStarterKitBlocks(key, makeBlockId), activeContentBlockId)
+            );
+            scheduleSaveBlocks(next);
+            setShowAddBlockSheet(false);
+        },
+        [activeContentBlockId, blocks, scheduleSaveBlocks]
+    );
+
+    const applyQuickUpdate = useCallback(() => {
+        const parsedEnergy = quickUpdate.energy.trim() ? parseQuickNumber(quickUpdate.energy) : undefined;
+        const parsedProgressDelta = quickUpdate.progressDelta.trim()
+            ? parseQuickNumber(quickUpdate.progressDelta)
+            : undefined;
+
+        const next = sanitizeBusinessBlocks(
+            applyQuickUpdateDraft(
+                blocks,
+                {
+                    status: quickUpdate.status,
+                    energy: parsedEnergy == null ? undefined : parsedEnergy,
+                    progressDelta: parsedProgressDelta == null ? undefined : parsedProgressDelta,
+                    blockers: quickUpdate.blockers,
+                    nextAction: quickUpdate.nextAction,
+                },
+                makeBlockId
+            )
+        );
+        scheduleSaveBlocks(next);
+        setShowQuickUpdateSheet(false);
+    }, [blocks, quickUpdate, scheduleSaveBlocks]);
 
     const isBusy =
         createEvent.isPending ||
@@ -226,8 +425,19 @@ export default function MomentDetailPage() {
         setEventId(base.id ?? null);
         setItemId(base.itemId ?? null);
         setUpdatedAt(base.updatedAt ?? null);
+        setBlocks([]);
+        setContentDirty(false);
+        setBlocksHydrated(false);
+        setBlocksSaveState("idle");
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
+        }
         setError(null);
         setActivePicker(null);
+        setActiveContentBlockId(null);
+        setShowAddBlockSheet(false);
+        setShowQuickUpdateSheet(false);
     }, [draftEvent]);
 
     const validate = useCallback(() => {
@@ -267,8 +477,9 @@ export default function MomentDetailPage() {
         const { start, end } = buildStartEnd();
         const resolvedTitle = title.trim() ? title.trim() : "(no title)";
         try {
+            let persistedEventId = eventId;
             if (eventId) {
-                await updateEvent.mutateAsync({
+                const updatedEvent = await updateEvent.mutateAsync({
                     eventId,
                     payload: {
                         title: resolvedTitle,
@@ -281,8 +492,11 @@ export default function MomentDetailPage() {
                         series_id: seriesId ?? undefined,
                     },
                 });
+                persistedEventId = updatedEvent.id;
+                setUpdatedAt(updatedEvent.updated_at);
+                setItemId(updatedEvent.item_id);
             } else {
-                await createEvent.mutateAsync({
+                const createdEvent = await createEvent.mutateAsync({
                     title: resolvedTitle,
                     start_at: start.toISOString(),
                     end_at: end.toISOString(),
@@ -291,6 +505,21 @@ export default function MomentDetailPage() {
                     project_id: projectId ?? undefined,
                     series_id: seriesId ?? undefined,
                 });
+                persistedEventId = createdEvent.id;
+                setEventId(createdEvent.id);
+                setUpdatedAt(createdEvent.updated_at);
+                setItemId(createdEvent.item_id);
+            }
+
+            if (contentDirty && persistedEventId) {
+                if (debounceRef.current) {
+                    clearTimeout(debounceRef.current);
+                    debounceRef.current = null;
+                }
+                setBlocksSaveState("saving");
+                await persistBlocks(persistedEventId, blocks);
+                setBlocksSaveState("saved");
+                setContentDirty(false);
             }
             router.back();
         } catch (err) {
@@ -301,6 +530,9 @@ export default function MomentDetailPage() {
         color,
         createEvent,
         eventId,
+        blocks,
+        contentDirty,
+        persistBlocks,
         projectId,
         seriesId,
         rrule,
@@ -334,7 +566,7 @@ export default function MomentDetailPage() {
     }, [eventId, isTracking, startTracking, stopTracking]);
 
     return (
-        <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
+        <SafeAreaView className="flex-1 bg-background" edges={["top", "bottom"]}>
             <Pressable className="flex-1" onPress={Keyboard.dismiss}>
                 <View className="flex-1">
                     <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
@@ -455,7 +687,7 @@ export default function MomentDetailPage() {
 
                                 <RecurrenceInput
                                     value={rrule}
-                                    onChange={setRrule}
+                                    onChange={(value) => setRrule(value ?? null)}
                                     startDate={startDate}
                                 />
 
@@ -522,18 +754,60 @@ export default function MomentDetailPage() {
                     ) : null}
 
                     {activeTab === "content" ? (
-                        <View className="flex-1 min-h-0 px-4 py-4">
-                            {blocksSaveLabel ? <Text className="mb-2 px-1 text-xs text-muted-foreground">{blocksSaveLabel}</Text> : null}
-                            <View className="flex-1 min-h-[300px] bg-background rounded-md border border-border overflow-hidden">
-                                {item ? (
-                                    <BlockEditor value={item.blocks} onChange={scheduleSaveBlocks} editable />
-                                ) : (
-                                    <View className="flex-1 items-center justify-center p-4">
-                                        <Text className="text-sm text-muted-foreground text-center">
-                                            {itemId ? "Loading..." : t("pages.calendar.momentContent.deferred")}
+                        <View className="flex-1 min-h-0">
+                            <View className="border-b border-border px-4 pb-4 pt-4">
+                                <Text className="text-[11px] font-bold uppercase tracking-[2px] text-primary">Moment detail</Text>
+                                <Text className="mt-2 text-3xl font-extrabold tracking-tight text-foreground">
+                                    {title.trim() || "(no title)"}
+                                </Text>
+                                <View className="mt-3 flex-row flex-wrap gap-2">
+                                    {selectedProject ? (
+                                        <View className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1">
+                                            <Text className="text-xs font-bold text-primary">Project: {selectedProject.title}</Text>
+                                        </View>
+                                    ) : null}
+                                    {selectedSeries ? (
+                                        <View className="rounded-full border border-border bg-muted px-3 py-1">
+                                            <Text className="text-xs font-bold text-muted-foreground">Series: {selectedSeries.title}</Text>
+                                        </View>
+                                    ) : null}
+                                </View>
+
+                                <View className="mt-5 flex-row gap-3">
+                                    <View className="flex-1 rounded-[20px] border border-border bg-card px-4 py-4">
+                                        <Text className="text-[10px] font-bold uppercase tracking-[2px] text-muted-foreground">Status</Text>
+                                        <Text className="mt-2 text-2xl font-extrabold text-primary">{completionPercent}%</Text>
+                                        <Text className="text-[11px] font-medium text-muted-foreground">Completion</Text>
+                                    </View>
+                                    <View className="flex-1 rounded-[20px] border border-border bg-card px-4 py-4">
+                                        <Text className="text-[10px] font-bold uppercase tracking-[2px] text-muted-foreground">Time left</Text>
+                                        <Text className="mt-2 text-2xl font-extrabold text-foreground">{formatSecondsCompact(timeLeftSeconds)}</Text>
+                                        <Text className="text-[11px] font-medium text-muted-foreground">Estimated remaining</Text>
+                                    </View>
+                                    <View className="flex-1 rounded-[20px] border border-border bg-card px-4 py-4">
+                                        <Text className="text-[10px] font-bold uppercase tracking-[2px] text-muted-foreground">Energy</Text>
+                                        <Text className="mt-2 text-2xl font-extrabold text-foreground">
+                                            {energyScore != null ? Math.round(energyScore) : "--"}
+                                        </Text>
+                                        <Text className="text-[11px] font-medium text-muted-foreground">
+                                            {energyScore != null ? `${energyDelta >= 0 ? "+" : ""}${Math.round(energyDelta)} vs previous` : "No data yet"}
                                         </Text>
                                     </View>
-                                )}
+                                </View>
+
+                                {blocksSaveLabel ? (
+                                    <Text className="mt-4 text-xs text-muted-foreground">{blocksSaveLabel}</Text>
+                                ) : null}
+                            </View>
+
+                            <View className="flex-1 min-h-0 px-4 pt-4">
+                                <BusinessBlocksEditor
+                                    value={blocks}
+                                    onChange={scheduleSaveBlocks}
+                                    editable
+                                    activeBlockId={activeContentBlockId}
+                                    onActiveBlockChange={setActiveContentBlockId}
+                                />
                             </View>
                         </View>
                     ) : null}
@@ -548,8 +822,144 @@ export default function MomentDetailPage() {
                         </View>
                     ) : null}
 
+                    {activeTab === "content" ? (
+                        <View className="absolute bottom-0 left-0 right-0 border-t border-border bg-background/95 px-4 pb-4 pt-3">
+                            <View className="flex-row gap-3">
+                                <Pressable
+                                    onPress={() => setShowAddBlockSheet(true)}
+                                    className="flex-1 flex-row items-center justify-center gap-2 rounded-[20px] border border-border bg-muted px-4 py-4"
+                                >
+                                    <Text className="text-base font-bold text-foreground">Add block</Text>
+                                </Pressable>
+                                <Pressable
+                                    onPress={() => setShowQuickUpdateSheet(true)}
+                                    className="flex-1 flex-row items-center justify-center gap-2 rounded-[20px] bg-primary px-4 py-4"
+                                >
+                                    <Text className="text-base font-bold text-primary-foreground">Quick update</Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    ) : null}
+
                 </View>
             </Pressable>
+
+            <Modal
+                transparent
+                visible={showAddBlockSheet}
+                animationType="slide"
+                onRequestClose={() => setShowAddBlockSheet(false)}
+            >
+                <TouchableWithoutFeedback onPress={() => setShowAddBlockSheet(false)}>
+                    <View className="flex-1 bg-black/35 justify-end">
+                        <TouchableWithoutFeedback>
+                            <View className="max-h-[88vh] rounded-t-[32px] border border-border bg-card px-5 pb-8 pt-4">
+                                <View className="mb-4 self-center h-1.5 w-12 rounded-full bg-muted" />
+                                <Text className="text-[11px] font-bold uppercase tracking-[2px] text-primary">Starter kits</Text>
+                                <Text className="mt-2 text-2xl font-extrabold text-foreground">Add a block or start from a structure</Text>
+
+                                <ScrollView className="mt-5 max-h-[70vh]" contentContainerClassName="gap-4 pb-8">
+                                    <View className="gap-3">
+                                        {STARTER_KITS.map((kit) => (
+                                            <Pressable
+                                                key={kit.key}
+                                                onPress={() => applyStarterKit(kit.key)}
+                                                className="rounded-[24px] border border-border bg-background px-4 py-4"
+                                            >
+                                                <Text className="text-base font-bold text-foreground">{kit.title}</Text>
+                                                <Text className="mt-1 text-sm leading-5 text-muted-foreground">{kit.description}</Text>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+
+                                    <View className="mt-2">
+                                        <Text className="text-[11px] font-bold uppercase tracking-[2px] text-primary">All blocks</Text>
+                                        <View className="mt-3 flex-row flex-wrap gap-2">
+                                            {businessBlockTypeValues.map((type) => (
+                                                <Pressable
+                                                    key={type}
+                                                    onPress={() => insertSingleBusinessBlock(type)}
+                                                    className="min-w-[46%] rounded-[20px] border border-border bg-background px-3 py-3"
+                                                >
+                                                    <Text className="text-sm font-semibold text-foreground">{BLOCK_DISPLAY_META[type].title}</Text>
+                                                    <Text className="mt-1 text-[10px] font-bold uppercase tracking-[2px] text-muted-foreground">{BLOCK_DISPLAY_META[type].eyebrow}</Text>
+                                                </Pressable>
+                                            ))}
+                                        </View>
+                                    </View>
+                                </ScrollView>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
+
+            <Modal
+                transparent
+                visible={showQuickUpdateSheet}
+                animationType="slide"
+                onRequestClose={() => setShowQuickUpdateSheet(false)}
+            >
+                <TouchableWithoutFeedback onPress={() => setShowQuickUpdateSheet(false)}>
+                    <View className="flex-1 bg-black/35 justify-end">
+                        <TouchableWithoutFeedback>
+                            <View className="rounded-t-[32px] border border-border bg-card px-5 pb-8 pt-4">
+                                <View className="mb-4 self-center h-1.5 w-12 rounded-full bg-muted" />
+                                <Text className="text-[11px] font-bold uppercase tracking-[2px] text-primary">Quick update</Text>
+                                <Text className="mt-2 text-2xl font-extrabold text-foreground">Patch the frequent signals</Text>
+
+                                <View className="mt-5 gap-3">
+                                    <View className="flex-row gap-2">
+                                        {[
+                                            { value: "on_track", label: "On track" },
+                                            { value: "at_risk", label: "At risk" },
+                                            { value: "off_track", label: "Off track" },
+                                        ].map((option) => (
+                                            <Pressable
+                                                key={option.value}
+                                                onPress={() => setQuickUpdate((prev) => ({ ...prev, status: option.value }))}
+                                                className={`flex-1 rounded-[18px] px-3 py-3 ${quickUpdate.status === option.value ? "bg-primary" : "bg-muted"}`}
+                                            >
+                                                <Text className={`text-center text-xs font-bold ${quickUpdate.status === option.value ? "text-primary-foreground" : "text-muted-foreground"}`}>{option.label}</Text>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+
+                                    <Input
+                                        value={quickUpdate.energy}
+                                        onChangeText={(text) => setQuickUpdate((prev) => ({ ...prev, energy: text }))}
+                                        keyboardType="numeric"
+                                        placeholder="Energy (1-10)"
+                                    />
+                                    <Input
+                                        value={quickUpdate.progressDelta}
+                                        onChangeText={(text) => setQuickUpdate((prev) => ({ ...prev, progressDelta: text }))}
+                                        keyboardType="numeric"
+                                        placeholder="Progress delta %"
+                                    />
+                                    <Textarea
+                                        value={quickUpdate.blockers}
+                                        onChangeText={(text) => setQuickUpdate((prev) => ({ ...prev, blockers: text }))}
+                                        placeholder="Blockers"
+                                    />
+                                    <Input
+                                        value={quickUpdate.nextAction}
+                                        onChangeText={(text) => setQuickUpdate((prev) => ({ ...prev, nextAction: text }))}
+                                        placeholder="Next action"
+                                    />
+
+                                    <Pressable
+                                        onPress={applyQuickUpdate}
+                                        className="mt-2 rounded-[20px] bg-primary px-4 py-4"
+                                    >
+                                        <Text className="text-center text-base font-bold text-primary-foreground">Apply quick update</Text>
+                                    </Pressable>
+                                </View>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
 
             {Platform.OS === "android" ? (
                 activePicker ? (

@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-PromptMode = Literal["full", "minimal", "none", "capture_analysis"]
+PromptMode = Literal["full", "minimal", "none", "capture_analysis", "editor_assistant"]
 
 
 @dataclass(slots=True)
@@ -27,7 +27,7 @@ def _clean(value: str | None) -> str:
 
 
 def _normalize_mode(mode: str) -> PromptMode:
-    if mode in {"full", "minimal", "none", "capture_analysis"}:
+    if mode in {"full", "minimal", "none", "capture_analysis", "editor_assistant"}:
         return mode  # type: ignore[return-value]
     return "full"
 
@@ -48,10 +48,10 @@ def _build_tools_section(allowed_tools: list[dict]) -> list[str]:
     lines = [
         "## Tooling",
         "Use only declared tools. Never execute writes without preview/apply confirmation.",
-        "When the user asks to create, update, plan, or change something in the workspace, you MUST call one of the preview tools (item_preview, event_preview, inbox_transform_preview) so a structured preview card is shown. Replying only in text for such intents is not allowed.",
-        "The plan is the structured preview card (with Apply/Cancel) that appears when you call a preview tool. You must call the tool so this card is shown; do not only describe the change in plain text.",
-        "When calling preview tools (item_preview, event_preview, inbox_transform_preview), always pass display_summary with the same user-facing text you would put in your reply for that change: event title, schedule (e.g. \"Horaire : 09:00 - 09:30 (30 min)\"), color in user language, and a short description if relevant. This text is shown in the plan card instead of raw parameters.",
-        "CRITICAL: Your text reply before a preview tool call MUST be at most 1-2 sentences. Call the preview tool IMMEDIATELY. Do NOT describe the event/item details in your reply — those details belong ONLY in the tool call arguments and display_summary.",
+        "Use preview tools (item_preview, event_preview, inbox_transform_preview) only for explicit mutation intents (create/update/delete/schedule/transform/apply).",
+        "For discussion intents (summarize, brainstorm, explain, analyze, compare, reformulate), do not call preview tools by default; answer in text and optionally suggest that you can prepare a preview if the user wants.",
+        "When you do call a preview tool, pass display_summary with clear user-facing details (title, schedule, color, short description) so the preview card is understandable.",
+        "Keep the text before a preview tool call short (1-2 sentences max). Put the detailed mutation payload in tool arguments and display_summary.",
     ]
 
     if not allowed_tools:
@@ -99,12 +99,25 @@ def _build_autonomous_policy_section() -> list[str]:
         "## Autonomous Planning Policy",
         "- Infer missing defaults when safe (title, duration, color, scheduling window).",
         "- Do not ask for fields that can be inferred from context, memory, or preferences.",
-        "- For planning/scheduling/edit intents, proactively call preview tools before replying (`event_preview`, `item_preview`, `inbox_transform_preview`).",
-        "- Do NOT describe planned changes or steps in plain text only. Always emit a structured preview via the preview tools so the user gets a preview card with Apply/Cancel.",
+        "- Use preview tools only when the user explicitly asks for a mutation (create/update/delete/transform/schedule/apply).",
+        "- For non-mutation discussion intents, answer directly in text; suggest preview as optional next step.",
         "- Output format for mutation intents: 1 short sentence intro → tool call. No bullet lists. No markdown headers. No detailed prose.",
         "- Avoid long questionnaires: ask at most one blocking question only when a critical field cannot be inferred.",
         "- Resolve relative dates/times into absolute datetimes with timezone in outputs.",
-        "- If assumptions are made, state them briefly and proceed with preview-first execution.",
+        "- If assumptions are made for a mutation, state them briefly and proceed with preview-first execution.",
+        "",
+    ]
+
+
+def _build_guided_chat_policy_section() -> list[str]:
+    return [
+        "## Guided Planning Policy (MODE=PLAN)",
+        "- You are in PLAN mode. Your priority is DIALOGUE and PLANNING over immediate execution.",
+        "- Before calling any preview tool, you MUST propose a clear, bulleted plan of action to the user.",
+        "- Ask for confirmation or missing details if the user's intent is broad (e.g. \"organise ma semaine\").",
+        "- Be proactive in suggesting missing fields (title, duration, category) but do not execute until the plan is clear.",
+        "- Once a plan is agreed upon, you may then proceed with preview tools in subsequent turns.",
+        "- Keep the tone professional, helpful, and collaborative.",
         "",
     ]
 
@@ -114,8 +127,8 @@ def _build_reply_contract_section() -> list[str]:
         "## Reply Contract",
         "- Keep answers concise and actionable.",
         "- Use the user's own words and correct spelling; do not merge or invent words (e.g. write \"ma journée\" not \"manjournée\", \"ma semaine\" not \"masemaine\").",
-        "- Do not output a plan or list of steps as plain text when the user wants to apply changes; use the preview tools instead so a structured preview card is shown.",
-        "- NEVER list event/item details (title, time, color, description, etc.) as prose when a preview tool exists. Those details belong ONLY inside the tool call arguments and display_summary.",
+        "- When the user wants to apply a change, prefer preview tools over plain-text plans.",
+        "- Do not overproduce previews: for read-only or exploratory prompts, keep the response textual unless the user asks for a mutation.",
         "- If the user only asks for an explanation (no mutation), you may reply in text.",
         "- If context is insufficient, ask one direct question.",
         "- Use markdown only when it improves readability.",
@@ -245,7 +258,26 @@ def build_agent_system_prompt(params: SystemPromptParams) -> str:
         lines.extend(_build_context_section(params.extra_system_prompt))
         return "\n".join([line for line in lines if line is not None]).strip()
 
+    if mode == "editor_assistant":
+        lines.extend(
+            [
+                "## Editor Assistant Contract",
+                "- You are assisting text editing actions (rewrite, shorter, longer, summarize, grammar_fix, translate_fr_en).",
+                "- Return strict JSON with key: result_text.",
+                "- Preserve intent and be concise unless user asked to expand.",
+                "- Do not include markdown fences or extra keys unless explicitly requested.",
+                "",
+            ]
+        )
+        lines.extend(_build_time_section(params.user_timezone, params.user_now, params.locale))
+        lines.extend(_build_context_section(params.extra_system_prompt))
+        return "\n".join([line for line in lines if line is not None]).strip()
+
     if mode == "full":
+        run_mode = (params.runtime_info or {}).get("mode")
+        if run_mode == "guided":
+            lines.extend(_build_guided_chat_policy_section())
+
         lines.extend(_build_safety_section())
         lines.extend(_build_autonomous_policy_section())
         lines.extend(_build_reply_contract_section())

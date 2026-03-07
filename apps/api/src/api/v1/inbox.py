@@ -1,8 +1,11 @@
 import json
 import logging
+import uuid
+from hashlib import sha256
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from time import perf_counter
+from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -18,7 +21,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,16 +33,19 @@ from src.models.capture_artifact import CaptureArtifact
 from src.models.capture_asset import CaptureAsset
 from src.models.capture_job import CaptureJob
 from src.models.capture_tag import CaptureTag, CaptureTagLink
+from src.models.entity_link import EntityLink
 from src.models.event import Event
 from src.models.inbox_capture import InboxCapture
 from src.models.item import Item
 from src.models.user import User
 from src.models.workspace import WorkspaceMember
+from src.schemas.business_block import BUSINESS_BLOCK_TYPES
 from src.schemas.inbox import (
     ApplyCaptureRequest,
     ApplyCaptureResponse,
     CaptureActionResponse,
     CaptureActionSuggestionOut,
+    CaptureLinksResponse,
     CaptureArtifactOut,
     CaptureArtifactsResponse,
     CaptureAssetOut,
@@ -52,6 +58,27 @@ from src.schemas.inbox import (
     CreateCaptureRequest,
     InboxCaptureOut,
     InboxListResponse,
+    InboxSearchEntryOut,
+    InboxSearchResponse,
+    NoteSummaryRefreshResponse,
+    UpdateCaptureRequest,
+)
+from src.schemas.item import EntityLinkOut
+from src.services.capture_ai_service import (
+    build_capture_preview_plan_fallback,
+    build_capture_preview_plan_with_subagent,
+    generate_capture_summary_with_subagent,
+)
+from src.services.capture_async_queue import (
+    capture_async_worker_unavailable_reason,
+    create_capture_run_id,
+    is_capture_async_worker_available,
+    publish_capture_outbox_event_by_id,
+    relay_pending_capture_outbox_events,
+    queue_name_for_tier,
+    resolve_workspace_billing_tier,
+    schedule_capture_pipeline_outbox_event,
+    update_capture_queue_meta,
 )
 from src.services.capture_pipeline import (
     enqueue_default_jobs,
@@ -65,12 +92,21 @@ DEFAULT_AI_MODE = "proposal_only"
 DEFAULT_AUTO_APPLY_THRESHOLD = 0.90
 DEFAULT_MAX_ACTIONS = 3
 SAFE_AUTO_APPLY_ACTIONS = {"create_item", "create_task"}
+SUPPORTED_CAPTURE_ACTION_TYPES = {
+    "create_event",
+    "create_task",
+    "create_item",
+    "draft_reply",
+    "pay_invoice",
+    "review",
+}
 COMING_SOON_CAPABILITIES = [
     "context_research",
     "web_research",
     "advanced_enrichments",
     "connectors",
 ]
+CAPTURE_TITLE_MAX_LEN = 160
 logger = logging.getLogger(__name__)
 
 
@@ -92,6 +128,28 @@ def _validate_link_content(raw_content: str) -> str:
             detail="capture_type=link requires a valid http(s) URL in raw_content",
         )
     return normalized
+
+
+def _normalize_capture_title(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return ""
+    return cleaned[:CAPTURE_TITLE_MAX_LEN]
+
+
+def _use_async_capture_worker(trigger: str) -> bool:
+    if not settings.CAPTURE_ASYNC_WORKER_ENABLED:
+        return False
+    if is_capture_async_worker_available():
+        return True
+    logger.warning(
+        "capture.async.inline_fallback trigger=%s reason=%s",
+        trigger,
+        capture_async_worker_unavailable_reason() or "unknown",
+    )
+    return False
 
 
 async def _get_capture_or_404(
@@ -321,6 +379,99 @@ def _capture_source_type(capture: InboxCapture) -> str:
     return value if value else "text"
 
 
+def _capture_is_note_intent(
+    *,
+    capture_type: str,
+    source: str | None,
+    metadata: dict[str, Any] | None,
+) -> bool:
+    if capture_type != "text":
+        return False
+    meta = metadata or {}
+    source_value = str(source or "").strip().lower()
+    intent_value = str(meta.get("intent", "")).strip().lower()
+    channel_value = str(meta.get("channel", "")).strip().lower()
+    return (
+        source_value == "note"
+        or intent_value == "note"
+        or channel_value == "note"
+        or meta.get("note_intent") is True
+    )
+
+
+def _resolved_capture_title(capture: InboxCapture) -> str | None:
+    meta = capture.meta if isinstance(capture.meta, dict) else {}
+    manual_title = _normalize_capture_title(meta.get("manual_title") if isinstance(meta.get("manual_title"), str) else None)
+    if manual_title:
+        return manual_title
+    ai_title = _normalize_capture_title(meta.get("ai_title") if isinstance(meta.get("ai_title"), str) else None)
+    if ai_title:
+        return ai_title
+    return None
+
+
+def _extract_blocks_text(node: Any) -> str:
+    if isinstance(node, list) and node and all(
+        isinstance(entry, dict)
+        and isinstance(entry.get("type"), str)
+        and entry.get("type") in BUSINESS_BLOCK_TYPES
+        and isinstance(entry.get("payload"), dict)
+        for entry in node
+    ):
+        parts: list[str] = []
+        for entry in node:
+            payload = entry.get("payload") if isinstance(entry, dict) else None
+            if not isinstance(payload, dict):
+                continue
+            block_type = str(entry.get("type"))
+            if block_type == "text_block":
+                text_value = str(payload.get("text") or "").strip()
+                if text_value:
+                    parts.append(text_value)
+            elif block_type == "checklist_block":
+                items = payload.get("items")
+                if isinstance(items, list):
+                    for item in items:
+                        if isinstance(item, dict) and isinstance(item.get("text"), str):
+                            parts.append(item["text"])
+            elif block_type == "table_block":
+                rows = payload.get("rows")
+                if isinstance(rows, list):
+                    for row in rows:
+                        if isinstance(row, list):
+                            parts.append(" ".join(str(cell) for cell in row))
+            elif block_type == "set_block":
+                exercise_name = str(payload.get("exercise_name") or "").strip()
+                if exercise_name:
+                    parts.append(exercise_name)
+            elif block_type == "inbox_block":
+                refs = payload.get("capture_refs")
+                if isinstance(refs, list):
+                    for ref in refs:
+                        if isinstance(ref, dict):
+                            ref_title = str(ref.get("title") or "").strip()
+                            if ref_title:
+                                parts.append(ref_title)
+            else:
+                parts.append(_extract_blocks_text(payload))
+        return " ".join(part for part in parts if part).strip()
+    if isinstance(node, list):
+        return " ".join(_extract_blocks_text(item) for item in node).strip()
+    if not isinstance(node, dict):
+        return ""
+    own_text = str(node.get("text")).strip() if isinstance(node.get("text"), str) else ""
+    content = node.get("content")
+    children = _extract_blocks_text(content) if isinstance(content, list) else ""
+    return " ".join(part for part in [own_text, children] if part).strip()
+
+
+def _note_source_text(item: Item | None) -> str:
+    if item is None or not isinstance(item.blocks, list):
+        return ""
+    compact = _extract_blocks_text(item.blocks)
+    return " ".join(compact.split()).strip()
+
+
 def _treated_bucket_for_capture(capture: InboxCapture) -> str:
     if capture.deleted_at is not None:
         return "treated"
@@ -356,10 +507,13 @@ def _derive_item_kind_from_capture(capture_type: str) -> str:
     return "note"
 
 
-def _derive_item_title(raw_content: str, capture_type: str) -> str:
-    if raw_content.strip():
-        return raw_content.strip().splitlines()[0][:140]
-    return f"{capture_type.capitalize()} capture"
+def _derive_item_title(capture: InboxCapture) -> str:
+    resolved = _resolved_capture_title(capture)
+    if resolved:
+        return resolved[:140]
+    if capture.raw_content.strip():
+        return capture.raw_content.strip().splitlines()[0][:140]
+    return f"{capture.capture_type.capitalize()} capture"
 
 
 def _map_capture_status_to_item_status(capture_status: str) -> str:
@@ -385,7 +539,7 @@ async def _ensure_source_item_for_capture(
     capture_meta = capture.meta if isinstance(capture.meta, dict) else {}
     item = Item(
         workspace_id=workspace_id,
-        title=_derive_item_title(capture.raw_content, capture.capture_type),
+        title=_derive_item_title(capture),
         kind=_derive_item_kind_from_capture(capture.capture_type),  # type: ignore[arg-type]
         status=_map_capture_status_to_item_status(capture.status),  # type: ignore[arg-type]
         meta={
@@ -413,7 +567,7 @@ async def _sync_source_item_from_capture(
     capture_meta = capture.meta if isinstance(capture.meta, dict) else {}
     item.status = _map_capture_status_to_item_status(capture.status)  # type: ignore[assignment]
     if not item.title.strip():
-        item.title = _derive_item_title(capture.raw_content, capture.capture_type)
+        item.title = _derive_item_title(capture)
     item.meta = {
         **item.meta,
         **capture_meta,
@@ -436,22 +590,10 @@ def _to_action_out(row: CaptureActionSuggestion) -> CaptureActionSuggestionOut:
     )
 
 
-def _fallback_review_action() -> CaptureActionSuggestionOut:
-    return CaptureActionSuggestionOut(
-        key="review_0",
-        label="Review",
-        type="review",
-        confidence=1.0,
-        requires_confirm=False,
-        preview_payload={"reason": "No action suggestion available"},
-        is_primary=True,
-    )
-
-
 def _filter_disabled_actions(
     suggestions: list[CaptureActionSuggestion],
 ) -> list[CaptureActionSuggestion]:
-    return [row for row in suggestions if row.action_type != "summarize"]
+    return [row for row in suggestions if row.action_type in SUPPORTED_CAPTURE_ACTION_TYPES]
 
 
 def _to_capture_out(
@@ -463,8 +605,6 @@ def _to_capture_out(
 ) -> InboxCaptureOut:
     actionable_suggestions = _filter_disabled_actions(suggestions)
     actions = [_to_action_out(row) for row in actionable_suggestions][:max_actions]
-    if not actions:
-        actions = [_fallback_review_action()]
     primary = next((item for item in actions if item.is_primary), actions[0] if actions else None)
     archived = capture.deleted_at is not None or capture.status == "archived"
     archived_reason: str | None = None
@@ -497,6 +637,7 @@ def _to_capture_out(
         {
             "id": capture.id,
             "item_id": item_id,
+            "title": _resolved_capture_title(capture),
             "raw_content": capture.raw_content,
             "source": capture.source,
             "source_type": _capture_source_type(capture),
@@ -515,7 +656,7 @@ def _to_capture_out(
             "primary_action": primary,
             "requires_review": (primary.type == "review" or primary.requires_confirm)
             if primary
-            else True,
+            else False,
             "archived": archived,
             "archived_reason": archived_reason,
             "deleted_at": capture.deleted_at,
@@ -565,6 +706,7 @@ def _suggest_from_capture(
             confidence=selected.confidence,
             reason=f"Suggestion generated for action {selected.action_type}",
             preview_payload=payload,
+            missing_fields=[],
         )
 
     raw = (capture.raw_content or "").strip()
@@ -575,9 +717,61 @@ def _suggest_from_capture(
         suggested_title=title or "New item",
         suggested_kind=kind,  # type: ignore[arg-type]
         confidence=0.55,
-        reason="Heuristic preview based on capture_type and raw_content",
+        reason="Fallback preview derived from current capture payload",
         preview_payload={},
+        missing_fields=[],
     )
+
+
+def _capture_semantic_text(
+    capture: InboxCapture,
+    artifacts: list[CaptureArtifact],
+) -> str:
+    chunks: list[str] = []
+    if capture.raw_content.strip():
+        chunks.append(capture.raw_content.strip())
+    for artifact in artifacts:
+        if artifact.artifact_type not in {
+            "summary",
+            "preprocess_summary",
+            "transcript",
+            "extracted_text",
+            "vlm_analysis",
+            "capture_analysis",
+        }:
+            continue
+        if not isinstance(artifact.content_json, dict):
+            continue
+        text_value = artifact.content_json.get("text")
+        if isinstance(text_value, str) and text_value.strip():
+            chunks.append(text_value.strip())
+    return "\n".join(chunks).strip()
+
+
+def _selected_action_for_preview(
+    *,
+    capture: InboxCapture,
+    suggestions: list[CaptureActionSuggestion],
+    requested_action_key: str | None,
+) -> dict[str, Any] | None:
+    actionable = _filter_disabled_actions(suggestions)
+    selected: CaptureActionSuggestion | None = None
+    if requested_action_key:
+        selected = next((item for item in actionable if item.action_key == requested_action_key), None)
+    if selected is None and actionable:
+        selected = next((item for item in actionable if item.is_primary), actionable[0])
+    if selected is None:
+        return None
+    payload = selected.payload_json if isinstance(selected.payload_json, dict) else {}
+    return {
+        "key": selected.action_key,
+        "type": selected.action_type,
+        "label": selected.label,
+        "confidence": selected.confidence,
+        "requires_confirm": selected.requires_confirm,
+        "payload": payload,
+        "capture_id": str(capture.id),
+    }
 
 
 async def _load_assets(db: AsyncSession, capture_id: UUID) -> list[CaptureAsset]:
@@ -688,19 +882,6 @@ async def _apply_selected_action(
             None,
         )
         if selected is None:
-            disabled = next(
-                (
-                    item
-                    for item in suggestions
-                    if item.action_key == action_key and item.action_type == "summarize"
-                ),
-                None,
-            )
-            if disabled is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="summarize_action_disabled_for_capture",
-                )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Action suggestion not found",
@@ -709,6 +890,11 @@ async def _apply_selected_action(
         selected = next(
             (item for item in actionable_suggestions if item.is_primary),
             actionable_suggestions[0],
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="no_suggested_actions",
         )
 
     payload = selected.payload_json if selected and isinstance(selected.payload_json, dict) else {}
@@ -883,6 +1069,108 @@ async def _maybe_auto_apply_capture(
     )
 
 
+async def _run_capture_pipeline_inline(
+    *,
+    db: AsyncSession,
+    workspace: WorkspaceMember,
+    capture: InboxCapture,
+    run_id: uuid.UUID,
+    queue_name: str,
+) -> None:
+    await enqueue_default_jobs(
+        db,
+        capture,
+        run_id=run_id,
+        queue_name=queue_name,
+    )
+    await process_capture_jobs(
+        db,
+        capture,
+        run_id=run_id,
+    )
+    await _maybe_auto_apply_capture(db=db, workspace=workspace, capture=capture)
+    await _sync_source_item_from_capture(
+        db,
+        workspace_id=workspace.workspace_id,
+        capture=capture,
+    )
+
+
+async def _run_capture_pipeline_async(
+    *,
+    db: AsyncSession,
+    workspace: WorkspaceMember,
+    capture: InboxCapture,
+    run_id: uuid.UUID,
+    trigger: str,
+) -> tuple[str, str]:
+    tier = await resolve_workspace_billing_tier(db, workspace.workspace_id)
+    scheduled = await schedule_capture_pipeline_outbox_event(
+        db,
+        capture=capture,
+        trigger=trigger,
+        tier=tier,
+        run_id=run_id,
+    )
+    update_capture_queue_meta(
+        capture,
+        run_id=scheduled.run_id,
+        queue_name=scheduled.queue_name,
+        queue_state="not_enqueued",
+        trigger=trigger,
+    )
+    await _sync_source_item_from_capture(
+        db,
+        workspace_id=workspace.workspace_id,
+        capture=capture,
+    )
+    await db.commit()
+
+    task_id = await publish_capture_outbox_event_by_id(
+        db,
+        outbox_event_id=scheduled.outbox_event_id,
+    )
+    if not task_id:
+        capture.status = "failed"
+        update_capture_queue_meta(
+            capture,
+            run_id=scheduled.run_id,
+            queue_name=scheduled.queue_name,
+            queue_state="not_enqueued",
+            trigger=trigger,
+            error_code="queue_enqueue_failed",
+        )
+        await _sync_source_item_from_capture(
+            db,
+            workspace_id=workspace.workspace_id,
+            capture=capture,
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="queue_enqueue_failed",
+        )
+
+    update_capture_queue_meta(
+        capture,
+        run_id=scheduled.run_id,
+        queue_name=scheduled.queue_name,
+        queue_state="enqueued",
+        trigger=trigger,
+        task_id=task_id,
+    )
+    try:
+        await relay_pending_capture_outbox_events(db, limit=20)
+    except Exception:
+        logger.exception(
+            "capture.outbox.relay_pending_failed capture_id=%s run_id=%s",
+            str(capture.id),
+            str(scheduled.run_id),
+        )
+    await db.commit()
+    return task_id, scheduled.queue_name
+
+
 @router.get("", response_model=InboxListResponse)
 async def list_inbox(
     bucket: str = Query(default="all"),
@@ -932,6 +1220,41 @@ async def list_inbox(
     return InboxListResponse(captures=rows, entries=rows)
 
 
+@router.get("/search", response_model=InboxSearchResponse)
+async def search_inbox(
+    q: str = Query(default="", min_length=0),
+    limit: int = Query(default=10, ge=1, le=50),
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> InboxSearchResponse:
+    search_term = q.strip()
+    if not search_term:
+        return InboxSearchResponse(captures=[])
+
+    result = await db.execute(
+        select(InboxCapture)
+        .where(
+            InboxCapture.workspace_id == workspace.workspace_id,
+            InboxCapture.deleted_at.is_(None),
+            InboxCapture.raw_content.ilike(f"%{search_term}%"),
+        )
+        .order_by(InboxCapture.created_at.desc())
+        .limit(limit)
+    )
+    captures = list(result.scalars().all())
+    rows = [
+        InboxSearchEntryOut(
+            id=capture.id,
+            title=_derive_item_title(capture),
+            capture_type=capture.capture_type,  # type: ignore[arg-type]
+            status=capture.status,  # type: ignore[arg-type]
+            created_at=capture.created_at,
+        )
+        for capture in captures
+    ]
+    return InboxSearchResponse(captures=rows)
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_capture(
     body: CreateCaptureRequest,
@@ -951,13 +1274,10 @@ async def create_capture(
 
     capture_meta = dict(body.metadata or {})
     capture_meta.setdefault("source_type", body.capture_type)
-    is_note_intent = (
-        body.capture_type == "text"
-        and (
-            str(capture_meta.get("intent", "")).strip().lower() == "note"
-            or str(capture_meta.get("channel", "")).strip().lower() == "note"
-            or str(body.source or "").strip().lower() == "note"
-        )
+    is_note_intent = _capture_is_note_intent(
+        capture_type=body.capture_type,
+        source=body.source,
+        metadata=capture_meta,
     )
     capture_status = "ready" if is_note_intent else body.status
     if is_note_intent:
@@ -981,20 +1301,55 @@ async def create_capture(
         capture=capture,
     )
 
+    run_id: uuid.UUID | None = None
+    task_id: str | None = None
+    queue_state: str | None = None
+    queue_name: str | None = None
     if capture.status in {"captured", "queued"}:
         capture.status = "queued"
-        await enqueue_default_jobs(db, capture)
-        await process_capture_jobs(db, capture)
-        await _maybe_auto_apply_capture(db=db, workspace=workspace, capture=capture)
-        await _sync_source_item_from_capture(
-            db,
-            workspace_id=workspace.workspace_id,
-            capture=capture,
-        )
+        run_id = create_capture_run_id()
+        tier = await resolve_workspace_billing_tier(db, workspace.workspace_id)
+        queue_name = queue_name_for_tier(tier)
+        if _use_async_capture_worker("create_capture"):
+            task_id, queue_name = await _run_capture_pipeline_async(
+                db=db,
+                workspace=workspace,
+                capture=capture,
+                run_id=run_id,
+                trigger="create_capture",
+            )
+            queue_state = "enqueued"
+            await db.refresh(capture)
+        else:
+            await _run_capture_pipeline_inline(
+                db=db,
+                workspace=workspace,
+                capture=capture,
+                run_id=run_id,
+                queue_name=queue_name,
+            )
+            update_capture_queue_meta(
+                capture,
+                run_id=run_id,
+                queue_name=queue_name,  # type: ignore[arg-type]
+                queue_state="not_enqueued",
+                trigger="create_capture",
+            )
+            queue_state = "not_enqueued"
+            await db.commit()
+            await db.refresh(capture)
+    else:
+        await db.commit()
+        await db.refresh(capture)
 
-    await db.commit()
-    await db.refresh(capture)
-    return {"id": str(capture.id), "item_id": str(source_item.id)}
+    return {
+        "id": str(capture.id),
+        "item_id": str(source_item.id),
+        "task_id": task_id,
+        "run_id": str(run_id) if run_id else None,
+        "queue_state": queue_state,
+        "queue_name": queue_name,
+    }
 
 
 @router.post("/upload", response_model=CaptureUploadResponse, status_code=status.HTTP_201_CREATED)
@@ -1141,20 +1496,49 @@ async def upload_capture(
         capture.capture_type,
     )
 
+    run_id = create_capture_run_id()
+    task_id: str | None = None
+    queue_state: str | None = None
+    queue_name: str | None = None
     try:
-        await enqueue_default_jobs(db, capture)
+        tier = await resolve_workspace_billing_tier(db, workspace.workspace_id)
+        queue_name = queue_name_for_tier(tier)
+        force_inline_processing = source == "sync_attachment"
+        if _use_async_capture_worker("upload_capture") and not force_inline_processing:
+            task_id, queue_name = await _run_capture_pipeline_async(
+                db=db,
+                workspace=workspace,
+                capture=capture,
+                run_id=run_id,
+                trigger="upload_capture",
+            )
+            queue_state = "enqueued"
+        else:
+            await _run_capture_pipeline_inline(
+                db=db,
+                workspace=workspace,
+                capture=capture,
+                run_id=run_id,
+                queue_name=queue_name,
+            )
+            update_capture_queue_meta(
+                capture,
+                run_id=run_id,
+                queue_name=queue_name,  # type: ignore[arg-type]
+                queue_state="not_enqueued",
+                trigger="upload_capture",
+            )
+            queue_state = "not_enqueued"
         logger.info(
-            "capture.jobs_enqueued request_id=%s capture_id=%s",
+            "capture.jobs_enqueued request_id=%s capture_id=%s run_id=%s queue_name=%s queue_state=%s",
             request_id,
             str(capture.id),
+            str(run_id),
+            queue_name,
+            queue_state,
         )
-        await process_capture_jobs(db, capture)
-        await _maybe_auto_apply_capture(db=db, workspace=workspace, capture=capture)
-        await _sync_source_item_from_capture(
-            db,
-            workspace_id=workspace.workspace_id,
-            capture=capture,
-        )
+    except HTTPException:
+        raise
     except Exception as exc:
         current_meta = capture.meta if isinstance(capture.meta, dict) else {}
         capture.status = "failed"
@@ -1220,7 +1604,14 @@ async def upload_capture(
             detail="capture_upload_db_error",
         ) from exc
 
-    return CaptureUploadResponse(id=capture.id, status=capture.status)  # type: ignore[arg-type]
+    return CaptureUploadResponse(
+        id=capture.id,
+        status=capture.status,  # type: ignore[arg-type]
+        task_id=task_id,
+        run_id=run_id,
+        queue_state=queue_state,  # type: ignore[arg-type]
+        queue_name=queue_name,
+    )
 
 
 @router.get("/{capture_id}/assets/{asset_id}/content")
@@ -1265,6 +1656,31 @@ async def get_asset_content(
             **({"ETag": f'"{asset.checksum}"'} if asset.checksum else {}),
         },
     )
+
+
+@router.get("/{capture_id}/links", response_model=CaptureLinksResponse)
+async def get_capture_links(
+    capture_id: UUID,
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> CaptureLinksResponse:
+    await _get_capture_or_404(db, workspace.workspace_id, capture_id)
+    result = await db.execute(
+        select(EntityLink)
+        .where(
+            EntityLink.workspace_id == workspace.workspace_id,
+            EntityLink.deleted_at.is_(None),
+            or_(
+                (EntityLink.from_entity_type == "capture")
+                & (EntityLink.from_entity_id == capture_id),
+                (EntityLink.to_entity_type == "capture")
+                & (EntityLink.to_entity_id == capture_id),
+            ),
+        )
+        .order_by(EntityLink.created_at.desc())
+    )
+    links = list(result.scalars().all())
+    return CaptureLinksResponse(links=[EntityLinkOut.model_validate(link) for link in links])
 
 
 @router.get("/{capture_id}", response_model=CaptureDetailResponse)
@@ -1317,6 +1733,182 @@ async def get_capture(
     )
 
 
+@router.patch("/{capture_id}", response_model=CaptureActionResponse)
+async def update_capture(
+    capture_id: UUID,
+    body: UpdateCaptureRequest,
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> CaptureActionResponse:
+    capture = await _get_capture_or_404(
+        db,
+        workspace.workspace_id,
+        capture_id,
+        include_deleted=True,
+    )
+    if capture.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="capture_deleted",
+        )
+    if capture.status == "archived":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="capture_archived",
+        )
+
+    current_meta = capture.meta if isinstance(capture.meta, dict) else {}
+    next_meta = dict(current_meta)
+    normalized_title = _normalize_capture_title(body.title)
+    if normalized_title:
+        next_meta["manual_title"] = normalized_title
+        next_meta["title_locked"] = True
+    else:
+        next_meta.pop("manual_title", None)
+        next_meta["title_locked"] = False
+    capture.meta = next_meta
+
+    source_item = await _find_source_item(
+        db,
+        workspace_id=workspace.workspace_id,
+        capture_id=capture.id,
+    )
+    if source_item is not None:
+        source_item.title = _derive_item_title(capture)
+
+    await db.commit()
+    return CaptureActionResponse(capture_id=capture.id, status=capture.status)
+
+
+@router.post("/{capture_id}/note-summary/refresh", response_model=NoteSummaryRefreshResponse)
+async def refresh_note_summary(
+    capture_id: UUID,
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> NoteSummaryRefreshResponse:
+    capture = await _get_capture_or_404(
+        db,
+        workspace.workspace_id,
+        capture_id,
+        include_deleted=True,
+    )
+    if capture.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="capture_deleted",
+        )
+    if capture.status == "archived":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="capture_archived",
+        )
+    capture_meta = capture.meta if isinstance(capture.meta, dict) else {}
+    if not _capture_is_note_intent(
+        capture_type=capture.capture_type,
+        source=capture.source,
+        metadata=capture_meta,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="not_note_capture",
+        )
+
+    source_item = await _find_source_item(
+        db,
+        workspace_id=workspace.workspace_id,
+        capture_id=capture.id,
+    )
+    if source_item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="linked_note_not_found",
+        )
+
+    note_text = _note_source_text(source_item)
+    if len(note_text) < settings.NOTE_SUMMARY_MIN_CHARS:
+        return NoteSummaryRefreshResponse(
+            capture_id=capture.id,
+            status="skipped_too_short",
+            summary_updated=False,
+            source_hash=None,
+        )
+
+    source_hash = sha256(note_text.encode("utf-8")).hexdigest()
+    artifacts_summary = (
+        capture_meta.get("artifacts_summary")
+        if isinstance(capture_meta.get("artifacts_summary"), dict)
+        else {}
+    )
+    existing_summary = (
+        str(artifacts_summary.get("summary")).strip()
+        if isinstance(artifacts_summary, dict) and isinstance(artifacts_summary.get("summary"), str)
+        else ""
+    )
+    if source_hash == capture_meta.get("note_summary_source_hash") and existing_summary:
+        return NoteSummaryRefreshResponse(
+            capture_id=capture.id,
+            status="unchanged",
+            summary_updated=False,
+            source_hash=source_hash,
+        )
+
+    try:
+        summary_payload = await generate_capture_summary_with_subagent(
+            db=db,
+            capture=capture,
+            semantic_text=note_text,
+            capture_type=capture.capture_type,
+            metadata={**capture_meta, "note_intent": True, "summary_source": "item_blocks"},
+        )
+    except Exception as exc:
+        compact_note = " ".join(note_text.split()).strip()
+        fallback_summary = compact_note[:240] if compact_note else "Note capture"
+        summary_payload = {
+            "text": fallback_summary,
+            "description": compact_note[:1200] if compact_note else fallback_summary,
+            "key_points": [],
+            "title": None,
+            "fallback_used": True,
+        }
+        logger.warning(
+            "capture.note_summary.refresh_fallback capture_id=%s error=%s",
+            str(capture.id),
+            str(exc),
+        )
+    key_points_raw = summary_payload.get("key_points")
+    key_points = (
+        [str(item).strip() for item in key_points_raw if str(item).strip()]
+        if isinstance(key_points_raw, list)
+        else []
+    )
+    summary_text = str(summary_payload.get("text") or "").strip()
+    updated_meta = dict(capture_meta)
+    updated_meta["artifacts_summary"] = {
+        **(artifacts_summary if isinstance(artifacts_summary, dict) else {}),
+        "summary": summary_text[:320],
+        "headline": summary_text[:100],
+        "key_clauses": key_points[:6],
+    }
+    updated_meta["note_summary_source_hash"] = source_hash
+    updated_meta["note_summary_generated_at"] = datetime.now(UTC).isoformat()
+    if updated_meta.get("title_locked") is not True:
+        model_title = _normalize_capture_title(summary_payload.get("title") if isinstance(summary_payload.get("title"), str) else None)
+        if model_title:
+            updated_meta["ai_title"] = model_title
+    capture.meta = updated_meta
+
+    if source_item is not None:
+        source_item.title = _derive_item_title(capture)
+
+    await db.commit()
+    return NoteSummaryRefreshResponse(
+        capture_id=capture.id,
+        status="generated",
+        summary_updated=True,
+        source_hash=source_hash,
+    )
+
+
 @router.get("/{capture_id}/artifacts", response_model=CaptureArtifactsResponse)
 async def get_capture_artifacts(
     capture_id: UUID,
@@ -1342,17 +1934,89 @@ async def reprocess_capture(
     db: AsyncSession = Depends(get_db),
 ) -> CaptureActionResponse:
     capture = await _get_capture_or_404(db, workspace.workspace_id, capture_id)
-    capture.status = "queued"
-    await enqueue_default_jobs(db, capture)
-    await process_capture_jobs(db, capture)
-    await _maybe_auto_apply_capture(db=db, workspace=workspace, capture=capture)
-    await _sync_source_item_from_capture(
-        db,
-        workspace_id=workspace.workspace_id,
-        capture=capture,
+    now = datetime.now(UTC)
+    current_meta = capture.meta if isinstance(capture.meta, dict) else {}
+    next_meta = dict(current_meta)
+    for key in (
+        "artifacts_summary",
+        "pipeline_trace",
+        "last_error_code",
+        "last_error_at",
+        "agent_trace",
+        "agent_hint",
+    ):
+        next_meta.pop(key, None)
+    next_meta["reprocessed_at"] = now.isoformat()
+    capture.meta = next_meta
+
+    artifact_result = await db.execute(
+        select(CaptureArtifact).where(
+            CaptureArtifact.capture_id == capture.id,
+            CaptureArtifact.deleted_at.is_(None),
+        )
     )
-    await db.commit()
-    return CaptureActionResponse(capture_id=capture.id, status=capture.status)
+    for row in artifact_result.scalars().all():
+        row.deleted_at = now
+
+    suggestion_result = await db.execute(
+        select(CaptureActionSuggestion).where(
+            CaptureActionSuggestion.capture_id == capture.id,
+            CaptureActionSuggestion.deleted_at.is_(None),
+        )
+    )
+    for row in suggestion_result.scalars().all():
+        row.deleted_at = now
+
+    jobs_result = await db.execute(
+        select(CaptureJob).where(
+            CaptureJob.capture_id == capture.id,
+            CaptureJob.deleted_at.is_(None),
+        )
+    )
+    for row in jobs_result.scalars().all():
+        row.deleted_at = now
+
+    capture.status = "queued"
+    run_id = create_capture_run_id()
+    tier = await resolve_workspace_billing_tier(db, workspace.workspace_id)
+    queue_name = queue_name_for_tier(tier)
+    task_id: str | None = None
+    if _use_async_capture_worker("reprocess_capture"):
+        task_id, queue_name = await _run_capture_pipeline_async(
+            db=db,
+            workspace=workspace,
+            capture=capture,
+            run_id=run_id,
+            trigger="reprocess_capture",
+        )
+        queue_state = "enqueued"
+        await db.refresh(capture)
+    else:
+        await _run_capture_pipeline_inline(
+            db=db,
+            workspace=workspace,
+            capture=capture,
+            run_id=run_id,
+            queue_name=queue_name,
+        )
+        update_capture_queue_meta(
+            capture,
+            run_id=run_id,
+            queue_name=queue_name,  # type: ignore[arg-type]
+            queue_state="not_enqueued",
+            trigger="reprocess_capture",
+        )
+        queue_state = "not_enqueued"
+        await db.commit()
+
+    return CaptureActionResponse(
+        capture_id=capture.id,
+        status=capture.status,
+        task_id=task_id,
+        run_id=run_id,
+        queue_state=queue_state,  # type: ignore[arg-type]
+        queue_name=queue_name,
+    )
 
 
 @router.post("/{capture_id}/preview", response_model=CapturePreviewResponse)
@@ -1365,10 +2029,116 @@ async def preview_capture(
     capture = await _get_capture_or_404(db, workspace.workspace_id, capture_id)
     suggestion_map = await _load_capture_suggestions(db, [capture.id])
     suggestions = suggestion_map.get(capture.id, [])
-    return _suggest_from_capture(
-        capture,
-        suggestions,
+    actionable_suggestions = _filter_disabled_actions(suggestions)
+    if not actionable_suggestions:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="no_suggested_actions",
+        )
+    artifacts = await _load_artifacts(db, capture.id)
+    semantic_text = _capture_semantic_text(capture, artifacts)
+    selected_action = _selected_action_for_preview(
+        capture=capture,
+        suggestions=suggestions,
         requested_action_key=body.action_key if body else None,
+    )
+    preview_payload = await build_capture_preview_plan_with_subagent(
+        db=db,
+        capture=capture,
+        semantic_text=semantic_text,
+        capture_type=capture.capture_type,
+        selected_action=selected_action,
+        metadata=capture.meta if isinstance(capture.meta, dict) else {},
+    )
+    fallback_preview = build_capture_preview_plan_fallback(
+        capture=capture,
+        selected_action=selected_action,
+    )
+
+    artifact_payload = {
+        "text": json.dumps(
+            {
+                "action_type": preview_payload.get("action_type"),
+                "reason": preview_payload.get("reason"),
+                "missing_fields": preview_payload.get("missing_fields", []),
+            },
+            ensure_ascii=False,
+        ),
+        "agent_id": preview_payload.get("agent_id"),
+        "agent_name": preview_payload.get("agent_name"),
+        "mode": preview_payload.get("mode"),
+        "modules": preview_payload.get("modules"),
+        "toolset_snapshot": preview_payload.get("toolset_snapshot"),
+        "retrieval_snapshot": preview_payload.get("retrieval_snapshot"),
+        "prompt_snapshot": preview_payload.get("prompt_snapshot"),
+        "error_code": preview_payload.get("error_code"),
+        "preview_payload": preview_payload.get("preview_payload"),
+    }
+    db.add(
+        CaptureArtifact(
+            workspace_id=capture.workspace_id,
+            capture_id=capture.id,
+            artifact_type="capture_preview_plan",
+            content_json=artifact_payload,
+            provider=str(preview_payload.get("provider", "sync")),
+            model=str(preview_payload.get("model", settings.SYNC_MODEL_BALANCED)),
+            confidence=(
+                float(preview_payload.get("confidence"))
+                if isinstance(preview_payload.get("confidence"), (int, float))
+                else float(fallback_preview["confidence"])
+            ),
+        )
+    )
+    await db.commit()
+
+    return CapturePreviewResponse(
+        capture_id=capture.id,
+        action_key=(
+            str(preview_payload.get("action_key")).strip()
+            if isinstance(preview_payload.get("action_key"), str) and str(preview_payload.get("action_key")).strip()
+            else fallback_preview["action_key"]
+        ),
+        action_type=(
+            str(preview_payload.get("action_type")).strip()
+            if (
+                isinstance(preview_payload.get("action_type"), str)
+                and str(preview_payload.get("action_type")).strip() in SUPPORTED_CAPTURE_ACTION_TYPES
+            )
+            else fallback_preview["action_type"]
+        ),
+        suggested_title=(
+            str(preview_payload.get("suggested_title")).strip()
+            if isinstance(preview_payload.get("suggested_title"), str) and str(preview_payload.get("suggested_title")).strip()
+            else fallback_preview["suggested_title"]
+        ),
+        suggested_kind=(
+            str(preview_payload.get("suggested_kind")).strip()
+            if (
+                isinstance(preview_payload.get("suggested_kind"), str)
+                and str(preview_payload.get("suggested_kind")).strip() in {"note", "objective", "task", "resource"}
+            )
+            else fallback_preview["suggested_kind"]
+        ),
+        confidence=(
+            max(0.0, min(1.0, float(preview_payload.get("confidence"))))
+            if isinstance(preview_payload.get("confidence"), (int, float))
+            else float(fallback_preview["confidence"])
+        ),
+        reason=(
+            str(preview_payload.get("reason")).strip()
+            if isinstance(preview_payload.get("reason"), str) and str(preview_payload.get("reason")).strip()
+            else str(fallback_preview["reason"])
+        ),
+        preview_payload=(
+            preview_payload.get("preview_payload")
+            if isinstance(preview_payload.get("preview_payload"), dict)
+            else fallback_preview["preview_payload"]
+        ),
+        missing_fields=(
+            [str(item).strip() for item in preview_payload.get("missing_fields", []) if str(item).strip()]
+            if isinstance(preview_payload.get("missing_fields"), list)
+            else []
+        ),
     )
 
 
@@ -1382,6 +2152,12 @@ async def apply_capture(
     capture = await _get_capture_or_404(db, workspace.workspace_id, capture_id)
     suggestion_map = await _load_capture_suggestions(db, [capture.id])
     suggestions = suggestion_map.get(capture.id, [])
+    actionable_suggestions = _filter_disabled_actions(suggestions)
+    if body.action_key is None and not actionable_suggestions:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="no_suggested_actions",
+        )
     item, event, applied_action_key = await _apply_selected_action(
         db=db,
         workspace=workspace,

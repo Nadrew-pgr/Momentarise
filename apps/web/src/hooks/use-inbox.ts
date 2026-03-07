@@ -7,12 +7,16 @@ import type {
   CaptureActionResponse,
   CaptureArtifactsResponse,
   CaptureDetailResponse,
+  CaptureLinksResponse,
   CapturePreviewRequest,
   CapturePreviewResponse,
   CaptureUploadResponse,
   CreateCaptureRequest,
   InboxListResponse,
+  InboxSearchResponse,
   ReprocessCaptureResponse,
+  NoteSummaryRefreshResponse,
+  UpdateCaptureRequest,
 } from "@momentarise/shared";
 import {
   applyCaptureRequestSchema,
@@ -20,12 +24,16 @@ import {
   captureActionResponseSchema,
   captureArtifactsResponseSchema,
   captureDetailResponseSchema,
+  captureLinksResponseSchema,
   capturePreviewRequestSchema,
   capturePreviewResponseSchema,
   captureUploadResponseSchema,
   createCaptureRequestSchema,
   inboxListResponseSchema,
+  inboxSearchResponseSchema,
   reprocessCaptureResponseSchema,
+  noteSummaryRefreshResponseSchema,
+  updateCaptureRequestSchema,
 } from "@momentarise/shared";
 import { fetchWithAuth } from "@/lib/bff-client";
 
@@ -82,6 +90,40 @@ export function useInbox(options?: { includeArchived?: boolean; bucket?: InboxBu
       const data = await res.json();
       return inboxListResponseSchema.parse(data) as InboxListResponse;
     },
+  });
+}
+
+export function useInboxSearch(query: string, limit = 10) {
+  const normalized = query.trim();
+  return useQuery<InboxSearchResponse>({
+    queryKey: ["inbox-search", normalized, limit],
+    enabled: normalized.length > 0,
+    queryFn: async () => {
+      const qs = new URLSearchParams({
+        q: normalized,
+        limit: String(limit),
+      });
+      const res = await fetchWithAuth(`/api/inbox/search?${qs.toString()}`);
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to search inbox"));
+      const data = await res.json();
+      return inboxSearchResponseSchema.parse(data) as InboxSearchResponse;
+    },
+  });
+}
+
+export function useCaptureLinks(captureId: string | null) {
+  return useQuery<CaptureLinksResponse>({
+    queryKey: ["inbox", "capture-links", captureId],
+    enabled: Boolean(captureId),
+    queryFn: async () => {
+      if (!captureId) return { links: [] };
+      const res = await fetchWithAuth(`/api/inbox/${captureId}/links`);
+      if (res.status === 404) return { links: [] } as CaptureLinksResponse;
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch capture links"));
+      const data = await res.json();
+      return captureLinksResponseSchema.parse(data) as CaptureLinksResponse;
+    },
+    retry: false,
   });
 }
 
@@ -231,7 +273,54 @@ export function useReprocessCapture() {
       const data = await res.json();
       return reprocessCaptureResponseSchema.parse(data) as ReprocessCaptureResponse;
     },
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox", "capture", variables.captureId] });
+      queryClient.invalidateQueries({ queryKey: ["inbox", "capture", variables.captureId, "artifacts"] });
+    },
+  });
+}
+
+export function useUpdateCapture() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      captureId,
+      payload,
+    }: {
+      captureId: string;
+      payload: UpdateCaptureRequest;
+    }) => {
+      const body = updateCaptureRequestSchema.parse(payload);
+      const res = await fetchWithAuth(`/api/inbox/${captureId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to update capture"));
+      const data = await res.json();
+      return captureActionResponseSchema.parse(data) as CaptureActionResponse;
+    },
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox", "capture", variables.captureId] });
+    },
+  });
+}
+
+export function useRefreshNoteSummary() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ captureId }: { captureId: string }) => {
+      const res = await fetchWithAuth(`/api/inbox/${captureId}/note-summary/refresh`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to refresh note summary"));
+      const data = await res.json();
+      return noteSummaryRefreshResponseSchema.parse(data) as NoteSummaryRefreshResponse;
+    },
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["inbox", "capture", variables.captureId] });
       queryClient.invalidateQueries({ queryKey: ["inbox"] });
     },
   });

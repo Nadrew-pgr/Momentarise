@@ -77,7 +77,12 @@
       "sectionYesterday": "Yesterday",
       "sectionEarlier": "Earlier",
       "captureFallbackTitle": "{{type}} capture",
+      "captureFallbackTimestamped": "{{type}} - {{date}} {{time}}",
       "noteFallbackTitle": "Note",
+      "captureTitle": "Capture title",
+      "saveTitle": "Save title",
+      "titleUpdated": "Title updated",
+      "titleUpdateError": "Unable to update title",
       "kindCapture": "Capture",
       "kindItem": "Item",
       "openItem": "Open item",
@@ -181,15 +186,65 @@
       "linkedTo": "Linked to",
       "emptyLinks": "No links for this item.",
       "noLinksBadge": "No links",
-      "noItemSelected": "Select a capture to process or an item."
+      "noItemSelected": "Select a capture to process or an item.",
+      "noteHeader": {
+        "edited": "Edited {{date}}",
+        "openCapture": "Open source capture"
+      },
+      "noteMenu": {
+        "title": "Note actions",
+        "openSourceCapture": "Open source capture",
+        "rename": "Rename",
+        "copyLink": "Copy link",
+        "copyLinkSuccess": "Link copied.",
+        "copyLinkError": "Unable to copy link.",
+        "delete": "Delete",
+        "duplicate": "Duplicate",
+        "moveTo": "Move to",
+        "versionHistory": "Version history",
+        "notifications": "Notifications",
+        "analytics": "Analytics",
+        "importExport": "Import / Export",
+        "favorite": "Add to favorites",
+        "unfavorite": "Remove from favorites",
+        "favoriteError": "Unable to update favorite state.",
+        "renamePromptTitle": "Rename note",
+        "renameEmpty": "Title cannot be empty.",
+        "renameSuccess": "Note renamed.",
+        "renameError": "Unable to rename note.",
+        "renamePartialError": "Partial rename: one entity could not be updated.",
+        "deleteConfirmBody": "The note and its source capture will be deleted.",
+        "deleteSuccess": "Note deleted.",
+        "deleteError": "Unable to delete note.",
+        "deletePartialError": "Partial delete: one entity could not be deleted."
+      }
     },
     "sync": {
       "title": "Sync",
       "newChat": "New chat",
       "retry": "Retry",
+      "header": {
+        "newConversation": "New conversation"
+      },
       "empty": {
         "title": "Sync is ready",
         "subtitle": "Tell Sync what to organize, update, or draft."
+      },
+      "menu": {
+        "title": "Sync actions",
+        "openHistory": "Open history",
+        "newChat": "New conversation",
+        "renameCurrent": "Rename conversation",
+        "deleteCurrent": "Delete conversation",
+        "delete": "Delete",
+        "renamePrompt": "Rename conversation",
+        "renameEmpty": "Title cannot be empty.",
+        "renameSuccess": "Conversation renamed.",
+        "renameError": "Unable to rename conversation.",
+        "deleteConfirmTitle": "Delete this conversation?",
+        "deleteConfirmBody": "Delete \"{{title}}\"?",
+        "deleteError": "Unable to delete conversation.",
+        "deleted": "Conversation deleted."
       },
       "composer": {
         "placeholder": "Ask Sync to plan, change, or organize something...",
@@ -197,7 +252,29 @@
         "stop": "Stop generation",
         "model": "Select model",
         "voiceSoon": "Voice input coming soon",
-        "attachSoon": "Attachments coming soon"
+        "attachSoon": "Attachments coming soon",
+        "attachLocal": "Attach file",
+        "attachInbox": "Attach from Inbox",
+        "waitAttachments": "Wait until all attachments are ready before sending.",
+        "attachLimitExceeded": "Maximum 5 elements (attachments + references) per message.",
+        "attachmentFailed": "Unable to prepare an attachment.",
+        "removeAttachment": "Remove attachment",
+        "inboxPickerTitle": "Attach from Inbox",
+        "inboxPickerDescription": "Select captures or items to include in Sync context.",
+        "inboxPickerSearch": "Search capture or item...",
+        "inboxPickerLoading": "Searching...",
+        "inboxPickerEmpty": "No result found.",
+        "inboxPickerAdd": "Add ({{count}})",
+        "mentionLoading": "Searching references...",
+        "mentionError": "Unable to load references.",
+        "mentionEmpty": "No matching capture or item.",
+        "contextStatus": {
+          "uploading": "uploading",
+          "processing": "processing",
+          "ready": "ready",
+          "failed": "failed"
+        },
+        "mentionHint": "· @ to mention a capture or item"
       },
       "actions": {
         "title": "Actions",
@@ -227,10 +304,20 @@
         "lastUpdate": "Updated",
         "model": "Model",
         "loading": "Loading conversation...",
-        "loadingSlow": "Conversation loading is taking longer than expected."
+        "loadingSlow": "Conversation loading is taking longer than expected.",
+        "menu": {
+          "open": "Open",
+          "rename": "Rename",
+          "delete": "Delete"
+        }
       },
       "previewPlan": {
-        "title": "Apply Plan",
+        "title": "Preview",
+        "entityEvent": "Moment",
+        "entityItem": "Item",
+        "entityCapture": "Capture",
+        "entityTimeline": "Timeline",
+        "entityUnknown": "Entity",
         "titleEventCreate": "Create moment",
         "titleEventUpdate": "Update moment",
         "titleEventDelete": "Delete moment",
@@ -238,7 +325,7 @@
         "titleItemUpdate": "Update item",
         "titleItemDelete": "Delete item",
         "titleInboxTransform": "Transform capture",
-        "titleFallback": "Apply Plan",
+        "titleFallback": "Plan",
         "summary": "Summary",
         "mutations": "Proposed mutations",
         "notes": "Notes",
@@ -273,7 +360,8 @@
         }
       },
       "warning": {
-        "title": "Warning"
+        "title": "Warning",
+        "legacyEventIgnored": "Some incompatible legacy events were ignored."
       },
       "activity": {
         "title": "Agent activity",
@@ -355,7 +443,10 @@
         "saving": "Saving content...",
         "saved": "Content saved",
         "saveError": "Content save failed",
-        "deferred": "Content will be saved after creating the moment"
+        "deferred": "Content will be saved after creating the moment",
+        "focusOpen": "Open focus mode",
+        "focusTitle": "Moment content",
+        "focusHint": "Use full width to edit blocks and logs with less friction."
       },
       "coachPlaceholder": "Coach tab is coming soon.",
       "actions": {

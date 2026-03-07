@@ -1,27 +1,36 @@
 import type { SyncPreview } from "@momentarise/shared";
-import { FileText } from "lucide-react";
+import { Check, CheckCircle2, FileText } from "lucide-react";
 import {
   Plan,
-  PlanAction,
   PlanContent,
-  PlanDescription,
-  PlanFooter,
   PlanHeader,
-  PlanTitle,
   PlanTrigger,
 } from "@/components/ai-elements/plan";
 import { Button } from "@/components/ui/button";
 
 interface PreviewPlanCardLabels {
   title: string;
-  /** Optional user-facing plan type title (e.g. "Création d'un moment"). When set, shown as main title instead of entity_type · action. */
   planTitle?: string;
+  titleFallback?: string;
+  entityEvent: string;
+  entityItem: string;
+  entityCapture: string;
+  entityTimeline: string;
+  entityUnknown: string;
   summary: string;
   mutations: string;
   notes: string;
   apply: string;
   undo: string;
+  applied?: string;
   pending: string;
+  applying: string;
+  schedule: string;
+  linkedProject: string;
+  linkedSeries: string;
+  targetEvent: string;
+  targetItem: string;
+  descriptionPrefix: string;
 }
 
 interface PreviewPlanCardProps {
@@ -30,6 +39,7 @@ interface PreviewPlanCardProps {
   canUndo: boolean;
   isApplying: boolean;
   isUndoing: boolean;
+  isApplied?: boolean;
   onApply: () => void;
   onUndo: () => void;
   labels: PreviewPlanCardLabels;
@@ -41,13 +51,13 @@ interface PreviewMutation {
   display_summary?: string;
 }
 
-const COLOR_LABELS: Record<string, string> = {
-  sky: "Bleu ciel",
-  amber: "Ambre",
-  violet: "Violet",
-  rose: "Rose",
-  emerald: "Émeraude",
-  orange: "Orange",
+const COLOR_MAP: Record<string, string> = {
+  sky: "var(--sync-chat-preview-dot-sky)",
+  amber: "var(--sync-chat-preview-dot-amber)",
+  violet: "var(--sync-chat-preview-dot-violet)",
+  rose: "var(--sync-chat-preview-dot-rose)",
+  emerald: "var(--sync-chat-preview-dot-emerald)",
+  orange: "var(--sync-chat-preview-dot-orange)",
 };
 
 function extractMutations(preview: SyncPreview): PreviewMutation[] {
@@ -98,62 +108,98 @@ function extractNotes(preview: SyncPreview): string[] {
     .filter((entry) => entry.length > 0);
 }
 
-function mutationArgsPreview(args: Record<string, unknown>): string {
-  const keys = ["title", "start_at", "end_at", "estimated_time_seconds", "color", "target"];
-  const parts = keys
-    .filter((key) => key in args)
-    .map((key) => `${key}: ${String(args[key])}`);
+function extractMainTitleInfo(mutations: PreviewMutation[]): { title: string | null; colorToken: string } {
+  let title: string | null = null;
+  let colorToken = "var(--sync-chat-preview-dot-default)";
 
-  if (parts.length > 0) return parts.join(" · ");
-  const compact = JSON.stringify(args);
-  return compact.length <= 180 ? compact : `${compact.slice(0, 177)}...`;
+  for (const mut of mutations) {
+    if (typeof mut.args.title === "string" && mut.args.title.trim()) {
+      if (!title) title = mut.args.title.trim();
+    }
+    if (typeof mut.args.color === "string" && mut.args.color.trim()) {
+      const mapped = COLOR_MAP[mut.args.color.toLowerCase()];
+      if (mapped) colorToken = mapped;
+    }
+  }
+
+  return { title, colorToken };
 }
 
-/** User-friendly fallback when display_summary is not provided. */
-function formatMutationArgsReadable(args: Record<string, unknown>): string {
-  const parts: string[] = [];
+function resolveEntityLabel(entityType: string, labels: PreviewPlanCardLabels): string {
+  const normalized = entityType.trim().toLowerCase();
+  if (!normalized) return labels.entityUnknown;
+  if (normalized.includes("event")) return labels.entityEvent;
+  if (normalized.includes("item")) return labels.entityItem;
+  if (normalized.includes("timeline")) return labels.entityTimeline;
+  if (normalized.includes("inbox") || normalized.includes("capture")) return labels.entityCapture;
+  return labels.entityUnknown;
+}
 
-  const title = args.title;
-  if (typeof title === "string" && title.trim()) {
-    parts.push(title.trim());
-  }
+function normalizeText(value: string): string {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function formatMutationArgsReadable(
+  args: Record<string, unknown>,
+  labels: PreviewPlanCardLabels
+): string {
+  const parts: string[] = [];
 
   const startAt = args.start_at;
   const endAt = args.end_at;
-  const estimatedSeconds = typeof args.estimated_time_seconds === "number" ? args.estimated_time_seconds : null;
+
   if (typeof startAt === "string" && typeof endAt === "string") {
     try {
       const start = new Date(startAt);
       const end = new Date(endAt);
       const startTime = start.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
       const endTime = end.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-      const mins = estimatedSeconds != null ? Math.round(estimatedSeconds / 60) : Math.round((end.getTime() - start.getTime()) / 60000);
-      parts.push(`Horaire : ${startTime} - ${endTime} (${mins} min)`);
+      let diffMs = end.getTime() - start.getTime();
+      if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
+      const totalMins = Math.round(diffMs / 60000);
+      const durationStr = totalMins >= 60
+        ? (totalMins % 60 === 0 ? `${Math.floor(totalMins / 60)} h` : `${Math.floor(totalMins / 60)} h ${totalMins % 60}`)
+        : `${totalMins} min`;
+      parts.push(`${labels.schedule}: ${startTime} - ${endTime} (${durationStr})`);
     } catch {
-      parts.push(`Horaire : ${String(startAt)} - ${String(endAt)}`);
+      parts.push(`${labels.schedule}: ${String(startAt)} - ${String(endAt)}`);
     }
   } else if (typeof startAt === "string") {
     try {
       const start = new Date(startAt);
-      parts.push(`Horaire : ${start.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`);
+      parts.push(
+        `${labels.schedule}: ${start.toLocaleTimeString(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}`
+      );
     } catch {
-      parts.push(`Horaire : ${startAt}`);
+      parts.push(`${labels.schedule}: ${startAt}`);
     }
   }
 
-  const color = args.color;
-  if (typeof color === "string" && color.trim()) {
-    const label = COLOR_LABELS[color.toLowerCase()] ?? color;
-    parts.push(`Couleur : ${label}`);
+  if (args.project_id) {
+    parts.push(labels.linkedProject);
+  }
+  if (args.series_id) {
+    parts.push(labels.linkedSeries);
   }
 
   const target = args.target;
   if (typeof target === "string" && target.trim()) {
-    parts.push(target === "event" ? "Événement" : "Item");
+    parts.push(target === "event" ? labels.targetEvent : labels.targetItem);
   }
 
   if (parts.length > 0) return parts.join("\n");
-  return mutationArgsPreview(args);
+
+  const fallbackArgs = { ...args };
+  delete fallbackArgs.title;
+  delete fallbackArgs.color;
+  const keys = Object.keys(fallbackArgs);
+  if (keys.length === 0) return "";
+
+  const compact = JSON.stringify(fallbackArgs);
+  return compact.length <= 180 ? compact : `${compact.slice(0, 177)}...`;
 }
 
 export function PreviewPlanCard({
@@ -162,6 +208,7 @@ export function PreviewPlanCard({
   canUndo,
   isApplying,
   isUndoing,
+  isApplied = false,
   onApply,
   onUndo,
   labels,
@@ -171,71 +218,173 @@ export function PreviewPlanCard({
   const summary = extractSummary(preview);
   const mutations = extractMutations(preview);
   const notes = extractNotes(preview);
-  const title = labels.planTitle ?? (preview.entity_type ? `${preview.entity_type} · ${preview.action}` : labels.title);
+  const { title: momentTitle, colorToken } = extractMainTitleInfo(mutations);
+  const entityLabel = resolveEntityLabel(preview.entity_type, labels);
+  const hasDisplaySummary = mutations.some((mutation) => Boolean(mutation.display_summary?.trim()));
+
+  const isAppliedState = isApplied;
+  const displayTitle = momentTitle || labels.planTitle || labels.titleFallback || labels.title;
+
+  const mutationBlocks = mutations
+    .map((mutation, index) => {
+      const displaySummary =
+        typeof mutation.display_summary === "string" && mutation.display_summary.trim()
+          ? mutation.display_summary.trim()
+          : null;
+      const readableArgs = formatMutationArgsReadable(mutation.args, labels);
+      const rawDescription =
+        typeof mutation.args.description === "string" ? mutation.args.description.trim() : "";
+
+      const primaryLine = displaySummary ?? readableArgs;
+      const normalizedPrimary = primaryLine ? normalizeText(primaryLine) : "";
+      const normalizedDescription = rawDescription ? normalizeText(rawDescription) : "";
+      const shouldShowDescription =
+        !displaySummary &&
+        Boolean(rawDescription) &&
+        normalizedDescription.length > 0 &&
+        (!normalizedPrimary || !normalizedPrimary.includes(normalizedDescription));
+
+      if (!primaryLine && !shouldShowDescription) return null;
+
+      return {
+        key: `${mutation.kind}-${index}`,
+        primaryLine,
+        description: shouldShowDescription ? rawDescription : null,
+      };
+    })
+    .filter(
+      (
+        block
+      ): block is {
+        key: string;
+        primaryLine: string;
+        description: string | null;
+      } => block !== null && block.primaryLine !== null
+    );
+
+  const normalizedSummary = summary ? normalizeText(summary) : "";
+  const summaryDupedInMutations =
+    normalizedSummary.length > 0 &&
+    mutationBlocks.some((block) => Boolean(block.primaryLine && normalizeText(block.primaryLine) === normalizedSummary));
+  const showSummary = Boolean(summary && !hasDisplaySummary && !summaryDupedInMutations);
 
   return (
-    <Plan className="sync-chat-preview-card rounded-2xl border border-border bg-background/95 shadow-sm" defaultOpen>
-      <PlanHeader className="gap-4">
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            <FileText className="h-3.5 w-3.5" />
-            {labels.title}
+    <Plan
+      className="sync-chat-preview-card w-full max-w-full overflow-hidden rounded-2xl border border-border/50 bg-background shadow-md transition-all"
+      defaultOpen
+    >
+      <div className="relative p-4 sm:p-5">
+        <PlanHeader className="mb-4 flex items-center justify-between p-0">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+              style={{
+                backgroundColor: `color-mix(in srgb, ${colorToken} 20%, transparent)`,
+              }}
+            >
+              <FileText className="h-4 w-4" style={{ color: colorToken }} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {entityLabel}
+                </span>
+                <h3 className="truncate text-base font-semibold leading-tight text-foreground">
+                  {displayTitle}
+                </h3>
+              </div>
+            </div>
           </div>
-          <PlanTitle className="truncate text-base">{title}</PlanTitle>
-          <PlanDescription>{summary}</PlanDescription>
-        </div>
-        <PlanAction className="flex items-center gap-2">
-          <span className="sync-chat-status-pill text-xs">{labels.pending}</span>
-          <PlanTrigger aria-label={labels.title} />
-        </PlanAction>
-      </PlanHeader>
+          <div className="flex items-center gap-2">
+            {isAppliedState ? (
+              <span className="sync-chat-preview-pill sync-chat-preview-pill-applied flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide">
+                <CheckCircle2 className="h-3 w-3" />
+                {labels.applied ?? labels.apply}
+              </span>
+            ) : (
+              <span className="sync-chat-preview-pill sync-chat-preview-pill-pending rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide">
+                {labels.pending}
+              </span>
+            )}
+            <PlanTrigger />
+          </div>
+        </PlanHeader>
 
-      <PlanContent className="space-y-4 pt-0">
-        <section>
-          <h4 className="mb-1.5 text-sm font-semibold">{labels.summary}</h4>
-          <p className="text-sm text-muted-foreground">{summary}</p>
-        </section>
+        <PlanContent className="space-y-4 px-0 pb-0 pt-0">
+          {showSummary ? (
+            <div className="px-1 mt-2">
+              <div className="text-[13px] leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                {summary}
+              </div>
+            </div>
+          ) : null}
 
-        {mutations.length > 0 ? (
-          <section>
-            <h4 className="mb-1.5 text-sm font-semibold">{labels.mutations}</h4>
-            <ul className="space-y-1.5">
-              {mutations.map((mutation, index) => (
-                <li key={`${mutation.kind}-${index}`} className="rounded-lg border border-border/70 px-3 py-2">
-                  <p className="text-sm font-medium">{mutation.kind}</p>
-                  {mutation.display_summary ? (
-                    <p className="mt-0.5 whitespace-pre-line text-sm text-muted-foreground">{mutation.display_summary}</p>
-                  ) : (
-                    <p className="mt-0.5 text-sm text-muted-foreground">{formatMutationArgsReadable(mutation.args)}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
+          {mutationBlocks.length > 0 && (
+            <div className="px-1 space-y-3">
+              {mutationBlocks.map((block) => {
+                return (
+                  <div key={block.key} className="flex flex-col gap-1.5 border-l-2 border-primary/30 pl-3">
+                    {block.primaryLine ? (
+                      <p className="whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground">{block.primaryLine}</p>
+                    ) : null}
+                    {block.description ? (
+                      <p className="whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground/90 italic">
+                        {labels.descriptionPrefix}: {block.description}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-        {notes.length > 0 ? (
-          <section>
-            <h4 className="mb-1.5 text-sm font-semibold">{labels.notes}</h4>
-            <ul className="space-y-1">
-              {notes.map((note, index) => (
-                <li key={`${note}-${index}`} className="text-xs text-muted-foreground">
-                  • {note}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-      </PlanContent>
+          {notes.length > 0 && (
+            <div className="px-1">
+              <ul className="space-y-1.5">
+                {notes.map((note, index) => (
+                  <li key={`${note}-${index}`} className="flex items-start gap-2 text-[12px] text-muted-foreground/80">
+                    <span className="mt-1 flex h-1.5 w-1.5 shrink-0 rounded-full bg-border" />
+                    <span className="leading-snug">{note}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </PlanContent>
 
-      <PlanFooter className="flex items-center gap-2">
-        <Button type="button" size="sm" onClick={onApply} disabled={!canApply || isApplying}>
-          {labels.apply}
-        </Button>
-        <Button type="button" size="sm" variant="outline" onClick={onUndo} disabled={!canUndo || isUndoing}>
-          {labels.undo}
-        </Button>
-      </PlanFooter>
+        {!isAppliedState && (
+          <div className="mt-5 flex items-center gap-2 pt-1">
+            <Button
+              className="w-full font-medium shadow-sm transition-all hover:bg-primary/90"
+              size="sm"
+              type="button"
+              onClick={onApply}
+              disabled={!canApply || isApplying}
+            >
+              {isApplying ? (
+                labels.applying
+              ) : (
+                <>
+                  <Check className="mr-1.5 h-4 w-4" />
+                  {labels.apply}
+                </>
+              )}
+            </Button>
+            {canUndo && (
+              <Button
+                className="w-full shadow-none"
+                variant="secondary"
+                size="sm"
+                type="button"
+                onClick={onUndo}
+                disabled={isUndoing}
+              >
+                {labels.undo}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </Plan>
   );
 }

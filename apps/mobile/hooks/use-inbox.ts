@@ -5,12 +5,16 @@ import type {
   CaptureActionResponse,
   CaptureArtifactsResponse,
   CaptureDetailResponse,
+  CaptureLinksResponse,
   CapturePreviewRequest,
   CapturePreviewResponse,
   CaptureUploadResponse,
   CreateCaptureRequest,
   InboxListResponse,
+  InboxSearchResponse,
   ReprocessCaptureResponse,
+  NoteSummaryRefreshResponse,
+  UpdateCaptureRequest,
 } from "@momentarise/shared";
 import {
   applyCaptureRequestSchema,
@@ -18,12 +22,16 @@ import {
   captureActionResponseSchema,
   captureArtifactsResponseSchema,
   captureDetailResponseSchema,
+  captureLinksResponseSchema,
   capturePreviewRequestSchema,
   capturePreviewResponseSchema,
   captureUploadResponseSchema,
   createCaptureRequestSchema,
   inboxListResponseSchema,
+  inboxSearchResponseSchema,
   reprocessCaptureResponseSchema,
+  noteSummaryRefreshResponseSchema,
+  updateCaptureRequestSchema,
 } from "@momentarise/shared";
 import { apiFetch, readApiError } from "@/lib/api";
 
@@ -47,10 +55,49 @@ export function useInbox(options?: { includeArchived?: boolean; bucket?: InboxBu
   });
 }
 
+export function useInboxSearch(query: string, limit = 10) {
+  const normalized = query.trim();
+  return useQuery<InboxSearchResponse>({
+    queryKey: ["inbox-search", normalized, limit],
+    enabled: normalized.length > 0,
+    queryFn: async () => {
+      const qs = new URLSearchParams({
+        q: normalized,
+        limit: String(limit),
+      });
+      const res = await apiFetch(`/api/v1/inbox/search?${qs.toString()}`);
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to search inbox"));
+      const data = await res.json();
+      return inboxSearchResponseSchema.parse(data) as InboxSearchResponse;
+    },
+  });
+}
+
+export function useCaptureLinks(captureId: string | null) {
+  return useQuery<CaptureLinksResponse>({
+    queryKey: ["inbox", "capture-links", captureId],
+    enabled: Boolean(captureId),
+    queryFn: async () => {
+      if (!captureId) return { links: [] };
+      const res = await apiFetch(`/api/v1/inbox/${captureId}/links`);
+      if (res.status === 404) return { links: [] } as CaptureLinksResponse;
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch capture links"));
+      const data = await res.json();
+      return captureLinksResponseSchema.parse(data) as CaptureLinksResponse;
+    },
+    retry: false,
+  });
+}
+
 export function useCaptureDetail(captureId: string | null) {
   return useQuery<CaptureDetailResponse>({
     queryKey: ["inbox", "capture", captureId],
     enabled: Boolean(captureId),
+    refetchInterval: (query) => {
+      const data = query.state.data as CaptureDetailResponse | undefined;
+      const status = data?.capture?.status;
+      return status === "queued" || status === "processing" ? 2000 : false;
+    },
     queryFn: async () => {
       const res = await apiFetch(`/api/v1/inbox/${captureId}`);
       if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch capture detail"));
@@ -189,7 +236,53 @@ export function useReprocessCapture() {
       const data = await res.json();
       return reprocessCaptureResponseSchema.parse(data) as ReprocessCaptureResponse;
     },
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox", "capture", variables.captureId] });
+      queryClient.invalidateQueries({ queryKey: ["inbox", "capture", variables.captureId, "artifacts"] });
+    },
+  });
+}
+
+export function useUpdateCapture() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      captureId,
+      payload,
+    }: {
+      captureId: string;
+      payload: UpdateCaptureRequest;
+    }) => {
+      const body = updateCaptureRequestSchema.parse(payload);
+      const res = await apiFetch(`/api/v1/inbox/${captureId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to update capture"));
+      const data = await res.json();
+      return captureActionResponseSchema.parse(data) as CaptureActionResponse;
+    },
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox", "capture", variables.captureId] });
+    },
+  });
+}
+
+export function useRefreshNoteSummary() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ captureId }: { captureId: string }) => {
+      const res = await apiFetch(`/api/v1/inbox/${captureId}/note-summary/refresh`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(await readApiError(res, "Failed to refresh note summary"));
+      const data = await res.json();
+      return noteSummaryRefreshResponseSchema.parse(data) as NoteSummaryRefreshResponse;
+    },
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["inbox", "capture", variables.captureId] });
       queryClient.invalidateQueries({ queryKey: ["inbox"] });
     },
   });

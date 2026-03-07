@@ -1,0 +1,33 @@
+
+> web@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 10.7s
+  Running TypeScript ...
+Failed to compile.
+
+./src/components/block-editor.tsx:100:10
+Type error: Conversion of type '{ type: "paragraph"; content: string; }[]' to type 'Block[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ type: "paragraph"; content: string; }' is not comparable to type 'Block'.
+    Type '{ type: "paragraph"; content: string; }' is not comparable to type 'BlockFromConfigNoChildren<BlockConfig<"paragraph", { backgroundColor: { default: "default"; }; textColor: { default: "default"; }; textAlignment: { default: "left"; values: readonly ["left", "center", "right", "justify"]; }; }, "inline">, InlineContentSchemaFromSpecs<...>, StyleSchemaFromSpecs<...>> & { ...; }'.
+      Type '{ type: "paragraph"; content: string; }' is missing the following properties from type 'BlockFromConfigNoChildren<BlockConfig<"paragraph", { backgroundColor: { default: "default"; }; textColor: { default: "default"; }; textAlignment: { default: "left"; values: readonly ["left", "center", "right", "justify"]; }; }, "inline">, InlineContentSchemaFromSpecs<...>, StyleSchemaFromSpecs<...>>': id, props
+
+[0m [90m  98 |[39m     [33m.[39mslice([35m0[39m[33m,[39m [35m400[39m)[33m;[39m
+ [90m  99 |[39m   [36mif[39m (lines[33m.[39mlength [33m===[39m [35m0[39m) [36mreturn[39m undefined[33m;[39m
+[31m[1m>[22m[39m[90m 100 |[39m   [36mreturn[39m lines[33m.[39mmap((line) [33m=>[39m ({ type[33m:[39m [32m"paragraph"[39m[33m,[39m content[33m:[39m line })) [36mas[39m [33mBlock[39m[][33m;[39m
+ [90m     |[39m          [31m[1m^[22m[39m
+ [90m 101 |[39m }
+ [90m 102 |[39m
+ [90m 103 |[39m [36mfunction[39m normalizeInitialContent(value[33m:[39m [33mBlock[39m[] [33m|[39m [33mRecord[39m[33m<[39m[33mstring[39m[33m,[39m unknown[33m>[39m[])[33m:[39m [33mBlock[39m[] [33m|[39m undefined {[0m
+Next.js build worker exited with code: 1 and signal: null
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path /Users/andrewpougary/DevLocal/Momentarise/apps/web
+npm error workspace web@0.1.0
+npm error location /Users/andrewpougary/DevLocal/Momentarise/apps/web
+npm error command failed
+npm error command sh -c next build

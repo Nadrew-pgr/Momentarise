@@ -1,23 +1,66 @@
 .sync-chat-page {
   min-height: calc(100dvh - 4rem - 1rem);
+  --sync-chat-glass-bg-soft: color-mix(in srgb, hsl(var(--background)) 90%, transparent);
+  --sync-chat-glass-bg: color-mix(in srgb, hsl(var(--background)) 86%, transparent);
+  --sync-chat-glass-bg-hover: color-mix(in srgb, hsl(var(--background)) 94%, transparent);
+  --sync-chat-glass-blur-soft: 8px;
+  --sync-chat-glass-blur: 10px;
+  --sync-chat-glass-shadow-soft:
+    rgba(15, 23, 42, 0.08) 0 0 0 1px,
+    rgba(15, 23, 42, 0.05) 0 4px 10px -2px,
+    rgba(15, 23, 42, 0.04) 0 16px 28px -12px;
+  --sync-chat-feedback-positive-border: color-mix(in srgb, hsl(var(--primary)) 32%, transparent);
+  --sync-chat-feedback-positive-bg: color-mix(in srgb, hsl(var(--primary)) 14%, transparent);
+  --sync-chat-feedback-positive-text: color-mix(
+    in srgb,
+    hsl(var(--primary)) 72%,
+    hsl(var(--foreground)) 28%
+  );
+  --sync-chat-feedback-warning-border: color-mix(
+    in srgb,
+    hsl(var(--muted-foreground)) 34%,
+    transparent
+  );
+  --sync-chat-feedback-warning-bg: color-mix(in srgb, hsl(var(--muted)) 66%, transparent);
+  --sync-chat-feedback-warning-text: hsl(var(--muted-foreground));
+  --sync-chat-preview-pill-applied-bg: color-mix(in srgb, hsl(var(--primary)) 12%, transparent);
+  --sync-chat-preview-pill-applied-text: color-mix(
+    in srgb,
+    hsl(var(--primary)) 70%,
+    hsl(var(--foreground)) 30%
+  );
+  --sync-chat-preview-pill-pending-bg: color-mix(in srgb, hsl(var(--muted)) 78%, transparent);
+  --sync-chat-preview-pill-pending-text: hsl(var(--muted-foreground));
+  --sync-chat-preview-dot-default: #6366f1;
+  --sync-chat-preview-dot-sky: #38bdf8;
+  --sync-chat-preview-dot-amber: #f59e0b;
+  --sync-chat-preview-dot-violet: #8b5cf6;
+  --sync-chat-preview-dot-rose: #f43f5e;
+  --sync-chat-preview-dot-emerald: #10b981;
+  --sync-chat-preview-dot-orange: #f97316;
 }
 
 .sync-chat-scroll-area {
   background:
     radial-gradient(circle at 20% 15%, color-mix(in srgb, hsl(var(--primary)) 10%, transparent), transparent 44%),
     radial-gradient(circle at 85% 80%, color-mix(in srgb, hsl(var(--muted-foreground)) 12%, transparent), transparent 38%);
-  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, hsl(var(--muted-foreground)) 22%, transparent) transparent;
 }
 
 .sync-chat-scroll-area::-webkit-scrollbar {
-  width: 10px;
+  width: 7px;
+}
+
+.sync-chat-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .sync-chat-scroll-area::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
   background-clip: content-box;
-  background-color: color-mix(in srgb, hsl(var(--muted-foreground)) 34%, transparent);
+  background-color: color-mix(in srgb, hsl(var(--muted-foreground)) 22%, transparent);
 }
 
 .sync-chat-composer-wrap {
@@ -25,12 +68,9 @@
 }
 
 .sync-chat-composer-box {
-  backdrop-filter: blur(8px);
-  background: color-mix(in srgb, hsl(var(--background)) 90%, transparent);
-  box-shadow:
-    rgba(15, 23, 42, 0.08) 0 0 0 1px,
-    rgba(15, 23, 42, 0.05) 0 4px 10px -2px,
-    rgba(15, 23, 42, 0.04) 0 16px 28px -12px;
+  backdrop-filter: blur(var(--sync-chat-glass-blur-soft));
+  background: var(--sync-chat-glass-bg-soft);
+  box-shadow: var(--sync-chat-glass-shadow-soft);
 }
 
 .sync-chat-status-pill {
@@ -59,20 +99,82 @@
 }
 
 .sync-chat-scroll-button {
-  width: 2rem;
-  height: 2rem;
-  opacity: 0.72;
-  border-color: color-mix(in srgb, hsl(var(--border)) 75%, transparent);
-  background: color-mix(in srgb, hsl(var(--background)) 90%, transparent);
-  box-shadow: 0 6px 16px -14px rgba(15, 23, 42, 0.55);
+  width: 2.25rem;
+  height: 2.25rem;
+  opacity: 1;
+  color: hsl(var(--muted-foreground));
+  border: none;
+  border-radius: 999px;
+  background-color: var(--sync-chat-glass-bg);
+  backdrop-filter: blur(var(--sync-chat-glass-blur));
+  outline: none;
+  box-shadow: none !important;
 }
 
 .sync-chat-scroll-button:hover {
   opacity: 1;
+  background-color: var(--sync-chat-glass-bg-hover);
+  box-shadow: none !important;
 }
 
 .sync-chat-action-feedback {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.sync-chat-feedback-banner-positive {
+  border-color: var(--sync-chat-feedback-positive-border);
+  background: var(--sync-chat-feedback-positive-bg);
+  color: var(--sync-chat-feedback-positive-text);
+}
+
+.sync-chat-feedback-banner-warning {
+  border-color: var(--sync-chat-feedback-warning-border);
+  background: var(--sync-chat-feedback-warning-bg);
+  color: var(--sync-chat-feedback-warning-text);
+}
+
+.sync-chat-preview-pill {
+  border: 1px solid transparent;
+}
+
+.sync-chat-preview-pill-applied {
+  border-color: color-mix(in srgb, var(--sync-chat-preview-pill-applied-text) 26%, transparent);
+  background: var(--sync-chat-preview-pill-applied-bg);
+  color: var(--sync-chat-preview-pill-applied-text);
+}
+
+.sync-chat-preview-pill-pending {
+  border-color: color-mix(in srgb, var(--sync-chat-preview-pill-pending-text) 24%, transparent);
+  background: var(--sync-chat-preview-pill-pending-bg);
+  color: var(--sync-chat-preview-pill-pending-text);
+}
+
+.sync-chat-preview-dot {
+  background: var(--sync-chat-preview-dot-color, var(--sync-chat-preview-dot-default));
+}
+
+.sync-chat-preview-dot-sky {
+  --sync-chat-preview-dot-color: var(--sync-chat-preview-dot-sky);
+}
+
+.sync-chat-preview-dot-amber {
+  --sync-chat-preview-dot-color: var(--sync-chat-preview-dot-amber);
+}
+
+.sync-chat-preview-dot-violet {
+  --sync-chat-preview-dot-color: var(--sync-chat-preview-dot-violet);
+}
+
+.sync-chat-preview-dot-rose {
+  --sync-chat-preview-dot-color: var(--sync-chat-preview-dot-rose);
+}
+
+.sync-chat-preview-dot-emerald {
+  --sync-chat-preview-dot-color: var(--sync-chat-preview-dot-emerald);
+}
+
+.sync-chat-preview-dot-orange {
+  --sync-chat-preview-dot-color: var(--sync-chat-preview-dot-orange);
 }
 
 .sync-chat-empty-title {
