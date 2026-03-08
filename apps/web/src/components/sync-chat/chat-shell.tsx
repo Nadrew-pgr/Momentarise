@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import type {
   SyncApply,
   SyncContextSearchResult,
   SyncEventEnvelope,
   SyncMessage,
   SyncPreview,
+  SyncQuestion,
   SyncRunSummary,
 } from "@momentarise/shared";
+import { InteractiveQuestionUI } from "./interactive-question-ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -337,6 +340,7 @@ export function SyncChatShell() {
   const [isStreaming, setIsStreaming] = useState(false);
 
   const [latestPreview, setLatestPreview] = useState<SyncPreview | null>(null);
+  const [latestQuestion, setLatestQuestion] = useState<SyncQuestion | null>(null);
   const [appliedPreviewIds, setAppliedPreviewIds] = useState<string[]>([]);
   const [notices, setNotices] = useState<SyncNotice[]>([]);
   const [reasoningEntries, setReasoningEntries] = useState<SyncReasoningEntry[]>([]);
@@ -415,6 +419,7 @@ export function SyncChatShell() {
     setStreamingAssistantBuffer("");
     setIsStreaming(false);
     setLatestPreview(null);
+    setLatestQuestion(null);
     setAppliedPreviewIds([]);
     setNotices([]);
     setReasoningEntries([]);
@@ -542,6 +547,9 @@ export function SyncChatShell() {
       }
 
       case "question":
+        setLatestQuestion(event.payload);
+        break;
+
       case "draft":
         break;
 
@@ -1456,6 +1464,7 @@ export function SyncChatShell() {
     }
 
     setLatestPreview(null);
+    setLatestQuestion(null);
     const previousContextEntries = contextEntries;
     const attachmentsPayload = contextEntries
       .filter(
@@ -1553,6 +1562,39 @@ export function SyncChatShell() {
     startStream,
     t,
   ]);
+
+  const handleQuestionAnswer = useCallback(
+    async (answer: string) => {
+      if (isStreaming || !runId) return;
+
+      const optimisticMessageId = crypto.randomUUID();
+      setPendingUserMessages((prev) => [
+        ...prev,
+        {
+          id: optimisticMessageId,
+          content: answer,
+          createdAt: new Date(),
+          status: "pending",
+        },
+      ]);
+
+      setLatestQuestion(null);
+
+      try {
+        await startStream({
+          runId,
+          message: answer,
+          optimisticMessageId,
+        });
+      } catch (error) {
+        setTransportError(toErrorMessage(error, t("pages.sync.error.generic")));
+        setPendingUserMessages((prev) =>
+          prev.map((item) => (item.id === optimisticMessageId ? { ...item, status: "failed" } : item))
+        );
+      }
+    },
+    [isStreaming, runId, startStream, t]
+  );
 
   const handleRetry = useCallback(async () => {
     if (isStreaming) return;
@@ -1849,8 +1891,24 @@ export function SyncChatShell() {
           onAttachInbox={handleOpenInboxPicker}
           selectionOverride={composerSelectionOverride}
           beforeComposer={
-            contextEntries.length > 0 || isMentionPopoverVisible ? (
-              <div className="space-y-2">
+            latestQuestion || contextEntries.length > 0 || isMentionPopoverVisible ? (
+              <div className="space-y-4">
+                <AnimatePresence>
+                  {latestQuestion && (
+                    <InteractiveQuestionUI
+                      question={latestQuestion}
+                      onSelectOption={handleQuestionAnswer}
+                      onOtherClick={() => {
+                        // Just scroll to composer and maybe focus it
+                        const composerEl = document.querySelector('[data-composer-input="true"]');
+                        if (composerEl instanceof HTMLElement) {
+                          composerEl.focus();
+                        }
+                      }}
+                    />
+                  )}
+                </AnimatePresence>
+
                 {contextEntries.length > 0 ? (
                   <div className="flex flex-wrap gap-2 rounded-2xl border border-border/70 bg-card/90 p-2.5">
                     {contextEntries.map((entry) => {

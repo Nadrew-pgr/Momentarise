@@ -314,6 +314,43 @@ export function Composer({
                     size="icon"
                     variant="outline"
                     className="h-9 w-9 rounded-full"
+                    disabled={disabled || isStreaming}
+                    aria-label="Mode"
+                  >
+                    {runMode === "free" ? (
+                      <Zap className="h-4 w-4 text-blue-500" />
+                    ) : (
+                      <ClipboardList className="h-4 w-4 text-amber-500" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-56 rounded-xl p-1">
+                  <DropdownMenuItem
+                    onClick={() => onModeChange?.("free")}
+                    className={`rounded-lg px-3 py-2 ${runMode === "free" ? "bg-accent" : ""}`}
+                  >
+                    <Zap className="mr-2.5 h-4 w-4 text-blue-500" />
+                    <span className="flex-1 font-medium">Normal</span>
+                    <span className="text-[10px] text-muted-foreground">direct</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onModeChange?.("guided")}
+                    className={`rounded-lg px-3 py-2 ${runMode === "guided" ? "bg-accent" : ""}`}
+                  >
+                    <ClipboardList className="mr-2.5 h-4 w-4 text-amber-500" />
+                    <span className="flex-1 font-medium">Plan Mode</span>
+                    <span className="text-[10px] text-muted-foreground">guidé</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-9 w-9 rounded-full"
                     disabled={disabled || isStreaming || models.length === 0}
                     aria-label={modelLabel}
                   >
@@ -358,43 +395,6 @@ export function Composer({
                       ))}
                     </div>
                   ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    className="h-9 w-9 rounded-full"
-                    disabled={disabled || isStreaming}
-                    aria-label="Mode"
-                  >
-                    {runMode === "free" ? (
-                      <Zap className="h-4 w-4 text-blue-500" />
-                    ) : (
-                      <ClipboardList className="h-4 w-4 text-amber-500" />
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-56 rounded-xl p-1">
-                  <DropdownMenuItem
-                    onClick={() => onModeChange?.("free")}
-                    className={`rounded-lg px-3 py-2 ${runMode === "free" ? "bg-accent" : ""}`}
-                  >
-                    <Zap className="mr-2.5 h-4 w-4 text-blue-500" />
-                    <span className="flex-1 font-medium">Normal</span>
-                    <span className="text-[10px] text-muted-foreground">direct</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onModeChange?.("guided")}
-                    className={`rounded-lg px-3 py-2 ${runMode === "guided" ? "bg-accent" : ""}`}
-                  >
-                    <ClipboardList className="mr-2.5 h-4 w-4 text-amber-500" />
-                    <span className="flex-1 font-medium">Plan Mode</span>
-                    <span className="text-[10px] text-muted-foreground">guidé</span>
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 

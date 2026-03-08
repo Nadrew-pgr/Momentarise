@@ -42,6 +42,12 @@ export async function proxyWithAuth(
     return NextResponse.json(data, { status: res.status });
   }
   const text = await res.text();
+  if (res.status === 204) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: contentType ? { "Content-Type": contentType } : undefined,
+    });
+  }
   return new NextResponse(text, {
     status: res.status,
     headers: contentType ? { "Content-Type": contentType } : undefined,

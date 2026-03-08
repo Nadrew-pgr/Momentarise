@@ -26,4 +26,13 @@ Ajouter une mention explicite dans l’UI Inbox/détail indiquant les capacités
 - enrichissements avancés,
 - connecteurs externes.
 
-Cette idée est partiellement implémentée côté UI (bloc \"Bientôt\") et doit rester pilotée par feature flags backend (`CAPTURE_CONTEXT_ENRICHMENT_ENABLED`, `CAPTURE_WEB_RESEARCH_ENABLED`).
+Cette idée est partiellement implémentée côté UI (bloc "Bientôt") et doit rester pilotée par feature flags backend (`CAPTURE_CONTEXT_ENRICHMENT_ENABLED`, `CAPTURE_WEB_RESEARCH_ENABLED`).
+
+---
+
+## Automatisation Liste de Courses — 2026-03-08
+
+Ajouter une fonctionnalité "Shop Next" :
+- **Trigger** : Quand l'utilisateur lit ou mentionne un article/produit (ex: dans une recette ou un moment "inbox"), le système l'ajoute automatiquement (ou propose de l'ajouter) à la liste "Prochaines courses prévues".
+- **Usage** : Évite d'oublier des ingrédients ou produits de nécessité cités au fil de l'eau.
+- **Intégration** : Pourrait être un module spécifique de l'Inbox ou une action suggérée par le compagnon IA.

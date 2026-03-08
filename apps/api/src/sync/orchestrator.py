@@ -31,6 +31,7 @@ from src.schemas.sync import (
     SyncQueuePayload,
     SyncReasoningPayload,
     SyncRunOut,
+    SyncQuestionOut,
     SyncSourcesPayload,
     SyncTaskPayload,
     SyncUndonePayload,
@@ -707,6 +708,25 @@ class SyncOrchestrator:
                             emitted_preview_payloads.append(self._serialize_preview_payload(preview))
                             yield await self._record_preview_event(run=run, preview=preview)
                             preview_emitted = True
+
+                        question_candidate = execution.get("question") if isinstance(execution, dict) else None
+                        if isinstance(question_candidate, dict):
+                            question = await self._create_question(
+                                run=run,
+                                key=str(question_candidate.get("key") or "default"),
+                                prompt=str(question_candidate.get("prompt") or ""),
+                                options=question_candidate.get("options"),
+                                help_text=question_candidate.get("help_text"),
+                            )
+                            yield await self._record_question_event(run=run, question=question)
+                            run.status = "waiting_answer"
+                            yield await self._record_plain_event(
+                                run=run,
+                                type_="done",
+                                payload=SyncDonePayload(status=run.status).model_dump(mode="json"),
+                            )
+                            await self.db.commit()
+                            return
 
                         llm_messages.append(
                             {
@@ -1513,17 +1533,44 @@ class SyncOrchestrator:
             "summary": draft.summary,
             "created_at": draft.created_at.isoformat(),
         }
-        event = AIEvent(run_id=run.id, seq=draft.seq, type="draft", payload_json=payload)
-        self.db.add(event)
-        await self.db.flush()
-        return SyncEventEnvelope(
-            seq=draft.seq,
+        if detail:
+            payload["detail"] = detail
+        return await self._record_plain_event(run=run, type_="draft", payload=payload)
+
+    async def _create_question(
+        self,
+        *,
+        run: AIRun,
+        key: str,
+        prompt: str,
+        options: list[str] | None = None,
+        help_text: str | None = None,
+    ) -> AIQuestion:
+        seq = await self._next_seq(run)
+        question = AIQuestion(
             run_id=run.id,
-            ts=draft.created_at,
-            trace_id=None,
-            type="draft",
-            payload=payload,
+            seq=seq,
+            key=key,
+            prompt=prompt,
+            options_json=options or [],
+            help_text=help_text,
         )
+        self.db.add(question)
+        await self.db.flush()
+        return question
+
+    async def _record_question_event(self, *, run: AIRun, question: AIQuestion) -> SyncEventEnvelope:
+        payload = SyncQuestionOut(
+            id=question.id,
+            run_id=question.run_id,
+            seq=question.seq,
+            key=question.key,
+            prompt=question.prompt,
+            help_text=question.help_text,
+            options=question.options_json if isinstance(question.options_json, list) else [],
+            created_at=question.created_at,
+        ).model_dump(mode="json")
+        return await self._record_plain_event(run=run, type_="question", payload=payload)
 
     async def _record_preview_event(self, *, run: AIRun, preview: AIDraft) -> SyncEventEnvelope:
         payload = self._serialize_preview_payload(preview)

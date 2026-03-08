@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { syncPreviewSchema } from "@momentarise/shared";
-import type { SyncApply, SyncPreview, SyncRunSummary, SyncRunMode } from "@momentarise/shared";
+import type { SyncApply, SyncPreview, SyncRunSummary, SyncRunMode, SyncQuestion } from "@momentarise/shared";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -19,6 +19,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
 import { EllipsisVertical, Menu } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -46,6 +47,7 @@ import { ModelSelector } from "@/components/react-native-ai-elements/model-selec
 import { RunModeSelector } from "@/components/react-native-ai-elements/run-mode-selector";
 import type { ChatMessage, SyncMessageContextLink } from "@/components/react-native-ai-elements/types";
 import { PreviewPlanCard } from "@/components/sync/preview-plan-card";
+import { InteractiveQuestionUI } from "@/components/sync/interactive-question-ui";
 import { AnchoredMenu, type AnchoredMenuAnchor } from "@/components/ui/anchored-menu";
 
 type MessageRow = ChatMessage;
@@ -338,6 +340,7 @@ export default function SyncScreen() {
   const [previewToChangeId, setPreviewToChangeId] = useState<Record<string, string>>({});
   const [appliedPreviewIds, setAppliedPreviewIds] = useState<string[]>([]);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [latestQuestion, setLatestQuestion] = useState<SyncQuestion | null>(null);
   const [isHydratingRun, setIsHydratingRun] = useState(false);
   const [isConversationMenuOpen, setIsConversationMenuOpen] = useState(false);
   const [conversationMenuAnchor, setConversationMenuAnchor] = useState<AnchoredMenuAnchor | null>(null);
@@ -1051,6 +1054,11 @@ export default function SyncScreen() {
       return;
     }
 
+    if (event.type === "question") {
+      setLatestQuestion(event.payload);
+      return;
+    }
+
     if (event.type === "preview") {
       pendingPreviewQueueRef.current = upsertPreviewQueue(
         pendingPreviewQueueRef.current,
@@ -1212,6 +1220,7 @@ export default function SyncScreen() {
       return;
     }
 
+    setLatestQuestion(null);
     const previousContextEntries = contextEntries;
     const attachmentsPayload = contextEntries
       .filter(
@@ -1313,6 +1322,42 @@ export default function SyncScreen() {
       });
     }
   }, [canSendComposer, contextEntries, createRun, input, runId, selectedModel, showToast, streamMutation, t]);
+
+  const handleQuestionAnswer = useCallback(
+    async (answer: string) => {
+      if (!answer.trim() || streamMutation.isPending || !runId) return;
+
+      const userMsg: MessageRow = {
+        id: Date.now().toString(),
+        role: "user",
+        content: answer.trim(),
+      };
+
+      setMessages((prev) => [...prev, userMsg]);
+      setLatestQuestion(null);
+      setStreamingText("");
+
+      try {
+        await streamMutation.mutateAsync({
+          runId,
+          payload: {
+            message: answer.trim(),
+            idempotency_key: buildIdempotencyKey(),
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        setMessages((prev) => prev.filter((message) => message.id !== userMsg.id));
+        showToast({
+          message:
+            error instanceof Error && error.message
+              ? error.message
+              : t("pages.sync.error.generic"),
+        });
+      }
+    },
+    [runId, showToast, streamMutation, t]
+  );
 
   const handleApply = useCallback(
     async (previewId: string) => {
@@ -1436,15 +1481,15 @@ export default function SyncScreen() {
       />
 
       <View className="flex-row items-center justify-center py-1">
+        <RunModeSelector
+          runMode={runMode}
+          onModeChange={setRunMode}
+          disabled={streamMutation.isPending}
+        />
         <ModelSelector
           models={syncModels}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
-          disabled={streamMutation.isPending}
-        />
-        <RunModeSelector
-          runMode={runMode}
-          onModeChange={setRunMode}
           disabled={streamMutation.isPending}
         />
       </View>
@@ -1567,6 +1612,17 @@ export default function SyncScreen() {
               </View>
             </View>
           ) : null}
+
+          {latestQuestion && (
+            <InteractiveQuestionUI
+              question={latestQuestion}
+              onSelectOption={handleQuestionAnswer}
+              onOtherClick={() => {
+                // Future: focus composer or scroll
+              }}
+              isDark={useColorScheme() === "dark"}
+            />
+          )}
 
           <Composer
             value={input}

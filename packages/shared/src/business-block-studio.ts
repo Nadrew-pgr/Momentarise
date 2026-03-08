@@ -26,7 +26,6 @@ export interface RuntimeUpdateDraft {
 export type QuickUpdateDraft = RuntimeUpdateDraft;
 
 export const QUICK_UPDATE_LABELS = {
-  blockers: "Blockers",
   energy: "Energy",
   nextAction: "Next Action",
   progressDelta: "Progress Delta",
