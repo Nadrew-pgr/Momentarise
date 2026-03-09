@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { itemKindSchema } from "./item";
+import { entityLinkSchema, itemKindSchema } from "./item";
 
 export const capturePipelineStatusSchema = z.enum([
   "captured",
@@ -38,7 +38,6 @@ export const captureActionTypeSchema = z.enum([
   "create_item",
   "draft_reply",
   "pay_invoice",
-  "summarize",
   "review",
 ]);
 
@@ -84,6 +83,7 @@ export const captureActionSuggestionSchema = z.object({
 const inboxCaptureOutWireSchema = z.object({
   id: z.string().uuid(),
   item_id: z.string().uuid().nullable().optional(),
+  title: z.string().nullable().optional(),
   raw_content: z.string(),
   source: z.string().nullable().optional(),
   source_type: z.string().optional(),
@@ -112,6 +112,7 @@ export const inboxCaptureOutSchema = inboxCaptureOutWireSchema.transform(
   ({
     meta,
     metadata,
+    title,
     requires_review,
     primary_action,
     suggested_actions,
@@ -132,6 +133,7 @@ export const inboxCaptureOutSchema = inboxCaptureOutWireSchema.transform(
   }) => ({
     ...rest,
     item_id: item_id ?? null,
+    title: title ?? null,
     source_type: source_type ?? rest.capture_type,
     pipeline_state: pipeline_state ?? rest.status,
     treated_bucket: treated_bucket ?? (rest.status === "applied" ? "treated" : "untreated"),
@@ -165,6 +167,22 @@ export const inboxListResponseSchema = z
     };
   });
 
+export const inboxSearchEntrySchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  capture_type: captureTypeSchema,
+  status: captureStatusSchema,
+  created_at: z.string().datetime(),
+});
+
+export const inboxSearchResponseSchema = z.object({
+  captures: z.array(inboxSearchEntrySchema),
+});
+
+export const captureLinksResponseSchema = z.object({
+  links: z.array(entityLinkSchema),
+});
+
 export const createCaptureRequestSchema = z.object({
   raw_content: z.string().default(""),
   source: z.string().nullable().optional().default("manual"),
@@ -173,9 +191,17 @@ export const createCaptureRequestSchema = z.object({
   metadata: metadataRecordSchema.default({}),
 });
 
+export const updateCaptureRequestSchema = z.object({
+  title: z.string().nullable().optional(),
+});
+
 export const captureUploadResponseSchema = z.object({
   id: z.string().uuid(),
   status: captureStatusSchema,
+  task_id: z.string().optional().nullable(),
+  run_id: z.string().uuid().optional().nullable(),
+  queue_state: z.enum(["enqueued", "not_enqueued"]).optional().nullable(),
+  queue_name: z.string().optional().nullable(),
 });
 
 const captureAssetWireSchema = z.object({
@@ -219,6 +245,9 @@ export const captureArtifactOutSchema = z.object({
 export const captureJobOutSchema = z.object({
   id: z.string().uuid(),
   job_type: z.string(),
+  run_id: z.string().uuid().nullable().optional(),
+  queue_name: z.string().nullable().optional(),
+  task_id: z.string().nullable().optional(),
   status: z.string(),
   attempt_count: z.number().int().nonnegative(),
   last_error: z.string().nullable().optional(),
@@ -244,6 +273,10 @@ export const captureArtifactsResponseSchema = z.object({
 export const reprocessCaptureResponseSchema = z.object({
   capture_id: z.string().uuid(),
   status: z.string(),
+  task_id: z.string().optional().nullable(),
+  run_id: z.string().uuid().optional().nullable(),
+  queue_state: z.enum(["enqueued", "not_enqueued"]).optional().nullable(),
+  queue_name: z.string().optional().nullable(),
 });
 
 export const processCaptureRequestSchema = z.object({
@@ -267,6 +300,7 @@ export const capturePreviewResponseSchema = z.object({
   confidence: z.number(),
   reason: z.string(),
   preview_payload: metadataRecordSchema.default({}),
+  missing_fields: z.array(z.string()).default([]),
 });
 
 export const applyCaptureRequestSchema = z.object({
@@ -286,6 +320,17 @@ export const applyCaptureResponseSchema = z.object({
 export const captureActionResponseSchema = z.object({
   capture_id: z.string().uuid(),
   status: z.string(),
+  task_id: z.string().optional().nullable(),
+  run_id: z.string().uuid().optional().nullable(),
+  queue_state: z.enum(["enqueued", "not_enqueued"]).optional().nullable(),
+  queue_name: z.string().optional().nullable(),
+});
+
+export const noteSummaryRefreshResponseSchema = z.object({
+  capture_id: z.string().uuid(),
+  status: z.enum(["generated", "unchanged", "skipped_too_short"]),
+  summary_updated: z.boolean().default(false),
+  source_hash: z.string().nullable().optional(),
 });
 
 export const externalCaptureRequestSchema = z.object({
@@ -306,7 +351,11 @@ export type CaptureBadge = z.infer<typeof captureBadgeSchema>;
 export type CaptureActionSuggestion = z.infer<typeof captureActionSuggestionSchema>;
 export type InboxCaptureOut = z.infer<typeof inboxCaptureOutSchema>;
 export type InboxListResponse = z.infer<typeof inboxListResponseSchema>;
+export type InboxSearchEntry = z.infer<typeof inboxSearchEntrySchema>;
+export type InboxSearchResponse = z.infer<typeof inboxSearchResponseSchema>;
+export type CaptureLinksResponse = z.infer<typeof captureLinksResponseSchema>;
 export type CreateCaptureRequest = z.input<typeof createCaptureRequestSchema>;
+export type UpdateCaptureRequest = z.input<typeof updateCaptureRequestSchema>;
 export type CaptureUploadResponse = z.infer<typeof captureUploadResponseSchema>;
 export type CaptureAssetOut = z.infer<typeof captureAssetOutSchema>;
 export type CaptureArtifactOut = z.infer<typeof captureArtifactOutSchema>;
@@ -321,4 +370,5 @@ export type CapturePreviewResponse = z.infer<typeof capturePreviewResponseSchema
 export type ApplyCaptureRequest = z.input<typeof applyCaptureRequestSchema>;
 export type ApplyCaptureResponse = z.infer<typeof applyCaptureResponseSchema>;
 export type CaptureActionResponse = z.infer<typeof captureActionResponseSchema>;
+export type NoteSummaryRefreshResponse = z.infer<typeof noteSummaryRefreshResponseSchema>;
 export type ExternalCaptureRequest = z.input<typeof externalCaptureRequestSchema>;

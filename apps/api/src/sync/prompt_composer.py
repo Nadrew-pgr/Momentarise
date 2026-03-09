@@ -4,7 +4,7 @@ from typing import Literal
 
 from src.sync.system_prompt import SystemPromptParams, build_agent_system_prompt
 
-PromptMode = Literal["full", "minimal", "none", "capture_analysis"]
+PromptMode = Literal["full", "minimal", "none", "capture_analysis", "editor_assistant"]
 
 
 @dataclass(slots=True)

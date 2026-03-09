@@ -150,13 +150,15 @@ def _to_response(member: WorkspaceMember) -> CalendarPreferencesResponse:
 def _read_ai_preferences(
     member: WorkspaceMember,
     workspace_defaults: dict | None = None,
-) -> tuple[str, float, int, dict, UUID | None, dict, str, str, str | None]:
+) -> tuple[str, float, int, dict, UUID | None, dict, UUID | None, dict, str, str, str | None]:
     mode = DEFAULT_AI_MODE
     threshold = DEFAULT_AUTO_APPLY_THRESHOLD
     max_actions = DEFAULT_MAX_ACTIONS
     provider_preferences = _merge_provider_preferences(None, workspace_defaults)
     capture_default_agent_id: UUID | None = None
     capture_agent_routing_rules: dict = {}
+    editor_default_agent_id: UUID | None = None
+    editor_agent_routing_rules: dict = {}
     capture_research_policy = DEFAULT_CAPTURE_RESEARCH_POLICY
     sync_model = "auto"
     sync_reasoning_level: str | None = None
@@ -186,6 +188,15 @@ def _read_ai_preferences(
             raw_routing_rules = ai_prefs.get("capture_agent_routing_rules")
             if isinstance(raw_routing_rules, dict):
                 capture_agent_routing_rules = raw_routing_rules
+            raw_editor_default_agent = ai_prefs.get("editor_default_agent_id")
+            if isinstance(raw_editor_default_agent, str) and raw_editor_default_agent.strip():
+                try:
+                    editor_default_agent_id = UUID(raw_editor_default_agent.strip())
+                except ValueError:
+                    editor_default_agent_id = None
+            raw_editor_routing_rules = ai_prefs.get("editor_agent_routing_rules")
+            if isinstance(raw_editor_routing_rules, dict):
+                editor_agent_routing_rules = raw_editor_routing_rules
             raw_research_policy = ai_prefs.get("capture_research_policy")
             if raw_research_policy in {"proposal_only", "auto_if_safe"}:
                 capture_research_policy = raw_research_policy
@@ -203,6 +214,8 @@ def _read_ai_preferences(
         provider_preferences,
         capture_default_agent_id,
         capture_agent_routing_rules,
+        editor_default_agent_id,
+        editor_agent_routing_rules,
         capture_research_policy,
         sync_model,
         sync_reasoning_level,
@@ -217,6 +230,8 @@ def _to_ai_response(member: WorkspaceMember, workspace_defaults: dict | None = N
         provider_preferences,
         capture_default_agent_id,
         capture_agent_routing_rules,
+        editor_default_agent_id,
+        editor_agent_routing_rules,
         capture_research_policy,
         sync_model,
         sync_reasoning_level,
@@ -231,6 +246,8 @@ def _to_ai_response(member: WorkspaceMember, workspace_defaults: dict | None = N
         capture_provider_preferences=provider_preferences,  # type: ignore[arg-type]
         capture_default_agent_id=capture_default_agent_id,
         capture_agent_routing_rules=capture_agent_routing_rules,
+        editor_default_agent_id=editor_default_agent_id,
+        editor_agent_routing_rules=editor_agent_routing_rules,
         capture_research_policy=capture_research_policy,  # type: ignore[arg-type]
         sync_model=sync_model,
         sync_reasoning_level=sync_reasoning_level,
@@ -317,6 +334,8 @@ async def update_ai_preferences(
         current_provider_preferences,
         current_default_agent_id,
         current_routing_rules,
+        current_editor_default_agent_id,
+        current_editor_routing_rules,
         current_research_policy,
         _,  # sync_model — handled separately below
         _,  # sync_reasoning_level — handled separately below
@@ -350,6 +369,29 @@ async def update_ai_preferences(
         str(default_agent_id) if default_agent_id is not None else None
     )
 
+    if "editor_default_agent_id" in body.model_fields_set:
+        editor_default_agent_id = body.editor_default_agent_id
+    else:
+        editor_default_agent_id = current_editor_default_agent_id
+    if editor_default_agent_id is not None:
+        result = await db.execute(
+            select(AgentProfile).where(
+                AgentProfile.id == editor_default_agent_id,
+                AgentProfile.workspace_id == workspace.workspace_id,
+                AgentProfile.deleted_at.is_(None),
+                AgentProfile.is_active.is_(True),
+            )
+        )
+        agent = result.scalar_one_or_none()
+        if agent is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="editor_default_agent_id must reference an active workspace agent",
+            )
+    ai_preferences["editor_default_agent_id"] = (
+        str(editor_default_agent_id) if editor_default_agent_id is not None else None
+    )
+
     if "capture_agent_routing_rules" in body.model_fields_set:
         ai_preferences["capture_agent_routing_rules"] = (
             body.capture_agent_routing_rules
@@ -358,6 +400,15 @@ async def update_ai_preferences(
         )
     else:
         ai_preferences["capture_agent_routing_rules"] = current_routing_rules
+
+    if "editor_agent_routing_rules" in body.model_fields_set:
+        ai_preferences["editor_agent_routing_rules"] = (
+            body.editor_agent_routing_rules
+            if isinstance(body.editor_agent_routing_rules, dict)
+            else {}
+        )
+    else:
+        ai_preferences["editor_agent_routing_rules"] = current_editor_routing_rules
 
     if "capture_research_policy" in body.model_fields_set:
         ai_preferences["capture_research_policy"] = (

@@ -137,6 +137,10 @@ class ToolExecutor:
                                 "type": "string",
                                 "enum": ["sky", "amber", "violet", "rose", "emerald", "orange"],
                             },
+                            "description": {
+                                "type": "string",
+                                "description": "A description of the event or the notes to attach to it.",
+                            },
                             "changes": {"type": "object", "additionalProperties": True},
                             "display_summary": {
                                 "type": "string",
@@ -174,6 +178,36 @@ class ToolExecutor:
                             },
                         },
                         "required": ["capture_id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "ask_question",
+                    "description": "Ask the user a specific question with multiple choice options. Use this for clarifying ambiguous requests (e.g. 'Which day?', 'Which project?') before proceeding with a plan.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {
+                                "type": "string",
+                                "description": "The question to ask the user.",
+                            },
+                            "options": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of up to 5 concise multiple choice options.",
+                            },
+                            "help_text": {
+                                "type": "string",
+                                "description": "Optional secondary text providing more context for the question.",
+                            },
+                            "key": {
+                                "type": "string",
+                                "description": "A unique identifier for this question within the conversation context.",
+                            },
+                        },
+                        "required": ["prompt", "key"],
                     },
                 },
             },
@@ -253,12 +287,12 @@ class ToolExecutor:
             }
 
         if operation == "update":
-            changes = args.get("changes") if isinstance(args.get("changes"), dict) else {}
-            for key in ["title", "start_at", "end_at", "estimated_time_seconds", "color", "item_id"]:
+            changes: dict[str, Any] = args.get("changes") if isinstance(args.get("changes"), dict) else {}
+            for key in ["title", "start_at", "end_at", "estimated_time_seconds", "color", "item_id", "description"]:
                 if key in args and args.get(key) is not None:
                     changes[key] = args.get(key)
-            if "color" in changes:
-                changes["color"] = cls._normalize_event_color(changes.get("color"))
+            if "color" in changes and isinstance(changes["color"], str):
+                changes["color"] = cls._normalize_event_color(changes["color"])
 
             mutation = {
                 "kind": "event.update",
@@ -302,6 +336,7 @@ class ToolExecutor:
                 "end_at": end_at.isoformat(),
                 "estimated_time_seconds": estimated_time_seconds,
                 "color": color,
+                "description": cls._as_string(args.get("description")),
             },
         }
         if display_summary:
@@ -342,6 +377,23 @@ class ToolExecutor:
         return {
             "summary": "Preview inbox transform",
             "mutation": mutation,
+        }
+
+    @classmethod
+    def build_ask_question(cls, args: dict[str, Any]) -> dict[str, Any]:
+        prompt = cls._as_string(args.get("prompt"))
+        options = args.get("options") if isinstance(args.get("options"), list) else []
+        help_text = cls._as_string(args.get("help_text"))
+        key = cls._as_string(args.get("key"))
+
+        return {
+            "summary": f"Question: {prompt}",
+            "question": {
+                "key": key,
+                "prompt": prompt,
+                "options": options[:5],
+                "help_text": help_text,
+            },
         }
 
     @classmethod

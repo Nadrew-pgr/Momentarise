@@ -83,6 +83,8 @@ function toCalendarEvent(source: EventOut): CalendarEvent {
     parentEventId: source.parent_event_id ?? undefined,
     seriesId: source.series_id ?? undefined,
     projectId: source.project_id ?? undefined,
+    estimatedTimeSeconds: source.estimated_time_seconds,
+    actualTimeAccSeconds: source.actual_time_acc_seconds,
   };
 }
 

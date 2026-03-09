@@ -10,7 +10,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { SafeAreaView } from "react-native-safe-area-context";
-import type { ProseMirrorNode } from "@momentarise/shared";
+import { businessBlockTypeValues, type ProseMirrorNode } from "@momentarise/shared";
 import { BlockEditor } from "@/components/BlockEditor";
 import {
   useDeleteItem,
@@ -22,6 +22,21 @@ import {
 import { useAppToast } from "@/lib/store";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+const BUSINESS_BLOCK_TYPE_SET = new Set<string>(businessBlockTypeValues);
+
+function isBusinessBlocksPayload(value: unknown): value is Array<{ type: string; payload: Record<string, unknown> }> {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  return value.every((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const block = entry as Record<string, unknown>;
+    return (
+      typeof block.type === "string" &&
+      BUSINESS_BLOCK_TYPE_SET.has(block.type) &&
+      !!block.payload &&
+      typeof block.payload === "object"
+    );
+  });
+}
 
 export default function ItemDetailPage() {
   const { t } = useTranslation();
@@ -56,6 +71,7 @@ export default function ItemDetailPage() {
     if (saveState === "error") return t("pages.item.saveError");
     return null;
   }, [saveState, t]);
+  const isBusinessItem = useMemo(() => isBusinessBlocksPayload(item?.blocks), [item?.blocks]);
 
   const scheduleSave = useCallback(
     (blocks: ProseMirrorNode[]) => {
@@ -194,7 +210,18 @@ export default function ItemDetailPage() {
           </View>
 
           <View className="flex-1 min-h-0 bg-background px-2 py-2">
-            <BlockEditor value={item.blocks} onChange={scheduleSave} editable />
+            {isBusinessItem ? (
+              <ScrollView className="flex-1 rounded border border-border bg-muted/20 p-3">
+                <Text className="text-sm text-muted-foreground">
+                  This item now uses Moment business blocks. Edit it from Moment {">"} Contenu.
+                </Text>
+                <Text className="mt-3 text-xs text-foreground">
+                  {JSON.stringify(item.blocks, null, 2)}
+                </Text>
+              </ScrollView>
+            ) : (
+              <BlockEditor value={item.blocks} onChange={scheduleSave} editable enableAI />
+            )}
           </View>
         </View>
       </Pressable>

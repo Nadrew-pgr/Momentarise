@@ -22,21 +22,6 @@ LinkRelationType = Literal[
     "part_of_sequence",
 ]
 
-
-class ProseMirrorNode(BaseModel):
-    """Minimal validation for ProseMirror/BlockNote block nodes."""
-
-    type: str
-    block_id: str | None = None
-    content: list["ProseMirrorNode"] | None = None
-    attrs: dict[str, Any] | None = None
-    text: str | None = None
-    marks: list[dict[str, Any]] | None = None
-
-
-ProseMirrorNode.model_rebuild()
-
-
 class ItemOut(BaseModel):
     id: uuid.UUID
     title: str
@@ -47,7 +32,8 @@ class ItemOut(BaseModel):
         serialization_alias="metadata",
     )
     source_capture_id: uuid.UUID | None = None
-    blocks: list[ProseMirrorNode]
+    # Keep BlockNote payload as-is so formatting metadata is preserved.
+    blocks: list[dict[str, Any]]
     created_at: datetime
     updated_at: datetime
 
@@ -60,11 +46,11 @@ class ItemCreateRequest(BaseModel):
     status: LifecycleStatus = "draft"
     metadata: dict[str, Any] = Field(default_factory=dict)
     source_capture_id: uuid.UUID | None = None
-    blocks: list[ProseMirrorNode] = Field(default_factory=list)
+    blocks: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class UpdateItemRequest(BaseModel):
-    blocks: list[ProseMirrorNode] | None = None
+    blocks: list[dict[str, Any]] | None = None
     title: str | None = None
     kind: ItemKind | None = None
     status: LifecycleStatus | None = None

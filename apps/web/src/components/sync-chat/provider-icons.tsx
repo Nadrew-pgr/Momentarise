@@ -11,20 +11,20 @@ interface IconProps {
     className?: string;
 }
 
-/** Mistral AI — official "Le Chat" M-shape mark */
+/** Mistral AI — compact "M" logomark for small sizes */
 export function MistralIcon({ size = 16, className }: IconProps) {
-    return (
-        <svg
-            width={size}
-            height={size}
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className={className}
-            aria-label="Mistral"
-        >
-            <path d="M3.209 0v4.364h4.364V0Zm13.218 0v4.364H24V0ZM3.209 4.364V8.73h4.364V4.364Zm4.364 0V8.73h4.363V4.364Zm4.363 0V8.73h4.364V4.364Zm4.364 0V8.73H24V4.364ZM0 8.727v4.364h4.364V8.727Zm7.573 0v4.364h4.363V8.727Zm4.363 0v4.364h4.364V8.727ZM24 8.727v-4.02h-4.364v4.384H24ZM0 13.091v4.364h4.364v-4.364Zm7.573 0v4.364h4.363v-4.364Zm4.363 0v4.364h4.364v-4.364ZM0 17.455v4.364h4.364v-4.364Zm7.573 0v4.364h4.363v-4.364Zm8.854 0v4.364h4.364v-4.364zM3.209 21.818V24h4.364v-2.182Zm13.218 0V24H24v-2.182Z" />
-        </svg>
-    );
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-label="Mistral"
+    >
+      <path d="M17.143 3.429v3.428h-3.429v3.429h-3.428V6.857H6.857V3.43H3.43v13.714H0v3.428h10.286v-3.428H6.857v-3.429h3.429v3.429h3.429v-3.429h3.428v3.429h-3.428v3.428H24v-3.428h-3.43V3.429z" />
+    </svg>
+  );
 }
 
 /** Anthropic — official "A" lettermark (Simple Icons) */

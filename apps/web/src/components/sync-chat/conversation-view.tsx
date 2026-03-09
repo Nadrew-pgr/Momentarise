@@ -16,17 +16,30 @@ import type {
   SyncSourcesEntry,
   SyncTaskEntry,
 } from "./types";
-import type { SyncPreview } from "@momentarise/shared";
 
 interface PreviewLabels {
   title: string;
   planTitle?: string;
+  titleFallback?: string;
+  entityEvent: string;
+  entityItem: string;
+  entityCapture: string;
+  entityTimeline: string;
+  entityUnknown: string;
   summary: string;
   mutations: string;
   notes: string;
   apply: string;
   undo: string;
+  applied?: string;
   pending: string;
+  applying: string;
+  schedule: string;
+  linkedProject: string;
+  linkedSeries: string;
+  targetEvent: string;
+  targetItem: string;
+  descriptionPrefix: string;
 }
 
 interface ConversationViewProps {
@@ -40,28 +53,21 @@ interface ConversationViewProps {
   sourceEntries: SyncSourcesEntry[];
   taskEntries: SyncTaskEntry[];
   queueEntries: SyncQueueEntry[];
-  latestPreview: SyncPreview | null;
-  canApply: boolean;
-  canUndo: boolean;
+  isHydratingHistory: boolean;
+  applyEnabled: boolean;
+  appliedPreviewIds: string[];
   isApplying: boolean;
   isUndoing: boolean;
-  onApply: () => void;
+  onApplyPreview: (previewId: string) => void;
   onUndo: () => void;
   previewLabels: PreviewLabels;
   assistantLabel: string;
-  userLabel: string;
-  toolLabel: string;
-  systemLabel: string;
-  emptyTitle: string;
   emptySubtitle: string;
   errorTitle: string;
   warningTitle: string;
-  pendingLabel: string;
-  failedLabel: string;
   retryLabel: string;
   logAriaLabel: string;
-  activityTitle: string;
-  queueLabel: string;
+  historyLoadingLabel: string;
   onRetry: () => void;
 }
 
@@ -109,36 +115,31 @@ export function ConversationView({
   sourceEntries,
   taskEntries,
   queueEntries,
-  latestPreview,
-  canApply,
-  canUndo,
+  isHydratingHistory,
+  applyEnabled,
+  appliedPreviewIds,
   isApplying,
   isUndoing,
-  onApply,
+  onApplyPreview,
   onUndo,
   previewLabels,
   assistantLabel,
-  userLabel,
-  toolLabel,
-  systemLabel,
-  emptyTitle,
   emptySubtitle,
   errorTitle,
   warningTitle,
-  pendingLabel,
-  failedLabel,
   retryLabel,
   logAriaLabel,
-  activityTitle,
-  queueLabel,
+  historyLoadingLabel,
   onRetry,
 }: ConversationViewProps) {
   const displayMessages = mergeMessages(messages, pendingMessages, streamingBuffer, isStreaming);
   const displayNotices = notices.slice(0, 3);
+  const appliedPreviewIdSet = new Set(appliedPreviewIds);
   const currentReasoning = latestReasoning(reasoningEntries);
   const currentSources = latestSources(sourceEntries);
   const showTypingIndicator = isStreaming && !streamingBuffer.trim();
   const hasConversation =
+    isHydratingHistory ||
     displayMessages.length > 0 ||
     showTypingIndicator ||
     Boolean(error) ||
@@ -147,9 +148,9 @@ export function ConversationView({
     queueEntries.length > 0;
 
   return (
-    <div className="sync-chat-scroll-area absolute inset-0 overflow-hidden px-6 pb-56 pt-6">
+    <div className="sync-chat-scroll-area h-full w-full overflow-hidden">
       <Conversation aria-label={logAriaLabel} className="h-full">
-        <ConversationContent className="mx-auto flex min-h-full w-full max-w-4xl gap-4 px-0 pb-16">
+        <ConversationContent className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-4 px-4 pb-[150px]">
           {!hasConversation ? (
             <div className="flex h-full flex-1 flex-col items-center justify-center text-center">
               <AnimatedOrb size={124} className="mb-4 sync-chat-orb-intro" />
@@ -177,6 +178,12 @@ export function ConversationView({
                 </Sources>
               ) : null}
 
+              {isHydratingHistory ? (
+                <div className="w-full rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-sm text-muted-foreground">
+                  {historyLoadingLabel}
+                </div>
+              ) : null}
+
               {currentReasoning && currentReasoning.content ? (
                 <Reasoning duration={currentReasoning.durationMs ? Math.ceil(currentReasoning.durationMs / 1000) : undefined}>
                   <ReasoningTrigger />
@@ -186,32 +193,57 @@ export function ConversationView({
 
               {displayMessages.map((message) => {
                 const from = message.role === "user" ? "user" : "assistant";
+                const messagePreviews = message.planPreviews ?? [];
+                const messageContextLinks = message.contextLinks ?? [];
 
                 return (
-                  <Message from={from} key={`${message.id}-${message.seq}`}>
-                    <div className="space-y-1">
-                      <MessageContent>
-                        <MessageResponse>{message.content || " "}</MessageResponse>
-                      </MessageContent>
-                    </div>
-                  </Message>
+                  <div className="space-y-2" key={`${message.id}-${message.seq}`}>
+                    {from === "user" && messageContextLinks.length > 0 ? (
+                      <div className="flex w-full justify-end">
+                        <div className="flex max-w-[75%] flex-wrap justify-end gap-1.5">
+                          {messageContextLinks.map((link) => (
+                            <a
+                              key={`${message.id}-context-${link.kind}-${link.id}`}
+                              href={link.internalPath}
+                              className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/50 px-2.5 py-1 text-[11px] text-foreground/85 transition-colors hover:bg-muted"
+                            >
+                              <span className="rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                {link.kind}
+                              </span>
+                              <span className="max-w-[180px] truncate">@{link.label}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    <Message from={from} className={from === "user" ? "max-w-[75%]" : "max-w-full"}>
+                      <div className="space-y-1">
+                        <MessageContent>
+                          <MessageResponse>{message.content || " "}</MessageResponse>
+                        </MessageContent>
+                      </div>
+                    </Message>
+                    {messagePreviews.map((preview) => {
+                      const isAppliedPreview = appliedPreviewIdSet.has(preview.id);
+                      const canApplyPreview = applyEnabled && !isApplying && !isAppliedPreview;
+                      return (
+                        <PreviewPlanCard
+                          key={`preview-${preview.id}`}
+                          preview={preview}
+                          canApply={canApplyPreview}
+                          canUndo={false}
+                          isApplying={isApplying}
+                          isUndoing={isUndoing}
+                          isApplied={isAppliedPreview}
+                          onApply={() => onApplyPreview(preview.id)}
+                          onUndo={onUndo}
+                          labels={previewLabels}
+                        />
+                      );
+                    })}
+                  </div>
                 );
               })}
-
-              {latestPreview ? (
-                <div className="w-full px-0">
-                  <PreviewPlanCard
-                    preview={latestPreview}
-                    canApply={canApply}
-                    canUndo={canUndo}
-                    isApplying={isApplying}
-                    isUndoing={isUndoing}
-                    onApply={onApply}
-                    onUndo={onUndo}
-                    labels={previewLabels}
-                  />
-                </div>
-              ) : null}
 
               {showTypingIndicator ? <TypingIndicator assistantLabel={assistantLabel} /> : null}
 

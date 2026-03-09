@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 const isoDatetimeSchema = z.string().datetime({ offset: true });
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const syncRunModeSchema = z.enum(["free", "guided"]);
 export const syncPromptModeSchema = z.enum(["full", "minimal", "none"]);
@@ -149,7 +150,38 @@ export const syncApplySchema = z.object({
   change_id: z.string().uuid(),
   applied_at: isoDatetimeSchema,
   undoable: z.boolean(),
+  entity_type: z.string(),
+  entity_id: z.string().uuid(),
+  open_target_kind: z.enum(["item", "event", "timeline"]),
+  open_target_id: z.string().uuid().nullable(),
+  open_target_date: isoDateSchema.nullable(),
 });
+
+export const syncAppliedEventPayloadSchema = z
+  .object({
+    run_id: z.string().uuid(),
+    preview_id: z.string().uuid(),
+    change_id: z.string().uuid(),
+    applied_at: isoDatetimeSchema,
+    undoable: z.boolean(),
+    entity_type: z.string().optional(),
+    entity_id: z.string().uuid().nullable().optional(),
+    open_target_kind: z.enum(["item", "event", "timeline"]).optional(),
+    open_target_id: z.string().uuid().nullable().optional(),
+    open_target_date: isoDateSchema.nullable().optional(),
+  })
+  .transform((payload) => ({
+    run_id: payload.run_id,
+    preview_id: payload.preview_id,
+    change_id: payload.change_id,
+    applied_at: payload.applied_at,
+    undoable: payload.undoable,
+    entity_type: payload.entity_type ?? "unknown",
+    entity_id: payload.entity_id ?? null,
+    open_target_kind: payload.open_target_kind ?? "timeline",
+    open_target_id: payload.open_target_id ?? null,
+    open_target_date: payload.open_target_date ?? null,
+  }));
 
 export const syncUndoSchema = z.object({
   run_id: z.string().uuid(),
@@ -157,6 +189,41 @@ export const syncUndoSchema = z.object({
   undone: z.boolean(),
   undone_at: isoDatetimeSchema,
 });
+
+export const syncUndoneSchema = z.object({
+  run_id: z.string().uuid(),
+  source_change_id: z.string().uuid(),
+  undo_change_id: z.string().uuid().nullable(),
+  undone_at: isoDatetimeSchema,
+  open_target_kind: z.enum(["item", "event", "timeline"]),
+  open_target_id: z.string().uuid().nullable(),
+  open_target_date: isoDateSchema.nullable(),
+});
+
+export const syncUndoneEventPayloadSchema = z
+  .union([
+    syncUndoneSchema,
+    z.object({
+      run_id: z.string().uuid(),
+      change_id: z.string().uuid(),
+      undone: z.boolean(),
+      undone_at: isoDatetimeSchema,
+    }),
+  ])
+  .transform((payload) => {
+    if ("source_change_id" in payload) {
+      return payload;
+    }
+    return {
+      run_id: payload.run_id,
+      source_change_id: payload.change_id,
+      undo_change_id: null,
+      undone_at: payload.undone_at,
+      open_target_kind: "timeline" as const,
+      open_target_id: null,
+      open_target_date: null,
+    };
+  });
 
 export const syncChangeSchema = z.object({
   id: z.string().uuid(),
@@ -182,6 +249,10 @@ export const syncCreateRunRequestSchema = z.object({
   context_json: jsonObjectSchema.default({}),
 });
 
+export const syncPatchRunRequestSchema = z.object({
+  title: z.string().trim().min(1).max(180).nullable().optional(),
+});
+
 export const syncAnswerRequestSchema = z.object({
   answer: z.string().min(1),
   question_id: z.string().uuid().optional(),
@@ -197,9 +268,35 @@ export const syncUndoRequestSchema = z.object({
   idempotency_key: z.string().min(1).max(128).optional(),
 });
 
+export const syncAttachmentSourceSchema = z.enum(["upload", "inbox"]);
+
+export const syncAttachmentSchema = z.object({
+  capture_id: z.string().uuid(),
+  source: syncAttachmentSourceSchema,
+});
+
+export const syncReferenceKindSchema = z.enum(["capture", "item"]);
+
+export const syncReferenceSchema = z.object({
+  kind: syncReferenceKindSchema,
+  id: z.string().uuid(),
+  label: z.string().trim().min(1).max(180).optional(),
+});
+
 export const syncStreamRequestSchema = z.object({
   message: z.string().default(""),
   from_seq: z.number().int().nonnegative().optional(),
+  attachments: z.array(syncAttachmentSchema).max(5).optional().default([]),
+  references: z.array(syncReferenceSchema).max(5).optional().default([]),
+}).superRefine((value, ctx) => {
+  const total = value.attachments.length + value.references.length;
+  if (total > 5) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "A maximum of 5 attachments/references is allowed",
+      path: ["attachments"],
+    });
+  }
 });
 
 export const syncUsageEventPayloadSchema = z.object({
@@ -276,7 +373,8 @@ export const syncEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("question"), payload: syncQuestionSchema }),
   z.object({ type: z.literal("draft"), payload: syncDraftSchema }),
   z.object({ type: z.literal("preview"), payload: syncPreviewSchema }),
-  z.object({ type: z.literal("applied"), payload: syncApplySchema }),
+  z.object({ type: z.literal("applied"), payload: syncAppliedEventPayloadSchema }),
+  z.object({ type: z.literal("undone"), payload: syncUndoneEventPayloadSchema }),
   z.object({ type: z.literal("usage"), payload: syncUsageEventPayloadSchema }),
   z.object({ type: z.literal("warning"), payload: syncWarningEventPayloadSchema }),
   z.object({ type: z.literal("error"), payload: syncErrorEventPayloadSchema }),
@@ -419,6 +517,20 @@ export const syncChangesResponseSchema = z.object({
   changes: z.array(syncChangeSchema),
 });
 
+export const syncContextSearchResultSchema = z.object({
+  kind: syncReferenceKindSchema,
+  id: z.string().uuid(),
+  label: z.string(),
+  subtitle: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  capture_type: z.string().nullable().optional(),
+  updated_at: isoDatetimeSchema,
+});
+
+export const syncContextSearchResponseSchema = z.object({
+  results: z.array(syncContextSearchResultSchema),
+});
+
 export const syncAgentsResponseSchema = z.object({
   agents: z.array(syncAgentSchema),
 });
@@ -427,14 +539,22 @@ export const syncAutomationsResponseSchema = z.object({
   automations: z.array(syncAutomationSchema),
 });
 
+export type SyncRunMode = z.infer<typeof syncRunModeSchema>;
 export type SyncRun = z.infer<typeof syncRunSchema>;
 export type SyncRunSummary = z.infer<typeof syncRunSummarySchema>;
 export type SyncMessage = z.infer<typeof syncMessageSchema>;
+export type SyncAttachmentSource = z.infer<typeof syncAttachmentSourceSchema>;
+export type SyncAttachment = z.infer<typeof syncAttachmentSchema>;
+export type SyncReferenceKind = z.infer<typeof syncReferenceKindSchema>;
+export type SyncReference = z.infer<typeof syncReferenceSchema>;
 export type SyncQuestion = z.infer<typeof syncQuestionSchema>;
 export type SyncDraft = z.infer<typeof syncDraftSchema>;
 export type SyncPreview = z.infer<typeof syncPreviewSchema>;
 export type SyncApply = z.infer<typeof syncApplySchema>;
+export type SyncAppliedEventPayload = z.infer<typeof syncAppliedEventPayloadSchema>;
 export type SyncUndo = z.infer<typeof syncUndoSchema>;
+export type SyncUndone = z.infer<typeof syncUndoneSchema>;
+export type SyncUndoneEventPayload = z.infer<typeof syncUndoneEventPayloadSchema>;
 export type SyncChange = z.infer<typeof syncChangeSchema>;
 export type SyncModel = z.infer<typeof syncModelSchema>;
 export type SyncModelCapabilities = z.infer<typeof syncModelCapabilitiesSchema>;
@@ -447,6 +567,7 @@ export type SyncQueueEventPayload = z.infer<typeof syncQueuePayloadSchema>;
 export type SyncResumeMessage = z.infer<typeof syncResumeMessageSchema>;
 export type SyncWsTokenResponse = z.infer<typeof syncWsTokenResponseSchema>;
 export type SyncCreateRunRequest = z.input<typeof syncCreateRunRequestSchema>;
+export type SyncPatchRunRequest = z.input<typeof syncPatchRunRequestSchema>;
 export type SyncAnswerRequest = z.input<typeof syncAnswerRequestSchema>;
 export type SyncApplyRequest = z.input<typeof syncApplyRequestSchema>;
 export type SyncUndoRequest = z.input<typeof syncUndoRequestSchema>;
@@ -459,3 +580,5 @@ export type SyncCreateAutomationRequest = z.input<typeof syncCreateAutomationReq
 export type SyncPatchAutomationRequest = z.input<typeof syncPatchAutomationRequestSchema>;
 export type SyncRunListResponse = z.infer<typeof syncRunListResponseSchema>;
 export type SyncEventsResponse = z.infer<typeof syncEventsResponseSchema>;
+export type SyncContextSearchResult = z.infer<typeof syncContextSearchResultSchema>;
+export type SyncContextSearchResponse = z.infer<typeof syncContextSearchResponseSchema>;

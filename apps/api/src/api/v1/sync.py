@@ -4,9 +4,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
@@ -17,6 +17,8 @@ from src.models.agent_profile import AgentProfile, AgentProfileVersion
 from src.models.ai_message import AIMessage
 from src.models.ai_run import AIRun
 from src.models.automation_spec import AutomationSpec
+from src.models.inbox_capture import InboxCapture
+from src.models.item import Item
 from src.models.user import User
 from src.models.workspace import WorkspaceMember
 from src.schemas.sync import (
@@ -24,6 +26,8 @@ from src.schemas.sync import (
     SyncAgentOut,
     SyncApplyOut,
     SyncApplyRequest,
+    SyncContextSearchResponse,
+    SyncContextSearchResult,
     SyncAutomationOut,
     SyncAutomationsResponse,
     SyncChangesResponse,
@@ -35,6 +39,7 @@ from src.schemas.sync import (
     SyncModelListResponse,
     SyncPatchAgentRequest,
     SyncPatchAutomationRequest,
+    SyncPatchRunRequest,
     SyncPublishAgentVersionResponse,
     SyncRunListResponse,
     SyncRunSummaryOut,
@@ -93,6 +98,37 @@ def _extract_message_preview(content_json: dict[str, Any] | None) -> str:
     return f"{compact[:177]}..."
 
 
+def _capture_title(capture: InboxCapture) -> str:
+    meta = capture.meta if isinstance(capture.meta, dict) else {}
+    for key in ("manual_title", "ai_title", "title"):
+        value = meta.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    compact = " ".join((capture.raw_content or "").split())
+    if compact:
+        return compact[:80]
+    return f"Capture {str(capture.id)[:8]}"
+
+
+def _inbox_search_score(*, query: str, label: str, subtitle: str, raw: str) -> int:
+    if not query:
+        return 1
+    lowered_query = query.lower()
+    lowered_label = label.lower()
+    lowered_subtitle = subtitle.lower()
+    lowered_raw = raw.lower()
+    score = 0
+    if lowered_label.startswith(lowered_query):
+        score += 6
+    if lowered_query in lowered_label:
+        score += 4
+    if lowered_query in lowered_subtitle:
+        score += 2
+    if lowered_query in lowered_raw:
+        score += 1
+    return score
+
+
 @router.get("/models", response_model=SyncModelListResponse)
 async def get_models() -> SyncModelListResponse:
     return SyncModelListResponse(models=SyncOrchestrator.available_models())
@@ -137,6 +173,36 @@ async def get_run(
     except SyncNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return SyncRunResponse(run=SyncRunOut.model_validate(run))
+
+
+@router.patch("/runs/{run_id}", response_model=SyncRunResponse)
+async def patch_run(
+    run_id: uuid.UUID,
+    body: SyncPatchRunRequest,
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> SyncRunResponse:
+    run = await _get_run_or_404(db, workspace_id=workspace.workspace_id, run_id=run_id)
+
+    if body.title is not None:
+        normalized_title = body.title.strip()
+        run.title = normalized_title if normalized_title else None
+
+    await db.commit()
+    await db.refresh(run)
+    return SyncRunResponse(run=SyncRunOut.model_validate(run))
+
+
+@router.delete("/runs/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_run(
+    run_id: uuid.UUID,
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    run = await _get_run_or_404(db, workspace_id=workspace.workspace_id, run_id=run_id)
+    run.deleted_at = datetime.now(UTC)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/runs", response_model=SyncRunListResponse)
@@ -221,6 +287,107 @@ async def list_runs(
     return SyncRunListResponse(runs=summaries, next_cursor=next_cursor)
 
 
+@router.get("/references/search", response_model=SyncContextSearchResponse)
+async def search_references(
+    query: str = Query(default="", max_length=180),
+    limit: int = Query(default=10, ge=1, le=20),
+    workspace: WorkspaceMember = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> SyncContextSearchResponse:
+    normalized_query = query.strip()
+    scan_limit = min(80, max(limit * 4, 20))
+
+    capture_filters: list[Any] = [
+        InboxCapture.workspace_id == workspace.workspace_id,
+        InboxCapture.deleted_at.is_(None),
+    ]
+    item_filters: list[Any] = [
+        Item.workspace_id == workspace.workspace_id,
+        Item.deleted_at.is_(None),
+    ]
+    if normalized_query:
+        pattern = f"%{normalized_query}%"
+        capture_filters.append(
+            or_(
+                InboxCapture.raw_content.ilike(pattern),
+                InboxCapture.source.ilike(pattern),
+            )
+        )
+        item_filters.append(Item.title.ilike(pattern))
+
+    captures_result = await db.execute(
+        select(InboxCapture)
+        .where(*capture_filters)
+        .order_by(InboxCapture.updated_at.desc())
+        .limit(scan_limit)
+    )
+    items_result = await db.execute(
+        select(Item)
+        .where(*item_filters)
+        .order_by(Item.updated_at.desc())
+        .limit(scan_limit)
+    )
+
+    scored: list[tuple[int, datetime, SyncContextSearchResult]] = []
+
+    for capture in captures_result.scalars().all():
+        label = _capture_title(capture)
+        subtitle = f"{capture.capture_type} · {capture.status}"
+        score = _inbox_search_score(
+            query=normalized_query,
+            label=label,
+            subtitle=subtitle,
+            raw=capture.raw_content or "",
+        )
+        if normalized_query and score <= 0:
+            continue
+        scored.append(
+            (
+                score,
+                capture.updated_at,
+                SyncContextSearchResult(
+                    kind="capture",
+                    id=capture.id,
+                    label=label,
+                    subtitle=subtitle,
+                    status=capture.status,
+                    capture_type=capture.capture_type,
+                    updated_at=capture.updated_at,
+                ),
+            )
+        )
+
+    for item in items_result.scalars().all():
+        label = item.title or f"Item {str(item.id)[:8]}"
+        subtitle = f"{item.kind} · {item.status}"
+        score = _inbox_search_score(
+            query=normalized_query,
+            label=label,
+            subtitle=subtitle,
+            raw=label,
+        )
+        if normalized_query and score <= 0:
+            continue
+        scored.append(
+            (
+                score,
+                item.updated_at,
+                SyncContextSearchResult(
+                    kind="item",
+                    id=item.id,
+                    label=label,
+                    subtitle=subtitle,
+                    status=item.status,
+                    capture_type=None,
+                    updated_at=item.updated_at,
+                ),
+            )
+        )
+
+    scored.sort(key=lambda entry: (entry[0], entry[1]), reverse=True)
+    return SyncContextSearchResponse(results=[entry[2] for entry in scored[:limit]])
+
+
 @router.get("/runs/{run_id}/events", response_model=SyncEventsResponse)
 async def list_run_events(
     run_id: uuid.UUID,
@@ -269,6 +436,8 @@ async def stream_run(
             run=run,
             message=body.message,
             from_seq=effective_from_seq,
+            attachments=body.attachments,
+            references=body.references,
         ):
             payload = event.model_dump(mode="json")
             yield f"data: {json.dumps(payload, ensure_ascii=True)}\n\n"
@@ -450,15 +619,23 @@ async def run_ws(
                 continue
 
             if data.get("type") == "message":
-                message = str(data.get("message") or "")
-                from_seq = data.get("from_seq")
-                if from_seq is not None:
-                    try:
-                        from_seq = int(from_seq)
-                    except (TypeError, ValueError):
-                        from_seq = None
+                try:
+                    stream_body = SyncStreamRequest.model_validate(
+                        {
+                            "message": data.get("message"),
+                            "from_seq": data.get("from_seq"),
+                            "attachments": data.get("attachments"),
+                            "references": data.get("references"),
+                        }
+                    )
+                except Exception:
+                    continue
                 async for event in orchestrator.stream_run_iter(
-                    run=run, message=message, from_seq=from_seq
+                    run=run,
+                    message=stream_body.message,
+                    from_seq=stream_body.from_seq,
+                    attachments=stream_body.attachments,
+                    references=stream_body.references,
                 ):
                     await websocket.send_json(event.model_dump(mode="json"))
                 continue

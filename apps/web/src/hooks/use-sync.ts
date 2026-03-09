@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import type {
   SyncAgent,
   SyncApply,
@@ -9,8 +10,10 @@ import type {
   SyncCreateAgentRequest,
   SyncCreateAutomationRequest,
   SyncCreateRunRequest,
+  SyncContextSearchResult,
   SyncEventEnvelope,
   SyncModel,
+  SyncPatchRunRequest,
   SyncPatchAgentRequest,
   SyncPatchAutomationRequest,
   SyncRun,
@@ -28,20 +31,81 @@ import {
   syncCreateAgentRequestSchema,
   syncCreateAutomationRequestSchema,
   syncCreateRunRequestSchema,
+  syncContextSearchResponseSchema,
   syncEventEnvelopeSchema,
   syncModelsResponseSchema,
   syncPatchAgentRequestSchema,
   syncPatchAutomationRequestSchema,
+  syncPatchRunRequestSchema,
   syncPublishAgentVersionResponseSchema,
   syncRunListResponseSchema,
   syncRunsResponseSchema,
-  syncEventsResponseSchema,
   syncStreamRequestSchema,
   syncUndoRequestSchema,
   syncUndoSchema,
   syncValidateAutomationResponseSchema,
 } from "@momentarise/shared";
 import { fetchWithAuth } from "@/lib/bff-client";
+
+function parseSyncEventEnvelopeSafe(
+  raw: unknown,
+  context: string
+): SyncEventEnvelope | null {
+  const parsed = syncEventEnvelopeSchema.safeParse(raw);
+  if (parsed.success) return parsed.data as SyncEventEnvelope;
+  console.warn("[sync] dropped invalid event", context, parsed.error.issues);
+  return null;
+}
+
+function parseSyncEventsResponseResilient(
+  data: unknown,
+  runId: string | null
+): SyncEventEnvelope[] {
+  if (!data || typeof data !== "object") {
+    throw new Error("Invalid sync events response");
+  }
+  const raw = data as {
+    events?: unknown;
+    run_id?: unknown;
+    last_seq?: unknown;
+  };
+  if (!Array.isArray(raw.events)) {
+    throw new Error("Invalid sync events payload");
+  }
+
+  const parsedEvents: SyncEventEnvelope[] = [];
+  let droppedCount = 0;
+
+  for (let idx = 0; idx < raw.events.length; idx += 1) {
+    const parsed = parseSyncEventEnvelopeSafe(
+      raw.events[idx],
+      `runs/${runId ?? "unknown"}/events#${idx}`
+    );
+    if (parsed) parsedEvents.push(parsed);
+    else droppedCount += 1;
+  }
+
+  if (droppedCount > 0) {
+    const runIdCandidate = typeof raw.run_id === "string" ? raw.run_id : runId;
+    const parsedRunId = z.string().uuid().safeParse(runIdCandidate);
+    if (parsedRunId.success) {
+      const maxSeq = parsedEvents.reduce((acc, event) => Math.max(acc, event.seq), 0);
+      parsedEvents.push({
+        seq: maxSeq + 1,
+        run_id: parsedRunId.data,
+        ts: new Date().toISOString(),
+        trace_id: null,
+        type: "warning",
+        payload: {
+          code: "legacy_event_ignored",
+          message: `${droppedCount} event(s) ignoré(s) pour compatibilité historique.`,
+        },
+      } as SyncEventEnvelope);
+    }
+  }
+
+  return parsedEvents;
+}
 
 async function buildSyncHttpError(res: Response, fallback: string): Promise<Error> {
   let detail = "";
@@ -97,7 +161,8 @@ export async function readSyncEventStream(
     const trimmed = line.trim();
     if (!trimmed) return;
     const payload = JSON.parse(trimmed);
-    const parsed = syncEventEnvelopeSchema.parse(payload) as SyncEventEnvelope;
+    const parsed = parseSyncEventEnvelopeSafe(payload, "stream");
+    if (!parsed) return;
     onEvent(parsed);
   };
 
@@ -201,6 +266,52 @@ export function useSyncRun(runId: string | null) {
   });
 }
 
+export function usePatchSyncRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      runId,
+      payload,
+    }: {
+      runId: string;
+      payload: SyncPatchRunRequest;
+    }) => {
+      const body = syncPatchRunRequestSchema.parse(payload);
+      const res = await fetchWithAuth(`/api/sync/runs/${runId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to patch sync run");
+      const data = await res.json();
+      const parsed = syncRunsResponseSchema.parse(data);
+      return parsed.run as SyncRun;
+    },
+    onSuccess: (run) => {
+      queryClient.setQueryData(["sync", "run", run.id], run);
+      queryClient.invalidateQueries({ queryKey: ["sync", "runs"] });
+    },
+  });
+}
+
+export function useDeleteSyncRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (runId: string) => {
+      const res = await fetchWithAuth(`/api/sync/runs/${runId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to delete sync run");
+    },
+    onSuccess: (_, runId) => {
+      queryClient.removeQueries({ queryKey: ["sync", "run", runId] });
+      queryClient.invalidateQueries({ queryKey: ["sync", "runs"] });
+      queryClient.invalidateQueries({ queryKey: ["sync", "changes"] });
+      queryClient.invalidateQueries({ queryKey: ["sync", "events", runId] });
+    },
+  });
+}
+
 export function useSyncRuns(limit = 50) {
   return useQuery<SyncRunSummary[]>({
     queryKey: ["sync", "runs", limit],
@@ -224,8 +335,25 @@ export function useSyncRunEvents(runId: string | null, fromSeq = 0) {
       const res = await fetchWithAuth(`/api/sync/runs/${runId}/events?${qs.toString()}`);
       if (!res.ok) throw await buildSyncHttpError(res, "Failed to fetch sync run events");
       const data = await res.json();
-      const parsed = syncEventsResponseSchema.parse(data);
-      return parsed.events as SyncEventEnvelope[];
+      return parseSyncEventsResponseResilient(data, runId);
+    },
+  });
+}
+
+export function useSyncContextSearch(query: string, limit = 10, enabled = true) {
+  return useQuery<SyncContextSearchResult[]>({
+    queryKey: ["sync", "context-search", query, limit],
+    enabled,
+    queryFn: async () => {
+      const qs = new URLSearchParams({
+        query,
+        limit: String(limit),
+      });
+      const res = await fetchWithAuth(`/api/sync/references/search?${qs.toString()}`);
+      if (!res.ok) throw await buildSyncHttpError(res, "Failed to search Sync context");
+      const data = await res.json();
+      const parsed = syncContextSearchResponseSchema.parse(data);
+      return parsed.results as SyncContextSearchResult[];
     },
   });
 }

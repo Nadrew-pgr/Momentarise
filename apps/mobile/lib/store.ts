@@ -52,6 +52,8 @@ export type DraftEvent = {
   parentEventId?: string | null;
   seriesId?: string | null;
   projectId?: string | null;
+  estimatedTimeSeconds?: number | null;
+  actualTimeAccSeconds?: number | null;
 };
 
 interface EventSheetState {
@@ -80,10 +82,14 @@ interface AppToastState {
   message: string;
   actionLabel: string | null;
   onAction: (() => void) | null;
+  secondaryActionLabel: string | null;
+  onSecondaryAction: (() => void) | null;
   show: (params: {
     message: string;
     actionLabel?: string;
     onAction?: () => void;
+    secondaryActionLabel?: string;
+    onSecondaryAction?: () => void;
   }) => void;
   hide: () => void;
 }
@@ -93,12 +99,16 @@ export const useAppToast = create<AppToastState>((set) => ({
   message: "",
   actionLabel: null,
   onAction: null,
-  show: ({ message, actionLabel, onAction }) =>
+  secondaryActionLabel: null,
+  onSecondaryAction: null,
+  show: ({ message, actionLabel, onAction, secondaryActionLabel, onSecondaryAction }) =>
     set({
       visible: true,
       message,
       actionLabel: actionLabel ?? null,
       onAction: onAction ?? null,
+      secondaryActionLabel: secondaryActionLabel ?? null,
+      onSecondaryAction: onSecondaryAction ?? null,
     }),
   hide: () =>
     set({
@@ -106,5 +116,7 @@ export const useAppToast = create<AppToastState>((set) => ({
       message: "",
       actionLabel: null,
       onAction: null,
+      secondaryActionLabel: null,
+      onSecondaryAction: null,
     }),
 }));

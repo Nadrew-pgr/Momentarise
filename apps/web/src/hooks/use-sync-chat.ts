@@ -10,6 +10,7 @@ import {
   useSyncStream,
   useUndoSyncRun,
 } from "@/hooks/use-sync";
+import { extractPlanPreviewsFromContentJson } from "@/lib/sync-plan-preview";
 import type {
   SyncChatMessage,
   SyncReasoningEntry,
@@ -59,6 +60,7 @@ export function useSyncChat(options: { fallbackErrorLabel?: string } = {}) {
   const [streamingAssistantBuffer, setStreamingAssistantBuffer] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [latestPreview, setLatestPreview] = useState<SyncPreview | null>(null);
+  const [appliedPreviewIds, setAppliedPreviewIds] = useState<string[]>([]);
   const [reasoningEntries, setReasoningEntries] = useState<SyncReasoningEntry[]>([]);
   const [sourcesEntries, setSourcesEntries] = useState<SyncSourcesEntry[]>([]);
   const [transportError, setTransportError] = useState<string | null>(null);
@@ -80,6 +82,7 @@ export function useSyncChat(options: { fallbackErrorLabel?: string } = {}) {
     setStreamingAssistantBuffer("");
     setIsStreaming(false);
     setLatestPreview(null);
+    setAppliedPreviewIds([]);
     setReasoningEntries([]);
     setSourcesEntries([]);
     setTransportError(null);
@@ -115,15 +118,21 @@ export function useSyncChat(options: { fallbackErrorLabel?: string } = {}) {
           break;
         case "message": {
           const payload = event.payload;
+          const planPreviews = extractPlanPreviewsFromContentJson(payload.content_json);
           const nextMessage: SyncChatMessage = {
             id: payload.id,
             seq: event.seq,
             role: payload.role,
             content: extractMessageContent(payload),
             createdAt: new Date(payload.created_at),
+            planPreviews: planPreviews.length > 0 ? planPreviews : undefined,
             delivery: "sent",
           };
           setMessages((prev) => upsertBySeq(prev, nextMessage));
+          if (planPreviews.length > 0) {
+            const latestFromMessage = planPreviews.slice().sort((a, b) => b.seq - a.seq)[0] ?? null;
+            if (latestFromMessage) setLatestPreview(latestFromMessage);
+          }
           if (payload.role === "user") {
             setPendingUserMessages((prev) =>
               prev.filter(
@@ -137,6 +146,13 @@ export function useSyncChat(options: { fallbackErrorLabel?: string } = {}) {
         }
         case "preview":
           setLatestPreview(event.payload);
+          break;
+        case "applied":
+          setAppliedPreviewIds((prev) => {
+            const nextId = event.payload.preview_id;
+            if (prev.includes(nextId)) return prev;
+            return [...prev, nextId];
+          });
           break;
         case "reasoning": {
           const payload = event.payload;
@@ -327,17 +343,27 @@ export function useSyncChat(options: { fallbackErrorLabel?: string } = {}) {
     () => changes.find((c) => c.undoable) ?? null,
     [changes]
   );
-  const canApply = Boolean(runId && latestPreview && !applyRun.isPending);
+  const appliedPreviewIdSet = useMemo(() => new Set(appliedPreviewIds), [appliedPreviewIds]);
+  const canApply = Boolean(
+    runId &&
+    latestPreview &&
+    !appliedPreviewIdSet.has(latestPreview.id) &&
+    !applyRun.isPending
+  );
   const canUndo = Boolean(runId && latestUndoableChange && !undoRun.isPending);
 
-  const handleApply = useCallback(async () => {
-    if (!runId || !latestPreview) return;
+  const handleApply = useCallback(async (previewId?: string) => {
+    const targetPreviewId = previewId ?? latestPreview?.id;
+    if (!runId || !targetPreviewId) return;
     setTransportError(null);
     try {
       await applyRun.mutateAsync({
         runId,
-        payload: { preview_id: latestPreview.id, idempotency_key: crypto.randomUUID() },
+        payload: { preview_id: targetPreviewId, idempotency_key: crypto.randomUUID() },
       });
+      setAppliedPreviewIds((prev) =>
+        prev.includes(targetPreviewId) ? prev : [...prev, targetPreviewId]
+      );
     } catch (error) {
       setTransportError(toErrorMessage(error, fallbackError));
     }
@@ -410,6 +436,7 @@ export function useSyncChat(options: { fallbackErrorLabel?: string } = {}) {
     messages: mergedMessages,
     isStreaming,
     latestPreview,
+    appliedPreviewIds,
     latestReasoning,
     latestSources,
     transportError,

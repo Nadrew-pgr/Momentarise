@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import type { ReactNode } from "react";
-import { Brain, Mic, Paperclip, Square, Sparkles } from "lucide-react";
+import { Brain, Mic, Paperclip, Square, Sparkles, Zap, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -19,6 +19,7 @@ import {
 import { AnimatedOrb } from "./animated-orb";
 import { AudioWaveform } from "./audio-waveform";
 import { ProviderIcon } from "./provider-icons";
+import type { SyncRunMode } from "./types";
 
 interface ComposerModel {
   id: string;
@@ -54,54 +55,77 @@ function TierBadge({ tier }: { tier?: string }) {
 
 interface ComposerProps {
   value: string;
-  onValueChange: (value: string) => void;
+  onValueChange: (value: string, selection: { start: number; end: number }) => void;
+  onSelectionChange?: (selection: { start: number; end: number }) => void;
+  onComposerKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean | void;
   onSend: () => void;
   onStop: () => void;
   onAttach?: () => void;
+  onAttachLocal?: () => void;
+  onAttachInbox?: () => void;
   onVoice?: () => void;
   isStreaming: boolean;
   disabled?: boolean;
+  canSend?: boolean;
   models: ComposerModel[];
   selectedModel: string;
   onModelChange: (modelId: string) => void;
+  runMode?: SyncRunMode;
+  onModeChange?: (mode: SyncRunMode) => void;
   placeholder: string;
   sendLabel: string;
   stopLabel: string;
   modelLabel: string;
   voiceSoonLabel: string;
   attachSoonLabel: string;
+  attachLocalLabel?: string;
+  attachInboxLabel?: string;
   enableVoice?: boolean;
   enableAttach?: boolean;
+  beforeComposer?: ReactNode;
   afterComposer?: ReactNode;
+  selectionOverride?: { key: number; start: number; end: number } | null;
 }
 
 export function Composer({
   value,
   onValueChange,
+  onSelectionChange,
+  onComposerKeyDown,
   onSend,
   onStop,
   onAttach,
+  onAttachLocal,
+  onAttachInbox,
   onVoice,
   isStreaming,
   disabled = false,
+  canSend: canSendOverride = true,
   models,
   selectedModel,
   onModelChange,
+  runMode = "free",
+  onModeChange,
   placeholder,
   sendLabel,
   stopLabel,
   modelLabel,
   voiceSoonLabel,
   attachSoonLabel,
+  attachLocalLabel = "Attach file",
+  attachInboxLabel = "Attach from inbox",
   enableVoice = false,
   enableAttach = false,
+  beforeComposer = null,
   afterComposer = null,
+  selectionOverride = null,
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const appliedSelectionKeyRef = useRef<number | null>(null);
 
   const canSend = useMemo(
-    () => value.trim().length > 0 && !disabled && !isStreaming,
-    [value, disabled, isStreaming]
+    () => value.trim().length > 0 && !disabled && !isStreaming && canSendOverride,
+    [value, disabled, isStreaming, canSendOverride]
   );
 
   useEffect(() => {
@@ -111,14 +135,25 @@ export function Composer({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 140)}px`;
   }, [value]);
 
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea || !selectionOverride) return;
+    if (appliedSelectionKeyRef.current === selectionOverride.key) return;
+    appliedSelectionKeyRef.current = selectionOverride.key;
+    textarea.focus();
+    textarea.setSelectionRange(selectionOverride.start, selectionOverride.end);
+  }, [selectionOverride]);
+
   const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      const handled = onComposerKeyDown?.(event);
+      if (handled || event.defaultPrevented) return;
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         if (canSend) onSend();
       }
     },
-    [canSend, onSend]
+    [canSend, onComposerKeyDown, onSend]
   );
 
   const currentModel = models.find((model) => model.id === selectedModel);
@@ -145,13 +180,25 @@ export function Composer({
   return (
     <div className="sync-chat-composer-wrap pointer-events-none absolute inset-x-0 bottom-3 z-10 px-4">
       <TooltipProvider delayDuration={150}>
+        {beforeComposer ? <div className="pointer-events-auto mx-auto mb-2 w-full max-w-3xl">{beforeComposer}</div> : null}
         <div className="pointer-events-auto mx-auto w-full max-w-3xl">
-          <div className="rounded-3xl border-0 bg-background/90 p-3 shadow-sm ring-1 ring-border/30">
+          <div className="sync-chat-composer-box rounded-3xl p-3">
             <div className="flex items-end gap-2">
               <textarea
                 ref={textareaRef}
                 value={value}
-                onChange={(event) => onValueChange(event.target.value)}
+                onChange={(event) =>
+                  onValueChange(event.target.value, {
+                    start: event.currentTarget.selectionStart ?? event.target.value.length,
+                    end: event.currentTarget.selectionEnd ?? event.target.value.length,
+                  })
+                }
+                onSelect={(event) => {
+                  onSelectionChange?.({
+                    start: event.currentTarget.selectionStart ?? value.length,
+                    end: event.currentTarget.selectionEnd ?? value.length,
+                  });
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
                 disabled={disabled || isStreaming}
@@ -205,24 +252,60 @@ export function Composer({
 
               {enableVoice ? <AudioWaveform isRecording={false} /> : null}
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
+              {enableAttach ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
                     <Button
                       type="button"
                       size="icon"
                       variant="outline"
                       className="h-9 w-9 rounded-full"
-                      onClick={onAttach}
-                      disabled={!enableAttach || disabled || isStreaming}
-                      aria-label={attachSoonLabel}
+                      disabled={disabled || isStreaming}
+                      aria-label={attachLocalLabel}
                     >
                       <Paperclip className="h-4 w-4" />
                     </Button>
-                  </span>
-                </TooltipTrigger>
-                {!enableAttach ? <TooltipContent>{attachSoonLabel}</TooltipContent> : null}
-              </Tooltip>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-52 rounded-xl p-1">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (onAttachLocal) onAttachLocal();
+                        else onAttach?.();
+                      }}
+                      className="rounded-lg px-3 py-2"
+                    >
+                      {attachLocalLabel}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (onAttachInbox) onAttachInbox();
+                      }}
+                      className="rounded-lg px-3 py-2"
+                    >
+                      {attachInboxLabel}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        className="h-9 w-9 rounded-full"
+                        onClick={onAttach}
+                        disabled
+                        aria-label={attachSoonLabel}
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{attachSoonLabel}</TooltipContent>
+                </Tooltip>
+              )}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -275,6 +358,43 @@ export function Composer({
                       ))}
                     </div>
                   ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-9 w-9 rounded-full"
+                    disabled={disabled || isStreaming}
+                    aria-label="Mode"
+                  >
+                    {runMode === "free" ? (
+                      <Zap className="h-4 w-4 text-blue-500" />
+                    ) : (
+                      <ClipboardList className="h-4 w-4 text-amber-500" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-56 rounded-xl p-1">
+                  <DropdownMenuItem
+                    onClick={() => onModeChange?.("free")}
+                    className={`rounded-lg px-3 py-2 ${runMode === "free" ? "bg-accent" : ""}`}
+                  >
+                    <Zap className="mr-2.5 h-4 w-4 text-blue-500" />
+                    <span className="flex-1 font-medium">Normal</span>
+                    <span className="text-[10px] text-muted-foreground">direct</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onModeChange?.("guided")}
+                    className={`rounded-lg px-3 py-2 ${runMode === "guided" ? "bg-accent" : ""}`}
+                  >
+                    <ClipboardList className="mr-2.5 h-4 w-4 text-amber-500" />
+                    <span className="flex-1 font-medium">Plan Mode</span>
+                    <span className="text-[10px] text-muted-foreground">guidé</span>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 

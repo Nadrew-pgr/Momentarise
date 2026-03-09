@@ -1,7 +1,9 @@
 import asyncio
 import json
+import logging
+import re
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from collections.abc import AsyncIterator
 
@@ -19,6 +21,7 @@ from src.models.ai_tool_call import AIToolCall
 from src.models.ai_usage_event import AIUsageEvent
 from src.models.agent_profile import AgentProfile
 from src.models.event import Event
+from src.models.inbox_capture import InboxCapture
 from src.models.item import Item
 from src.models.workspace import WorkspaceMember
 from src.schemas.sync import (
@@ -30,6 +33,7 @@ from src.schemas.sync import (
     SyncRunOut,
     SyncSourcesPayload,
     SyncTaskPayload,
+    SyncUndonePayload,
     SyncUndoOut,
 )
 from src.services.maps_provider import estimate_travel_minutes
@@ -45,6 +49,8 @@ from src.sync.sync_mutation_engine import (
 from src.sync.tool_executor import ToolExecutor
 from src.sync.tool_policy import ToolPolicyEngine
 from src.sync.tool_registry import get_default_tools
+
+logger = logging.getLogger(__name__)
 
 
 class SyncNotFoundError(Exception):
@@ -120,17 +126,79 @@ class SyncOrchestrator:
             .order_by(AIEvent.seq.asc())
         )
         rows = list(result.scalars().all())
-        return [
-            SyncEventEnvelope(
-                seq=row.seq,
-                run_id=run.id,
-                ts=row.created_at,
-                trace_id=None,
-                type=row.type,  # type: ignore[arg-type]
-                payload=row.payload_json,
+        change_ids: set[uuid.UUID] = set()
+        source_change_ids: set[uuid.UUID] = set()
+
+        for row in rows:
+            payload = row.payload_json if isinstance(row.payload_json, dict) else {}
+            if row.type == "applied":
+                change_id = self._parse_optional_uuid(payload.get("change_id"))
+                if change_id is not None:
+                    change_ids.add(change_id)
+            elif row.type == "undone":
+                source_change_id = self._parse_optional_uuid(
+                    payload.get("source_change_id") or payload.get("change_id")
+                )
+                if source_change_id is not None:
+                    source_change_ids.add(source_change_id)
+                    change_ids.add(source_change_id)
+                undo_change_id = self._parse_optional_uuid(payload.get("undo_change_id"))
+                if undo_change_id is not None:
+                    change_ids.add(undo_change_id)
+
+        changes_by_id: dict[uuid.UUID, AIChange] = {}
+        if change_ids:
+            changes_result = await self.db.execute(
+                select(AIChange).where(
+                    AIChange.workspace_id == self.workspace_id,
+                    AIChange.run_id == run.id,
+                    AIChange.id.in_(list(change_ids)),
+                    AIChange.deleted_at.is_(None),
+                )
             )
-            for row in rows
-        ]
+            changes_by_id = {change.id: change for change in changes_result.scalars().all()}
+
+        undo_by_source_change_id: dict[uuid.UUID, AIChange] = {}
+        if source_change_ids:
+            undo_changes_result = await self.db.execute(
+                select(AIChange).where(
+                    AIChange.workspace_id == self.workspace_id,
+                    AIChange.run_id == run.id,
+                    AIChange.reason.like("sync_undo:%"),
+                    AIChange.deleted_at.is_(None),
+                )
+            )
+            for undo_change in undo_changes_result.scalars().all():
+                source_change_id = self._parse_source_change_id_from_undo_reason(undo_change.reason)
+                if source_change_id is None or source_change_id not in source_change_ids:
+                    continue
+                previous = undo_by_source_change_id.get(source_change_id)
+                if previous is None or previous.created_at < undo_change.created_at:
+                    undo_by_source_change_id[source_change_id] = undo_change
+
+        envelopes: list[SyncEventEnvelope] = []
+        for row in rows:
+            payload = row.payload_json if isinstance(row.payload_json, dict) else {}
+            normalized_payload = await self._normalize_replay_event_payload(
+                run=run,
+                event_type=row.type,
+                event_ts=row.created_at,
+                payload=payload,
+                changes_by_id=changes_by_id,
+                undo_by_source_change_id=undo_by_source_change_id,
+            )
+            envelopes.append(
+                SyncEventEnvelope(
+                    seq=row.seq,
+                    run_id=run.id,
+                    ts=row.created_at,
+                    trace_id=None,
+                    type=row.type,  # type: ignore[arg-type]
+                    payload=normalized_payload,
+                )
+            )
+
+        return envelopes
 
     async def stream_run(
         self,
@@ -138,9 +206,17 @@ class SyncOrchestrator:
         run: AIRun,
         message: str,
         from_seq: int | None = None,
+        attachments: list[Any] | None = None,
+        references: list[Any] | None = None,
     ) -> list[SyncEventEnvelope]:
         events: list[SyncEventEnvelope] = []
-        async for event in self.stream_run_iter(run=run, message=message, from_seq=from_seq):
+        async for event in self.stream_run_iter(
+            run=run,
+            message=message,
+            from_seq=from_seq,
+            attachments=attachments,
+            references=references,
+        ):
             events.append(event)
         return events
 
@@ -150,6 +226,8 @@ class SyncOrchestrator:
         run: AIRun,
         message: str,
         from_seq: int | None = None,
+        attachments: list[Any] | None = None,
+        references: list[Any] | None = None,
     ) -> AsyncIterator[SyncEventEnvelope]:
         if from_seq is not None:
             replayed = await self.replay_events(run, from_seq)
@@ -163,12 +241,41 @@ class SyncOrchestrator:
         try:
             run.status = "streaming"
 
+            normalized_attachments = self._normalize_stream_attachments(attachments)
+            normalized_references = self._normalize_stream_references(references)
+            context_resolution = await self._resolve_sync_context(
+                attachments=normalized_attachments,
+                references=normalized_references,
+            )
+
+            user_content_json: dict[str, Any] = {"text": clean_message}
+            if context_resolution["metadata"]:
+                user_content_json["metadata"] = {"sync_context": context_resolution["metadata"]}
+
             user_message = await self._create_message(
                 run=run,
                 role="user",
-                content_json={"text": clean_message},
+                content_json=user_content_json,
             )
             yield await self._record_message_event(run=run, message=user_message)
+
+            for warning in context_resolution["warnings"]:
+                yield await self._record_plain_event(
+                    run=run,
+                    type_="warning",
+                    payload={
+                        "code": warning.get("code") or "sync_context_warning",
+                        "message": warning.get("message") or "Some context could not be resolved.",
+                    },
+                )
+
+            context_sources = context_resolution["sources"]
+            if context_sources:
+                yield await self._record_plain_event(
+                    run=run,
+                    type_="sources",
+                    payload=SyncSourcesPayload(items=context_sources).model_dump(mode="json"),
+                )
 
             snippets = await RetrievalService.search(
                 self.db,
@@ -194,6 +301,17 @@ class SyncOrchestrator:
                 agent_policy=agent_policy,
                 runtime_allowlist=None,
             )
+            preview_tool_names = {"item_preview", "event_preview", "inbox_transform_preview"}
+            preview_tools_enabled = self._is_explicit_mutation_intent(clean_message)
+            if not preview_tools_enabled:
+                tools = [
+                    tool for tool in tools if str(tool.get("name") or "").strip() not in preview_tool_names
+                ]
+                logger.info(
+                    "sync.preview_blocked_non_mutation workspace=%s run=%s",
+                    self.workspace_id,
+                    run.id,
+                )
             tool_by_name = {tool["name"]: tool for tool in tools}
             allowed_tool_names = set(tool_by_name.keys())
             llm_tools = [
@@ -211,6 +329,8 @@ class SyncOrchestrator:
             prefetch_notes = await self._prefetch_planning_context(clean_message)
             if prefetch_notes:
                 workspace_notes = (workspace_notes or []) + prefetch_notes
+            if context_resolution["workspace_notes"]:
+                workspace_notes = (workspace_notes or []) + context_resolution["workspace_notes"]
             extra_system_prompt_raw = run.context_json.get("extra_system_prompt")
             extra_system_prompt = (
                 str(extra_system_prompt_raw).strip()
@@ -246,8 +366,19 @@ class SyncOrchestrator:
                     },
                 )
             )
-            if prompt_instructions:
-                system_prompt = f"{system_prompt}\nExtra instructions: {prompt_instructions}"
+            if run.prompt_instructions:
+                system_prompt = f"{system_prompt}\nExtra instructions: {run.prompt_instructions}"
+
+            # Auto-activation/Plan Mode Hint:
+            # If in "free" (Normal) mode but with a mutation intent, remind the AI to be cautious.
+            # If in "guided" (Plan) mode, the system_prompt already contains the Guided Planning Policy.
+            if run.mode == "free" and preview_tools_enabled:
+                planning_hint = (
+                    "\n\n[SYSTEM HINT: The user is in NORMAL mode but has a mutation intent. "
+                    "If the request is complex or lacks critical details, prefer a brief dialogue or a "
+                    "one-line plan before emitting previews to ensure accuracy and avoid spam.]"
+                )
+                system_prompt = f"{system_prompt}{planning_hint}"
 
             run.prompt_version = "v3"
             run.prompt_mode = prompt_mode
@@ -257,6 +388,7 @@ class SyncOrchestrator:
 
             llm_messages = await self._build_llm_messages(run=run, system_prompt=system_prompt)
             preview_emitted = False
+            emitted_preview_payloads: list[dict[str, Any]] = []
             final_output: dict[str, Any] | None = None
 
             # Resolve the model (handles "auto" and unknown models)
@@ -572,6 +704,7 @@ class SyncOrchestrator:
                                 preview.entity_id = entity_id
                                 await self.db.flush()
 
+                            emitted_preview_payloads.append(self._serialize_preview_payload(preview))
                             yield await self._record_preview_event(run=run, preview=preview)
                             preview_emitted = True
 
@@ -619,10 +752,24 @@ class SyncOrchestrator:
                 )
                 await asyncio.sleep(0.025)
 
+            assistant_content_json: dict[str, Any] = {"text": assistant_content}
+            if emitted_preview_payloads:
+                assistant_content_json["metadata"] = {
+                    "plan_preview": {
+                        "type": "plan_preview",
+                        "preview_ids": [
+                            str(payload["id"])
+                            for payload in emitted_preview_payloads
+                            if isinstance(payload.get("id"), str)
+                        ],
+                        "previews": emitted_preview_payloads,
+                    }
+                }
+
             assistant_message = await self._create_message(
                 run=run,
                 role="assistant",
-                content_json={"text": assistant_content},
+                content_json=assistant_content_json,
                 provider=str(final_output.get("provider") or "unknown"),
                 model=str(final_output.get("model") or run.selected_model or "unknown"),
                 usage_json=final_output.get("usage") if isinstance(final_output.get("usage"), dict) else None,
@@ -643,6 +790,24 @@ class SyncOrchestrator:
             yield await self._record_draft_event(run=run, draft=draft)
 
             run.status = "ready_to_apply" if preview_emitted else "done"
+            yield await self._record_plain_event(
+                run=run,
+                type_="done",
+                payload=SyncDonePayload(status=run.status).model_dump(mode="json"),
+            )
+            await self.db.commit()
+
+        except SyncValidationError as exc:
+            run.status = "failed"
+            yield await self._record_plain_event(
+                run=run,
+                type_="error",
+                payload={
+                    "code": "validation_error",
+                    "message": str(exc),
+                    "retryable": False,
+                },
+            )
             yield await self._record_plain_event(
                 run=run,
                 type_="done",
@@ -703,12 +868,11 @@ class SyncOrchestrator:
         )
         existing_change = existing.scalar_one_or_none()
         if existing_change is not None:
-            return SyncApplyOut(
+            return await self._build_apply_out(
                 run_id=run.id,
                 preview_id=preview_id,
-                change_id=existing_change.id,
                 applied_at=existing_change.created_at,
-                undoable=existing_change.undoable,
+                change=existing_change,
             )
 
         preview_result = await self.db.execute(
@@ -734,12 +898,11 @@ class SyncOrchestrator:
             )
             applied_change = applied_result.scalar_one_or_none()
             if applied_change is not None:
-                return SyncApplyOut(
+                return await self._build_apply_out(
                     run_id=run.id,
                     preview_id=preview.id,
-                    change_id=applied_change.id,
                     applied_at=applied_change.created_at,
-                    undoable=applied_change.undoable,
+                    change=applied_change,
                 )
 
         now = datetime.now(UTC)
@@ -779,14 +942,17 @@ class SyncOrchestrator:
         preview.applied_change_id = change.id
         run.status = "applied"
 
-        applied_payload = {
-            "run_id": str(run.id),
-            "preview_id": str(preview.id),
-            "change_id": str(change.id),
-            "applied_at": now.isoformat(),
-            "undoable": change.undoable,
-        }
-        await self._record_plain_event(run=run, type_="applied", payload=applied_payload)
+        apply_out = await self._build_apply_out(
+            run_id=run.id,
+            preview_id=preview.id,
+            applied_at=now,
+            change=change,
+        )
+        await self._record_plain_event(
+            run=run,
+            type_="applied",
+            payload=apply_out.model_dump(mode="json"),
+        )
         await self._record_plain_event(
             run=run,
             type_="done",
@@ -794,13 +960,7 @@ class SyncOrchestrator:
         )
 
         await self.db.commit()
-        return SyncApplyOut(
-            run_id=run.id,
-            preview_id=preview.id,
-            change_id=change.id,
-            applied_at=now,
-            undoable=change.undoable,
-        )
+        return apply_out
 
     async def undo_change(
         self,
@@ -834,6 +994,9 @@ class SyncOrchestrator:
         )
         existing_undo = existing.scalar_one_or_none()
         if existing_undo is not None:
+            if change.undoable:
+                change.undoable = False
+                await self.db.commit()
             return SyncUndoOut(
                 run_id=run.id,
                 change_id=change.id,
@@ -867,7 +1030,24 @@ class SyncOrchestrator:
             undoable=undo_result.undoable,
         )
         self.db.add(undo_change)
+        await self.db.flush()
+        change.undoable = False
         run.status = "done"
+        open_target_kind, open_target_id, open_target_date = await self._resolve_open_target(change)
+        undone_payload = SyncUndonePayload(
+            run_id=run.id,
+            source_change_id=change.id,
+            undo_change_id=undo_change.id,
+            undone_at=now,
+            open_target_kind=open_target_kind,
+            open_target_id=open_target_id,
+            open_target_date=open_target_date,
+        )
+        await self._record_plain_event(
+            run=run,
+            type_="undone",
+            payload=undone_payload.model_dump(mode="json"),
+        )
         await self._record_plain_event(
             run=run,
             type_="done",
@@ -881,6 +1061,274 @@ class SyncOrchestrator:
             undone=True,
             undone_at=now,
         )
+
+    async def _build_apply_out(
+        self,
+        *,
+        run_id: uuid.UUID,
+        preview_id: uuid.UUID,
+        applied_at: datetime,
+        change: AIChange,
+    ) -> SyncApplyOut:
+        open_target_kind, open_target_id, open_target_date = await self._resolve_open_target(change)
+        return SyncApplyOut(
+            run_id=run_id,
+            preview_id=preview_id,
+            change_id=change.id,
+            applied_at=applied_at,
+            undoable=change.undoable,
+            entity_type=change.entity_type,
+            entity_id=change.entity_id,
+            open_target_kind=open_target_kind,
+            open_target_id=open_target_id,
+            open_target_date=open_target_date,
+        )
+
+    async def _normalize_replay_event_payload(
+        self,
+        *,
+        run: AIRun,
+        event_type: str,
+        event_ts: datetime,
+        payload: dict[str, Any],
+        changes_by_id: dict[uuid.UUID, AIChange],
+        undo_by_source_change_id: dict[uuid.UUID, AIChange],
+    ) -> dict[str, Any]:
+        if event_type == "applied":
+            return await self._normalize_replay_applied_payload(
+                run=run,
+                event_ts=event_ts,
+                payload=payload,
+                changes_by_id=changes_by_id,
+            )
+        if event_type == "undone":
+            return await self._normalize_replay_undone_payload(
+                run=run,
+                event_ts=event_ts,
+                payload=payload,
+                changes_by_id=changes_by_id,
+                undo_by_source_change_id=undo_by_source_change_id,
+            )
+        return payload
+
+    async def _normalize_replay_applied_payload(
+        self,
+        *,
+        run: AIRun,
+        event_ts: datetime,
+        payload: dict[str, Any],
+        changes_by_id: dict[uuid.UUID, AIChange],
+    ) -> dict[str, Any]:
+        change_id = self._parse_optional_uuid(payload.get("change_id"))
+        change = changes_by_id.get(change_id) if change_id is not None else None
+
+        entity_type = payload.get("entity_type") if isinstance(payload.get("entity_type"), str) else None
+        entity_id = self._parse_optional_uuid(payload.get("entity_id"))
+        open_target_kind = (
+            payload.get("open_target_kind")
+            if payload.get("open_target_kind") in {"item", "event", "timeline"}
+            else None
+        )
+        open_target_id = self._parse_optional_uuid(payload.get("open_target_id"))
+        open_target_date = self._normalize_open_target_date(payload.get("open_target_date"))
+
+        if change is not None:
+            if entity_type is None:
+                entity_type = change.entity_type
+            if entity_id is None:
+                entity_id = change.entity_id
+            (
+                resolved_open_target_kind,
+                resolved_open_target_id,
+                resolved_open_target_date,
+            ) = await self._resolve_open_target(change)
+            if open_target_kind is None:
+                open_target_kind = resolved_open_target_kind
+            if open_target_id is None:
+                open_target_id = resolved_open_target_id
+            if open_target_date is None:
+                open_target_date = (
+                    resolved_open_target_date.isoformat()
+                    if isinstance(resolved_open_target_date, date)
+                    else None
+                )
+
+        preview_id = self._parse_optional_uuid(payload.get("preview_id"))
+        normalized_change_id = change_id or run.id
+
+        return {
+            "run_id": str(run.id),
+            "preview_id": str(preview_id or normalized_change_id),
+            "change_id": str(normalized_change_id),
+            "applied_at": self._normalize_datetime_value(payload.get("applied_at")) or event_ts.isoformat(),
+            "undoable": bool(payload.get("undoable")) if "undoable" in payload else bool(change.undoable if change else False),
+            "entity_type": entity_type or "unknown",
+            "entity_id": str(entity_id) if entity_id is not None else None,
+            "open_target_kind": open_target_kind or "timeline",
+            "open_target_id": str(open_target_id) if open_target_id is not None else None,
+            "open_target_date": open_target_date,
+        }
+
+    async def _normalize_replay_undone_payload(
+        self,
+        *,
+        run: AIRun,
+        event_ts: datetime,
+        payload: dict[str, Any],
+        changes_by_id: dict[uuid.UUID, AIChange],
+        undo_by_source_change_id: dict[uuid.UUID, AIChange],
+    ) -> dict[str, Any]:
+        source_change_id = self._parse_optional_uuid(
+            payload.get("source_change_id") or payload.get("change_id")
+        )
+        source_change = changes_by_id.get(source_change_id) if source_change_id is not None else None
+
+        undo_change_id = self._parse_optional_uuid(payload.get("undo_change_id"))
+        if undo_change_id is None and source_change_id is not None:
+            matched_undo = undo_by_source_change_id.get(source_change_id)
+            if matched_undo is not None:
+                undo_change_id = matched_undo.id
+
+        open_target_kind = (
+            payload.get("open_target_kind")
+            if payload.get("open_target_kind") in {"item", "event", "timeline"}
+            else None
+        )
+        open_target_id = self._parse_optional_uuid(payload.get("open_target_id"))
+        open_target_date = self._normalize_open_target_date(payload.get("open_target_date"))
+
+        if source_change is not None:
+            (
+                resolved_open_target_kind,
+                resolved_open_target_id,
+                resolved_open_target_date,
+            ) = await self._resolve_open_target(source_change)
+            if open_target_kind is None:
+                open_target_kind = resolved_open_target_kind
+            if open_target_id is None:
+                open_target_id = resolved_open_target_id
+            if open_target_date is None:
+                open_target_date = (
+                    resolved_open_target_date.isoformat()
+                    if isinstance(resolved_open_target_date, date)
+                    else None
+                )
+
+        normalized_source_change_id = source_change_id or run.id
+        return {
+            "run_id": str(run.id),
+            "source_change_id": str(normalized_source_change_id),
+            "undo_change_id": str(undo_change_id) if undo_change_id is not None else None,
+            "undone_at": self._normalize_datetime_value(payload.get("undone_at")) or event_ts.isoformat(),
+            "open_target_kind": open_target_kind or "timeline",
+            "open_target_id": str(open_target_id) if open_target_id is not None else None,
+            "open_target_date": open_target_date,
+        }
+
+    async def _resolve_open_target(
+        self,
+        change: AIChange,
+    ) -> tuple[str, uuid.UUID | None, date | None]:
+        entity_type = (change.entity_type or "").strip().lower()
+        action = (change.action or "").strip().lower()
+        after_payload = change.after_payload if isinstance(change.after_payload, dict) else {}
+        before_payload = change.before_payload if isinstance(change.before_payload, dict) else {}
+
+        item_snapshot = after_payload.get("item") if isinstance(after_payload.get("item"), dict) else None
+        item_before_snapshot = (
+            before_payload.get("item") if isinstance(before_payload.get("item"), dict) else None
+        )
+        event_snapshot = after_payload.get("event") if isinstance(after_payload.get("event"), dict) else None
+        event_before_snapshot = (
+            before_payload.get("event") if isinstance(before_payload.get("event"), dict) else None
+        )
+
+        if entity_type == "item" or action.startswith("item."):
+            item_id = (
+                self._parse_optional_uuid(item_snapshot.get("id")) if item_snapshot else None
+            ) or (
+                self._parse_optional_uuid(item_before_snapshot.get("id"))
+                if item_before_snapshot
+                else None
+            ) or change.entity_id
+            return "item", item_id, None
+
+        if entity_type == "event" or action.startswith("event."):
+            event_id = (
+                self._parse_optional_uuid(event_snapshot.get("id")) if event_snapshot else None
+            ) or (
+                self._parse_optional_uuid(event_before_snapshot.get("id"))
+                if event_before_snapshot
+                else None
+            ) or change.entity_id
+            event_date = self._extract_open_target_date_from_event(event_snapshot)
+            if event_date is None:
+                event_date = self._extract_open_target_date_from_event(event_before_snapshot)
+            if event_date is None and event_id is not None:
+                event_date = await self._fetch_event_date(event_id)
+            return "event", event_id, event_date
+
+        if entity_type == "capture" and action == "inbox.transform":
+            if event_snapshot is not None or event_before_snapshot is not None:
+                event_id = (
+                    self._parse_optional_uuid(event_snapshot.get("id")) if event_snapshot else None
+                ) or (
+                    self._parse_optional_uuid(event_before_snapshot.get("id"))
+                    if event_before_snapshot
+                    else None
+                )
+                event_date = self._extract_open_target_date_from_event(event_snapshot)
+                if event_date is None:
+                    event_date = self._extract_open_target_date_from_event(event_before_snapshot)
+                if event_date is None and event_id is not None:
+                    event_date = await self._fetch_event_date(event_id)
+                if event_id is not None:
+                    return "event", event_id, event_date
+                return "timeline", None, event_date
+
+            if item_snapshot is not None or item_before_snapshot is not None:
+                item_id = (
+                    self._parse_optional_uuid(item_snapshot.get("id")) if item_snapshot else None
+                ) or (
+                    self._parse_optional_uuid(item_before_snapshot.get("id"))
+                    if item_before_snapshot
+                    else None
+                )
+                if item_id is not None:
+                    return "item", item_id, None
+
+            return "timeline", None, None
+
+        return "timeline", None, None
+
+    @staticmethod
+    def _extract_open_target_date_from_event(event_snapshot: dict[str, Any] | None) -> date | None:
+        if not isinstance(event_snapshot, dict):
+            return None
+
+        raw_start_at = event_snapshot.get("start_at")
+        if isinstance(raw_start_at, datetime):
+            return raw_start_at.date()
+        if not isinstance(raw_start_at, str) or not raw_start_at.strip():
+            return None
+
+        normalized = raw_start_at.strip().replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized).date()
+        except ValueError:
+            return None
+
+    async def _fetch_event_date(self, event_id: uuid.UUID) -> date | None:
+        result = await self.db.execute(
+            select(Event.start_at).where(
+                Event.id == event_id,
+                Event.workspace_id == self.workspace_id,
+            )
+        )
+        start_at = result.scalar_one_or_none()
+        if isinstance(start_at, datetime):
+            return start_at.date()
+        return None
 
     async def mark_answer(
         self,
@@ -1078,18 +1526,7 @@ class SyncOrchestrator:
         )
 
     async def _record_preview_event(self, *, run: AIRun, preview: AIDraft) -> SyncEventEnvelope:
-        payload = {
-            "id": str(preview.id),
-            "run_id": str(preview.run_id),
-            "seq": preview.seq,
-            "entity_type": preview.entity_type,
-            "entity_id": str(preview.entity_id) if preview.entity_id else None,
-            "action": preview.action,
-            "diff_json": preview.body_json,
-            "expires_at": preview.expires_at.isoformat() if preview.expires_at else None,
-            "undoable": preview.undoable,
-            "created_at": preview.created_at.isoformat(),
-        }
+        payload = self._serialize_preview_payload(preview)
         event = AIEvent(run_id=run.id, seq=preview.seq, type="preview", payload_json=payload)
         self.db.add(event)
         await self.db.flush()
@@ -1101,6 +1538,21 @@ class SyncOrchestrator:
             type="preview",
             payload=payload,
         )
+
+    @staticmethod
+    def _serialize_preview_payload(preview: AIDraft) -> dict[str, Any]:
+        return {
+            "id": str(preview.id),
+            "run_id": str(preview.run_id),
+            "seq": preview.seq,
+            "entity_type": preview.entity_type,
+            "entity_id": str(preview.entity_id) if preview.entity_id else None,
+            "action": preview.action,
+            "diff_json": preview.body_json if isinstance(preview.body_json, dict) else {},
+            "expires_at": preview.expires_at.isoformat() if preview.expires_at else None,
+            "undoable": preview.undoable,
+            "created_at": preview.created_at.isoformat(),
+        }
 
     async def _create_tool_call(
         self,
@@ -1204,11 +1656,47 @@ class SyncOrchestrator:
         )
         rows = list(result.scalars().all())
         messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+        preview_reuse_context = await self._build_preview_reuse_context(run=run)
+        if preview_reuse_context:
+            messages.append({"role": "system", "content": preview_reuse_context})
         for row in rows:
             role = row.role if row.role in {"system", "user", "assistant", "tool"} else "user"
             content = self._extract_message_text(row.content_json)
             messages.append({"role": role, "content": content})
         return messages
+
+    async def _build_preview_reuse_context(self, *, run: AIRun) -> str | None:
+        result = await self.db.execute(
+            select(AIDraft)
+            .where(
+                AIDraft.run_id == run.id,
+                AIDraft.kind == "preview",
+                AIDraft.deleted_at.is_(None),
+            )
+            .order_by(AIDraft.seq.desc())
+            .limit(3)
+        )
+        rows = list(result.scalars().all())
+        if not rows:
+            return None
+
+        snapshots = [
+            {
+                "preview_id": str(row.id),
+                "seq": row.seq,
+                "entity_type": row.entity_type,
+                "entity_id": str(row.entity_id) if row.entity_id else None,
+                "action": row.action,
+                "diff_json": row.body_json if isinstance(row.body_json, dict) else {},
+                "applied": row.applied_change_id is not None,
+            }
+            for row in rows
+        ]
+        return (
+            "Persisted plan previews context (latest first). If the user asks to update or reuse a "
+            "previous plan, start from one of these previews and change only requested fields:\n"
+            f"{json.dumps(snapshots, ensure_ascii=True)}"
+        )
 
     async def _execute_tool_call(
         self,
@@ -1303,6 +1791,14 @@ class SyncOrchestrator:
                 "summary": str(preview.get("summary") or "Preview generated"),
                 "result_json": preview,
                 "preview": preview,
+            }
+
+        if tool_name == "ask_question":
+            question_data = ToolExecutor.build_ask_question(args)
+            return {
+                "summary": str(question_data.get("summary") or "Question asked"),
+                "result_json": question_data,
+                "question": question_data,
             }
 
         raise SyncValidationError(f"Unsupported tool '{tool_name}'")
@@ -1504,6 +2000,343 @@ class SyncOrchestrator:
         return any(token in lowered for token in scheduling_tokens)
 
     @staticmethod
+    def _is_explicit_mutation_intent(message: str) -> bool:
+        lowered = message.lower()
+        mutation_patterns = (
+            r"\b(create|add|update|edit|modify|delete|remove|schedule|reschedule|transform|apply)\b",
+            r"\b(cr(?:e|é)e(?:r)?|ajoute(?:r)?|planifie(?:r)?|programme(?:r)?|modifie(?:r)?|mets?\s+à\s+jour|"
+            r"supprime(?:r)?|enl[eè]ve(?:r)?|d[eé]place(?:r)?|transforme(?:r)?|applique(?:r)?|annule(?:r)?)\b",
+        )
+        return any(re.search(pattern, lowered) is not None for pattern in mutation_patterns)
+
+    @staticmethod
+    def _compact_text(value: Any, *, limit: int = 220) -> str:
+        if not isinstance(value, str):
+            return ""
+        compact = " ".join(value.split()).strip()
+        if len(compact) <= limit:
+            return compact
+        return f"{compact[: max(0, limit - 1)]}…"
+
+    @staticmethod
+    def _normalize_stream_attachments(raw_attachments: list[Any] | None) -> list[dict[str, str]]:
+        normalized: list[dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for raw in raw_attachments or []:
+            if isinstance(raw, dict):
+                capture_id = raw.get("capture_id")
+                source = raw.get("source")
+            else:
+                capture_id = getattr(raw, "capture_id", None)
+                source = getattr(raw, "source", None)
+            capture_id_str = str(capture_id).strip() if capture_id is not None else ""
+            source_str = str(source or "upload").strip().lower()
+            if source_str not in {"upload", "inbox"}:
+                source_str = "upload"
+            if not capture_id_str:
+                continue
+            dedupe_key = (capture_id_str, source_str)
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            normalized.append(
+                {
+                    "capture_id": capture_id_str,
+                    "source": source_str,
+                }
+            )
+        return normalized
+
+    @staticmethod
+    def _normalize_stream_references(raw_references: list[Any] | None) -> list[dict[str, str | None]]:
+        normalized: list[dict[str, str | None]] = []
+        seen: set[tuple[str, str]] = set()
+        for raw in raw_references or []:
+            if isinstance(raw, dict):
+                kind = raw.get("kind")
+                ref_id = raw.get("id")
+                label = raw.get("label")
+            else:
+                kind = getattr(raw, "kind", None)
+                ref_id = getattr(raw, "id", None)
+                label = getattr(raw, "label", None)
+            kind_str = str(kind or "").strip().lower()
+            if kind_str not in {"capture", "item"}:
+                continue
+            ref_id_str = str(ref_id).strip() if ref_id is not None else ""
+            if not ref_id_str:
+                continue
+            dedupe_key = (kind_str, ref_id_str)
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            normalized.append(
+                {
+                    "kind": kind_str,
+                    "id": ref_id_str,
+                    "label": str(label).strip() if isinstance(label, str) and label.strip() else None,
+                }
+            )
+        return normalized
+
+    async def _resolve_sync_context(
+        self,
+        *,
+        attachments: list[dict[str, str]],
+        references: list[dict[str, str | None]],
+    ) -> dict[str, Any]:
+        if len(attachments) + len(references) > 5:
+            raise SyncValidationError("You can attach or reference up to 5 elements per message.")
+
+        warnings: list[dict[str, str]] = []
+        source_items: list[dict[str, str | None]] = []
+        workspace_notes: list[str] = []
+        resolved_entries: list[dict[str, Any]] = []
+
+        for attachment in attachments:
+            capture_id = self._parse_optional_uuid(attachment.get("capture_id"))
+            if capture_id is None:
+                warnings.append(
+                    {
+                        "code": "sync_context_invalid_attachment",
+                        "message": "One attachment has an invalid capture identifier.",
+                    }
+                )
+                continue
+
+            capture = await self._load_capture_for_workspace(capture_id)
+            if capture is None:
+                if await self._capture_exists_any_workspace(capture_id):
+                    raise SyncValidationError("Attachment is not accessible in this workspace.")
+                warnings.append(
+                    {
+                        "code": "sync_context_attachment_missing",
+                        "message": "One attachment was not found and was ignored.",
+                    }
+                )
+                continue
+
+            if capture.status not in {"ready", "applied", "archived"}:
+                raise SyncValidationError(
+                    "An attachment is still processing. Wait until it is ready before sending."
+                )
+
+            context_entry = self._build_capture_context_entry(
+                capture,
+                source=attachment.get("source") or "upload",
+                label_override=None,
+            )
+            resolved_entries.append(context_entry["resolved"])
+            workspace_notes.append(context_entry["note"])
+            source_items.append(context_entry["source"])
+
+        for reference in references:
+            kind = str(reference.get("kind") or "").lower()
+            ref_id = self._parse_optional_uuid(reference.get("id"))
+            if kind not in {"capture", "item"} or ref_id is None:
+                warnings.append(
+                    {
+                        "code": "sync_context_invalid_reference",
+                        "message": "One reference has an invalid format and was ignored.",
+                    }
+                )
+                continue
+
+            label_override = (
+                str(reference.get("label")).strip()
+                if isinstance(reference.get("label"), str) and str(reference.get("label")).strip()
+                else None
+            )
+
+            if kind == "capture":
+                capture = await self._load_capture_for_workspace(ref_id)
+                if capture is None:
+                    if await self._capture_exists_any_workspace(ref_id):
+                        raise SyncValidationError("A capture reference is not accessible in this workspace.")
+                    warnings.append(
+                        {
+                            "code": "sync_context_reference_missing",
+                            "message": "One capture reference was not found and was ignored.",
+                        }
+                    )
+                    continue
+                context_entry = self._build_capture_context_entry(
+                    capture,
+                    source="reference",
+                    label_override=label_override,
+                )
+            else:
+                item = await self._load_item_for_workspace(ref_id)
+                if item is None:
+                    if await self._item_exists_any_workspace(ref_id):
+                        raise SyncValidationError("An item reference is not accessible in this workspace.")
+                    warnings.append(
+                        {
+                            "code": "sync_context_reference_missing",
+                            "message": "One item reference was not found and was ignored.",
+                        }
+                    )
+                    continue
+                context_entry = self._build_item_context_entry(item, label_override=label_override)
+
+            resolved_entries.append(context_entry["resolved"])
+            workspace_notes.append(context_entry["note"])
+            source_items.append(context_entry["source"])
+
+        metadata: dict[str, Any] = {}
+        if attachments or references or resolved_entries or warnings:
+            metadata = {
+                "attachments": attachments,
+                "references": references,
+                "resolved": resolved_entries,
+                "warnings": warnings,
+            }
+
+        return {
+            "metadata": metadata,
+            "warnings": warnings,
+            "sources": source_items,
+            "workspace_notes": workspace_notes,
+        }
+
+    @staticmethod
+    def _capture_context_title(capture: InboxCapture) -> str:
+        meta = capture.meta if isinstance(capture.meta, dict) else {}
+        for key in ("manual_title", "ai_title", "title"):
+            value = meta.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        compact_raw = SyncOrchestrator._compact_text(capture.raw_content, limit=96)
+        if compact_raw:
+            return compact_raw
+        return f"Capture {str(capture.id)[:8]}"
+
+    @staticmethod
+    def _capture_context_snippet(capture: InboxCapture) -> str:
+        meta = capture.meta if isinstance(capture.meta, dict) else {}
+        for key in ("summary", "ai_summary", "note_summary", "preview_text"):
+            value = meta.get(key)
+            compact = SyncOrchestrator._compact_text(value, limit=260)
+            if compact:
+                return compact
+        return SyncOrchestrator._compact_text(capture.raw_content, limit=260)
+
+    @classmethod
+    def _extract_blocks_text(cls, node: Any) -> str:
+        if isinstance(node, list):
+            parts = [cls._extract_blocks_text(entry) for entry in node]
+            return " ".join(part for part in parts if part).strip()
+        if not isinstance(node, dict):
+            return ""
+        own_text = str(node.get("text")).strip() if isinstance(node.get("text"), str) else ""
+        child_content = cls._extract_blocks_text(node.get("content")) if isinstance(node.get("content"), list) else ""
+        return " ".join(part for part in (own_text, child_content) if part).strip()
+
+    def _build_capture_context_entry(
+        self,
+        capture: InboxCapture,
+        *,
+        source: str,
+        label_override: str | None,
+    ) -> dict[str, Any]:
+        title = label_override or self._capture_context_title(capture)
+        snippet = self._capture_context_snippet(capture)
+        subtitle = f"{capture.capture_type} · {capture.status}"
+        internal_path = f"/inbox/captures/{capture.id}"
+        note = f'Capture "{title}" ({subtitle}).'
+        if snippet:
+            note = f'{note} Snippet: "{snippet}"'
+        return {
+            "resolved": {
+                "kind": "capture",
+                "id": str(capture.id),
+                "label": title,
+                "subtitle": subtitle,
+                "internal_path": internal_path,
+                "status": capture.status,
+                "capture_type": capture.capture_type,
+                "source": source,
+            },
+            "source": {
+                "id": str(capture.id),
+                "title": title,
+                "url": f"https://momentarise.local{internal_path}",
+                "snippet": snippet or None,
+            },
+            "note": note,
+        }
+
+    def _build_item_context_entry(
+        self,
+        item: Item,
+        *,
+        label_override: str | None,
+    ) -> dict[str, Any]:
+        title = label_override or item.title or f"Item {str(item.id)[:8]}"
+        excerpt = self._compact_text(self._extract_blocks_text(item.blocks), limit=260)
+        subtitle = f"{item.kind} · {item.status}"
+        internal_path = f"/inbox/items/{item.id}"
+        note = f'Item "{title}" ({subtitle}).'
+        if excerpt:
+            note = f'{note} Excerpt: "{excerpt}"'
+        return {
+            "resolved": {
+                "kind": "item",
+                "id": str(item.id),
+                "label": title,
+                "subtitle": subtitle,
+                "internal_path": internal_path,
+                "status": item.status,
+                "source": "reference",
+            },
+            "source": {
+                "id": str(item.id),
+                "title": title,
+                "url": f"https://momentarise.local{internal_path}",
+                "snippet": excerpt or None,
+            },
+            "note": note,
+        }
+
+    async def _load_capture_for_workspace(self, capture_id: uuid.UUID) -> InboxCapture | None:
+        result = await self.db.execute(
+            select(InboxCapture).where(
+                InboxCapture.id == capture_id,
+                InboxCapture.workspace_id == self.workspace_id,
+                InboxCapture.deleted_at.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def _capture_exists_any_workspace(self, capture_id: uuid.UUID) -> bool:
+        result = await self.db.execute(
+            select(InboxCapture.id).where(
+                InboxCapture.id == capture_id,
+                InboxCapture.deleted_at.is_(None),
+            )
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def _load_item_for_workspace(self, item_id: uuid.UUID) -> Item | None:
+        result = await self.db.execute(
+            select(Item).where(
+                Item.id == item_id,
+                Item.workspace_id == self.workspace_id,
+                Item.deleted_at.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def _item_exists_any_workspace(self, item_id: uuid.UUID) -> bool:
+        result = await self.db.execute(
+            select(Item.id).where(
+                Item.id == item_id,
+                Item.deleted_at.is_(None),
+            )
+        )
+        return result.scalar_one_or_none() is not None
+
+    @staticmethod
     def _extract_message_text(content_json: dict[str, Any] | None) -> str:
         if not isinstance(content_json, dict):
             return ""
@@ -1556,6 +2389,47 @@ class SyncOrchestrator:
         if isinstance(value, str) and value.strip():
             try:
                 return uuid.UUID(value)
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _parse_source_change_id_from_undo_reason(reason: Any) -> uuid.UUID | None:
+        if not isinstance(reason, str):
+            return None
+        if not reason.startswith("sync_undo:"):
+            return None
+        parts = reason.split(":")
+        if len(parts) < 3:
+            return None
+        return SyncOrchestrator._parse_optional_uuid(parts[1])
+
+    @staticmethod
+    def _normalize_open_target_date(value: Any) -> str | None:
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        if isinstance(value, str) and value.strip():
+            raw = value.strip()
+            try:
+                if "T" in raw:
+                    normalized = raw.replace("Z", "+00:00")
+                    return datetime.fromisoformat(normalized).date().isoformat()
+                return date.fromisoformat(raw).isoformat()
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _normalize_datetime_value(value: Any) -> str | None:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, str) and value.strip():
+            raw = value.strip()
+            normalized = raw.replace("Z", "+00:00")
+            try:
+                return datetime.fromisoformat(normalized).isoformat()
             except ValueError:
                 return None
         return None

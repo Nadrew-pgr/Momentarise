@@ -49,6 +49,11 @@ DEFAULT_TOOLS: tuple[ToolDefinition, ...] = (
         description="Build a preview to transform an inbox capture into item/event.",
         is_write=False,
     ),
+    ToolDefinition(
+        name="ask_question",
+        description="Ask a structured question with multiple choice options to refine user intent.",
+        is_write=False,
+    ),
 )
 
 

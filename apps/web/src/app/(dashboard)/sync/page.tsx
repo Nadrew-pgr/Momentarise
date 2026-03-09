@@ -1,7 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import "./sync-chat.css";
-import { SyncChatShell } from "@/components/sync-chat/chat-shell";
+
+const SyncChatShell = dynamic(
+  () => import("@/components/sync-chat/chat-shell").then((mod) => mod.SyncChatShell),
+  { ssr: false }
+);
 
 export default function SyncPage() {
   return (

@@ -1,8 +1,23 @@
 "use client";
 
-import { RiCalendarLine, RiDeleteBinLine, RiCloseLine } from "@remixicon/react";
-import type { Block } from "@blocknote/core";
-import type { ProseMirrorNode } from "@momentarise/shared";
+import { RiCalendarLine, RiDeleteBinLine, RiCloseLine, RiSparklingLine } from "@remixicon/react";
+import {
+  BLOCK_DISPLAY_META,
+  QUICK_UPDATE_LABELS,
+  STARTER_KITS,
+  applyRuntimeUpdateDraft,
+  buildStarterKitBlocks,
+  businessBlockTypeValues,
+  createBusinessBlock,
+  eventContentResponseSchema,
+  eventContentUpdateRequestSchema,
+  getBusinessBlockPreview,
+  insertBusinessBlocks,
+  resolveContentRenderMode,
+  sanitizeBusinessBlocks,
+  type BusinessBlock,
+  type ContentRenderMode,
+} from "@momentarise/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { format, isBefore } from "date-fns";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -14,8 +29,11 @@ import { EndHour, StartHour } from "./constants";
 import { cn } from "@/lib/utils";
 import { fetchWithAuth } from "@/lib/bff-client";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
-import { useItem, useItemLinks } from "@/hooks/use-item";
-import { BlockEditor } from "@/components/block-editor";
+import { useEventAnalytics, useEventContent } from "@/hooks/use-events";
+import { useItemLinks } from "@/hooks/use-item";
+import { useProjects } from "@/hooks/use-projects";
+import { useSeries } from "@/hooks/use-series";
+import { BusinessBlocksEditor } from "@/components/business-blocks-editor";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,10 +53,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Sidebar,
   SidebarContent,
   SidebarHeader,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
 import { RecurrenceInput } from "./recurrence-input";
@@ -48,6 +66,61 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 type MomentTab = "details" | "content" | "coach";
 type ContentSaveState = "idle" | "saving" | "saved" | "error";
+
+type QuickUpdateState = {
+  status: string;
+  energy: string;
+  progressDelta: string;
+  nextAction: string;
+};
+
+function makeBlockId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `blk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function formatSecondsCompact(value: number | null): string {
+  if (value == null || Number.isNaN(value)) return "--";
+  const seconds = Math.max(0, Math.round(value));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
+  return `${minutes}m`;
+}
+
+function parseQuickNumber(value: string): number | null {
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildQuickUpdateState(blocks: BusinessBlock[]): QuickUpdateState {
+  const statusBlock = blocks.find(
+    (block) => block.type === "status_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.status
+  );
+  const energyBlock = blocks.find(
+    (block) => block.type === "scale_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.energy
+  );
+  const progressBlock = blocks.find(
+    (block) => block.type === "metric_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.progressDelta
+  );
+  const nextActionBlock = blocks.find(
+    (block) => block.type === "task_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.nextAction
+  );
+
+  return {
+    status: statusBlock && statusBlock.type === "status_block" ? statusBlock.payload.state : "on_track",
+    energy:
+      energyBlock && energyBlock.type === "scale_block" ? String(energyBlock.payload.value ?? "") : "",
+    progressDelta:
+      progressBlock && progressBlock.type === "metric_block" && progressBlock.payload.current != null
+        ? String(progressBlock.payload.current)
+        : "",
+    nextAction:
+      nextActionBlock && nextActionBlock.type === "task_block" ? nextActionBlock.payload.title ?? "" : "",
+  };
+}
 
 interface EventDialogProps {
   event: CalendarEvent | null;
@@ -119,24 +192,54 @@ export function EventDialog({
   const [currentItemId, setCurrentItemId] = useState(event?.itemId ?? "");
   const [currentUpdatedAt, setCurrentUpdatedAt] = useState(event?.updatedAt);
   const [isTracking, setIsTracking] = useState(event?.isTracking ?? false);
+  const [activeContentBlockId, setActiveContentBlockId] = useState<string | null>(null);
+  const [quickUpdate, setQuickUpdate] = useState<QuickUpdateState>({
+    status: "on_track",
+    energy: "",
+    progressDelta: "",
+    nextAction: "",
+  });
+  const [futureAiPrompt, setFutureAiPrompt] = useState("");
+  const [contentModeOverride, setContentModeOverride] = useState<ContentRenderMode | null>(null);
 
-  const [blocks, setBlocks] = useState<Block[] | Record<string, unknown>[]>([]);
+  const [blocks, setBlocks] = useState<BusinessBlock[]>([]);
   const [blocksHydrated, setBlocksHydrated] = useState(false);
   const [contentDirty, setContentDirty] = useState(false);
   const [contentSaveState, setContentSaveState] = useState<ContentSaveState>("idle");
+  const [isContentFullscreen, setIsContentFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsContentFullscreen(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    setContentModeOverride(null);
+  }, [currentEventId]);
 
   const itemId = currentItemId || null;
-  const { data: item } = useItem(itemId);
+  const { data: eventContent } = useEventContent(currentEventId || null);
+  const { data: eventAnalytics } = useEventAnalytics(currentEventId || null, "week");
   const { data: linksData, isLoading: linksLoading } = useItemLinks(itemId);
+  const { data: projects = [] } = useProjects();
+  const { data: availableSeries = [] } = useSeries(projectId);
   const links = linksData?.links ?? [];
 
   useEffect(() => {
-    if (!item || !itemId || blocksHydrated || contentDirty) {
+    if (!eventContent || !currentEventId || blocksHydrated || contentDirty) {
       return;
     }
-    setBlocks(item.blocks as unknown as Block[]);
+    setBlocks(eventContent.blocks ?? []);
+    if (eventContent.item_id !== currentItemId) {
+      setCurrentItemId(eventContent.item_id);
+    }
     setBlocksHydrated(true);
-  }, [blocksHydrated, contentDirty, item, itemId]);
+  }, [blocksHydrated, contentDirty, currentEventId, currentItemId, eventContent]);
+
+  useEffect(() => {
+    setQuickUpdate(buildQuickUpdateState(blocks));
+  }, [blocks]);
 
   // Sync local state if the 'event' prop changes via external means (e.g., Drag & Drop on Calendar or switching events)
   useEffect(() => {
@@ -179,32 +282,53 @@ export function EventDialog({
       setBlocksHydrated(false);
       setContentDirty(false);
       setBlocks([]);
+      setActiveContentBlockId(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event?.id, event?.itemId, event?.start.getTime(), event?.end.getTime(), event?.allDay, event?.title]);
 
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === projectId) ?? null,
+    [projectId, projects]
+  );
+  const selectedSeries = useMemo(
+    () => availableSeries.find((series) => series.id === seriesId) ?? null,
+    [availableSeries, seriesId]
+  );
+
   const persistBlocks = useCallback(
-    async (targetItemId: string, nextBlocks: ProseMirrorNode[]) => {
-      const res = await fetchWithAuth(`/api/items/${targetItemId}`, {
+    async (targetEventId: string, nextBlocks: BusinessBlock[]) => {
+      const sanitizedBlocks = sanitizeBusinessBlocks(nextBlocks);
+      const body = eventContentUpdateRequestSchema.parse({
+        schema_version: "business_blocks_v1",
+        blocks: sanitizedBlocks,
+      });
+      const res = await fetchWithAuth(`/api/events/${targetEventId}/content`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blocks: nextBlocks }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         throw await readApiError(res, t("pages.calendar.errors.saveContent"));
       }
-      await res.json();
+      const payload = eventContentResponseSchema.parse(await res.json());
+      if (payload.item_id !== currentItemId) {
+        setCurrentItemId(payload.item_id);
+      }
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["item", targetItemId] }),
-        queryClient.invalidateQueries({ queryKey: ["items"] }),
+        queryClient.invalidateQueries({ queryKey: ["event-content", targetEventId] }),
+        queryClient.invalidateQueries({ queryKey: ["event-analytics", targetEventId] }),
+        queryClient.invalidateQueries({ queryKey: ["item", payload.item_id] }),
+        queryClient.invalidateQueries({ queryKey: ["item-links", payload.item_id] }),
+        queryClient.invalidateQueries({ queryKey: ["inbox"] }),
       ]);
     },
-    [queryClient, t]
+    [currentItemId, queryClient, t]
   );
 
   const { debounced: debouncedPersistBlocks, cancel: cancelDebouncedPersistBlocks } =
-    useDebouncedCallback((targetItemId: string, nextBlocks: ProseMirrorNode[]) => {
-      void persistBlocks(targetItemId, nextBlocks)
+    useDebouncedCallback((targetEventId: string, nextBlocks: BusinessBlock[]) => {
+      void persistBlocks(targetEventId, nextBlocks)
         .then(() => {
           setContentDirty(false);
           setContentSaveState("saved");
@@ -230,28 +354,98 @@ export function EventDialog({
   }, []);
 
   const handleBlocksChange = useCallback(
-    (nextBlocks: Block[]) => {
-      setBlocks(nextBlocks);
+    (nextBlocks: BusinessBlock[]) => {
+      const sanitizedBlocks = sanitizeBusinessBlocks(nextBlocks);
+      setBlocks(sanitizedBlocks);
       setContentDirty(true);
 
-      if (!currentItemId) {
+      if (!currentEventId) {
         setContentSaveState("idle");
         return;
       }
 
       setContentSaveState("saving");
-      debouncedPersistBlocks(currentItemId, nextBlocks as unknown as ProseMirrorNode[]);
+      debouncedPersistBlocks(currentEventId, sanitizedBlocks);
     },
-    [currentItemId, debouncedPersistBlocks]
+    [currentEventId, debouncedPersistBlocks]
   );
 
   const contentSaveLabel = useMemo(() => {
     if (contentSaveState === "saving") return t("pages.calendar.momentContent.saving");
     if (contentSaveState === "saved") return t("pages.calendar.momentContent.saved");
     if (contentSaveState === "error") return t("pages.calendar.momentContent.saveError");
-    if (!currentItemId) return t("pages.calendar.momentContent.deferred");
+    if (!currentEventId) return t("pages.calendar.momentContent.deferred");
     return null;
-  }, [contentSaveState, currentItemId, t]);
+  }, [contentSaveState, currentEventId, t]);
+
+  const contentPreviewBlocks = useMemo(() => blocks.slice(0, 3), [blocks]);
+
+  const timeLeftSeconds = useMemo(() => {
+    const estimated =
+      event?.estimatedTimeSeconds ??
+      Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 1000));
+    const actual = event?.actualTimeAccSeconds ?? 0;
+    return Math.max(estimated - actual, 0);
+  }, [endDate, event?.actualTimeAccSeconds, event?.estimatedTimeSeconds, startDate]);
+
+  const completionPercent = Math.round((eventAnalytics?.current.completion_rate ?? 0) * 100);
+  const energyScore = eventAnalytics?.current.energy_score;
+  const energyDelta = eventAnalytics?.delta.energy_score ?? 0;
+  const contentRenderMode = useMemo(
+    () =>
+      resolveContentRenderMode({
+        startAt: startDate,
+        endAt: endDate,
+        isTracking,
+        override: contentModeOverride,
+      }),
+    [contentModeOverride, endDate, isTracking, startDate]
+  );
+  const isRunMode = contentRenderMode === "run";
+
+  const insertSingleBusinessBlock = useCallback(
+    (type: (typeof businessBlockTypeValues)[number]) => {
+      const next = sanitizeBusinessBlocks(
+        insertBusinessBlocks(
+          blocks,
+          [createBusinessBlock(type, makeBlockId())],
+          activeContentBlockId
+        )
+      );
+      handleBlocksChange(next);
+    },
+    [activeContentBlockId, blocks, handleBlocksChange]
+  );
+
+  const applyStarterKit = useCallback(
+    (key: (typeof STARTER_KITS)[number]["key"]) => {
+      const next = sanitizeBusinessBlocks(
+        insertBusinessBlocks(blocks, buildStarterKitBlocks(key, makeBlockId), activeContentBlockId)
+      );
+      handleBlocksChange(next);
+    },
+    [activeContentBlockId, blocks, handleBlocksChange]
+  );
+
+  const applyQuickUpdate = useCallback(() => {
+    const parsedEnergy = quickUpdate.energy.trim() ? parseQuickNumber(quickUpdate.energy) : undefined;
+    const parsedProgressDelta = quickUpdate.progressDelta.trim()
+      ? parseQuickNumber(quickUpdate.progressDelta)
+      : undefined;
+    const next = sanitizeBusinessBlocks(
+      applyRuntimeUpdateDraft(
+        blocks,
+        {
+          status: quickUpdate.status,
+          energy: parsedEnergy == null ? undefined : parsedEnergy,
+          progressDelta: parsedProgressDelta == null ? undefined : parsedProgressDelta,
+          nextAction: quickUpdate.nextAction,
+        },
+        makeBlockId
+      )
+    );
+    handleBlocksChange(next);
+  }, [blocks, handleBlocksChange, quickUpdate]);
 
   const handleSave = async () => {
     setError(null);
@@ -322,11 +516,11 @@ export function EventDialog({
       setIsTracking(persistedEvent.isTracking ?? isTracking);
 
       if (contentDirty) {
-        if (!nextItemId) {
+        if (!nextEventId) {
           throw new Error(t("pages.calendar.errors.contentAttachFailed"));
         }
         setContentSaveState("saving");
-        await persistBlocks(nextItemId, blocks as unknown as ProseMirrorNode[]);
+        await persistBlocks(nextEventId, blocks);
         setContentDirty(false);
         setContentSaveState("saved");
       }
@@ -428,7 +622,7 @@ export function EventDialog({
           <span className="sr-only">Close</span>
         </Button>
       </SidebarHeader>
-      <SidebarContent className="flex-1 w-full md:w-[400px]">
+      <SidebarContent className="flex-1 w-full overflow-hidden md:w-[400px]">
 
         <div className="border-b border-border p-2">
           <div className="inline-flex w-full rounded-md border border-border bg-muted/50 p-1">
@@ -469,7 +663,7 @@ export function EventDialog({
         )}
 
         {activeTab === "details" ? (
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="grid gap-4">
               <div className="*:not-first:mt-1.5">
                 <Label htmlFor="title">{t("pages.calendar.momentFields.title")}</Label>
@@ -705,31 +899,93 @@ export function EventDialog({
         ) : null}
 
         {activeTab === "content" ? (
-          <div className="flex-1 flex flex-col overflow-hidden p-4">
-            {contentSaveLabel ? (
-              <p className="mb-2 text-muted-foreground text-xs">{contentSaveLabel}</p>
-            ) : null}
-            <div className="flex-1 min-h-0 overflow-hidden rounded-md border border-border bg-background">
-              <BlockEditor
-                editorKey={currentItemId || "moment-content-draft"}
-                value={blocks}
-                onChange={handleBlocksChange}
-                editable
-                className="h-full"
-              />
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="rounded-[28px] border border-border bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--accent))_100%)] p-5 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+                    Content studio
+                  </div>
+                  <h3 className="text-2xl font-extrabold tracking-tight text-foreground">
+                    Build the moment with business blocks
+                  </h3>
+                  <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    Use structured blocks for preparation, logging, follow-up and linked references.
+                  </p>
+                </div>
+                <div className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold text-muted-foreground">
+                  {blocks.length} block{blocks.length === 1 ? "" : "s"}
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                <div className="rounded-2xl border border-border bg-background/90 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Status</p>
+                  <p className="mt-2 text-2xl font-extrabold tracking-tight text-foreground">{completionPercent}%</p>
+                  <p className="text-xs font-medium text-muted-foreground">Completion</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-background/90 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Time left</p>
+                  <p className="mt-2 text-2xl font-extrabold tracking-tight text-foreground">{formatSecondsCompact(timeLeftSeconds)}</p>
+                  <p className="text-xs font-medium text-muted-foreground">Estimated remaining</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-background/90 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Energy</p>
+                  <p className="mt-2 text-2xl font-extrabold tracking-tight text-foreground">
+                    {energyScore != null ? Math.round(energyScore) : "--"}
+                  </p>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {energyScore != null ? `${energyDelta >= 0 ? "+" : ""}${Math.round(energyDelta)} vs previous` : "No data yet"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                {contentPreviewBlocks.length > 0 ? (
+                  contentPreviewBlocks.map((block) => {
+                    const meta = BLOCK_DISPLAY_META[block.type];
+                    return (
+                      <div key={block.id} className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-background/90 px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{meta.eyebrow}</p>
+                          <p className="truncate text-sm font-semibold text-foreground">{(block.label ?? "").trim() || meta.title}</p>
+                        </div>
+                        <p className="max-w-[320px] truncate text-xs font-medium text-muted-foreground">{getBusinessBlockPreview(block)}</p>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border bg-background/70 px-4 py-6 text-center text-sm text-muted-foreground">
+                    No content yet. Open the studio to start from a starter kit or add a first block.
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">{contentSaveLabel ?? "Changes save automatically while you edit."}</p>
+                {!isMobile ? (
+                  <Button
+                    type="button"
+                    className="rounded-2xl px-5"
+                    onClick={() => setIsContentFullscreen(true)}
+                  >
+                    Open content studio
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : null}
 
         {activeTab === "coach" ? (
-          <div className="p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-muted-foreground text-sm">
               {t("pages.calendar.coachPlaceholder")}
             </div>
           </div>
         ) : null}
 
-        <div className="mt-auto border-t border-border p-4">
+        <div className="shrink-0 border-t border-border p-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
               {currentEventId && onToggleTracking ? (
@@ -773,6 +1029,207 @@ export function EventDialog({
           </div>
         </div>
       </SidebarContent>
+
+      {!isMobile ? (
+        <Dialog open={isContentFullscreen} onOpenChange={setIsContentFullscreen}>
+          <DialogContent className="h-[min(900px,calc(100vh-2rem))] !w-[min(1440px,calc(100vw-2rem))] !max-w-[min(1440px,calc(100vw-2rem))] overflow-hidden rounded-[28px] border border-border bg-background p-0 shadow-[0_36px_120px_-56px_rgba(15,23,42,0.55)] sm:!max-w-[min(1440px,calc(100vw-2rem))]">
+            <DialogTitle className="sr-only">Moment content studio</DialogTitle>
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="border-b border-border bg-background/95 px-5 py-3 backdrop-blur">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                      <span>Moment content studio</span>
+                      <span className="h-1 w-1 rounded-full bg-border" />
+                      <span>{contentSaveLabel ?? "Autosave active"}</span>
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <h2 className="min-w-0 truncate text-[1.35rem] font-extrabold tracking-tight text-foreground">
+                        {title.trim() || event?.title || "Untitled moment"}
+                      </h2>
+                      {selectedProject ? (
+                        <span className="inline-flex items-center rounded-full border border-border bg-accent px-3 py-1 text-[11px] font-bold text-foreground">
+                          Project: {selectedProject.title}
+                        </span>
+                      ) : null}
+                      {selectedSeries ? (
+                        <span className="inline-flex items-center rounded-full border border-border bg-accent px-3 py-1 text-[11px] font-bold text-foreground">
+                          Series: {selectedSeries.title}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <div className="inline-flex rounded-full border border-border bg-accent p-1">
+                      <Button
+                        type="button"
+                        variant={isRunMode ? "ghost" : "secondary"}
+                        size="sm"
+                        className="h-8 rounded-full px-3"
+                        onClick={() => setContentModeOverride("builder")}
+                      >
+                        Builder
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={isRunMode ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-8 rounded-full px-3"
+                        onClick={() => setContentModeOverride("run")}
+                      >
+                        Run
+                      </Button>
+                    </div>
+                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => setIsContentFullscreen(false)}>
+                      Close studio
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:items-center">
+                  <div className="relative min-w-0 flex-1">
+                    <RiSparklingLine className="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={futureAiPrompt}
+                      onChange={(event) => setFutureAiPrompt(event.target.value)}
+                      placeholder="Que voulez-vous faire pendant ce Moment ?"
+                      className="h-10 rounded-2xl border-border bg-background pl-10 shadow-none"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border bg-accent px-3 py-2 text-xs font-semibold text-foreground">
+                      <span className="text-muted-foreground">Status</span>
+                      <span>{completionPercent}%</span>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border bg-accent px-3 py-2 text-xs font-semibold text-foreground">
+                      <span className="text-muted-foreground">Time left</span>
+                      <span>{formatSecondsCompact(timeLeftSeconds)}</span>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border bg-accent px-3 py-2 text-xs font-semibold text-foreground">
+                      <span className="text-muted-foreground">Energy</span>
+                      <span>{energyScore != null ? Math.round(energyScore) : "--"}</span>
+                      {energyScore != null ? (
+                        <span className="text-[11px] text-muted-foreground">
+                          {energyDelta >= 0 ? "+" : ""}{Math.round(energyDelta)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="min-h-0 min-w-0 overflow-hidden border-r border-border/70 bg-accent/20 px-4 py-4">
+                  <BusinessBlocksEditor
+                    value={blocks}
+                    onChange={handleBlocksChange}
+                    editable
+                    className="h-full"
+                    activeBlockId={activeContentBlockId}
+                    onActiveBlockChange={setActiveContentBlockId}
+                    renderMode={contentRenderMode}
+                  />
+                </div>
+
+                <aside className="hidden min-h-0 overflow-y-auto bg-background/95 px-4 py-4 lg:flex lg:flex-col lg:gap-3">
+                  <section className="rounded-[24px] border border-border bg-accent/20 p-4">
+                    <div className="mb-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Runtime update</p>
+                      <h3 className="mt-2 text-sm font-extrabold tracking-tight text-foreground">Patch the live signals</h3>
+                    </div>
+                    <div className="space-y-3">
+                      <Select
+                        value={quickUpdate.status}
+                        onValueChange={(value) => setQuickUpdate((prev) => ({ ...prev, status: value }))}
+                      >
+                        <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-white">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="on_track">On track</SelectItem>
+                          <SelectItem value="at_risk">At risk</SelectItem>
+                          <SelectItem value="off_track">Off track</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        value={quickUpdate.energy}
+                        onChange={(event) => setQuickUpdate((prev) => ({ ...prev, energy: event.target.value }))}
+                        placeholder="Energy (1-10)"
+                        className="h-11 rounded-2xl border-slate-200 bg-white"
+                      />
+                      <Input
+                        value={quickUpdate.progressDelta}
+                        onChange={(event) => setQuickUpdate((prev) => ({ ...prev, progressDelta: event.target.value }))}
+                        placeholder="Progress delta %"
+                        className="h-11 rounded-2xl border-slate-200 bg-white"
+                      />
+                      <Input
+                        value={quickUpdate.nextAction}
+                        onChange={(event) => setQuickUpdate((prev) => ({ ...prev, nextAction: event.target.value }))}
+                        placeholder="Next action"
+                        className="h-11 rounded-2xl border-slate-200 bg-white"
+                      />
+                      <Button className="w-full rounded-2xl" onClick={applyQuickUpdate}>
+                        Apply update
+                      </Button>
+                    </div>
+                  </section>
+
+                  {!isRunMode ? (
+                    <>
+                      <section className="rounded-[24px] border border-border bg-accent/20 p-4">
+                        <div className="mb-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Starter kits</p>
+                          <h3 className="mt-2 text-sm font-extrabold tracking-tight text-foreground">Start from a proven structure</h3>
+                        </div>
+                        <div className="space-y-3">
+                          {STARTER_KITS.map((kit) => (
+                            <button
+                              key={kit.key}
+                              type="button"
+                              onClick={() => applyStarterKit(kit.key)}
+                              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-accent"
+                            >
+                              <p className="text-sm font-bold text-foreground">{kit.title}</p>
+                              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{kit.description}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="rounded-[24px] border border-border bg-accent/20 p-4">
+                        <div className="mb-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">All blocks</p>
+                          <h3 className="mt-2 text-sm font-extrabold tracking-tight text-foreground">Add a single block</h3>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {businessBlockTypeValues.map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => insertSingleBusinessBlock(type)}
+                              className="rounded-2xl border border-border bg-background px-3 py-2.5 text-left text-xs font-semibold text-foreground transition-colors hover:bg-accent"
+                            >
+                              {BLOCK_DISPLAY_META[type].title}
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    </>
+                  ) : (
+                    <section className="rounded-[24px] border border-border bg-accent/20 p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Run mode</p>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-foreground">
+                        Keep this view focused on live adjustments. Switch back to Builder to add or restructure blocks.
+                      </p>
+                    </section>
+                  )}
+                </aside>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 

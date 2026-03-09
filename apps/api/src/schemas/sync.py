@@ -1,9 +1,9 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SyncRunMode = Literal["free", "guided"]
 SyncRunStatus = Literal[
@@ -20,6 +20,7 @@ PromptMode = Literal["full", "minimal", "none"]
 MessageRole = Literal["system", "user", "assistant", "tool"]
 AgentOrigin = Literal["system", "user", "template"]
 AutomationStatus = Literal["draft", "active", "paused"]
+SyncOpenTargetKind = Literal["item", "event", "timeline"]
 
 
 class SyncModelCapabilities(BaseModel):
@@ -148,6 +149,11 @@ class SyncApplyOut(BaseModel):
     change_id: uuid.UUID
     applied_at: datetime
     undoable: bool
+    entity_type: str
+    entity_id: uuid.UUID
+    open_target_kind: SyncOpenTargetKind
+    open_target_id: uuid.UUID | None = None
+    open_target_date: date | None = None
 
 
 class SyncUndoOut(BaseModel):
@@ -155,6 +161,16 @@ class SyncUndoOut(BaseModel):
     change_id: uuid.UUID
     undone: bool
     undone_at: datetime
+
+
+class SyncUndonePayload(BaseModel):
+    run_id: uuid.UUID
+    source_change_id: uuid.UUID
+    undo_change_id: uuid.UUID
+    undone_at: datetime
+    open_target_kind: SyncOpenTargetKind
+    open_target_id: uuid.UUID | None = None
+    open_target_date: date | None = None
 
 
 class SyncChangeOut(BaseModel):
@@ -187,9 +203,32 @@ class SyncCreateRunRequest(BaseModel):
     context_json: dict[str, Any] = Field(default_factory=dict)
 
 
+class SyncPatchRunRequest(BaseModel):
+    title: str | None = None
+
+
+class SyncAttachmentIn(BaseModel):
+    capture_id: uuid.UUID
+    source: Literal["upload", "inbox"] = "upload"
+
+
+class SyncReferenceIn(BaseModel):
+    kind: Literal["capture", "item"]
+    id: uuid.UUID
+    label: str | None = None
+
+
 class SyncStreamRequest(BaseModel):
     message: str = ""
     from_seq: int | None = None
+    attachments: list[SyncAttachmentIn] = Field(default_factory=list)
+    references: list[SyncReferenceIn] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_context_limit(self) -> "SyncStreamRequest":
+        if len(self.attachments) + len(self.references) > 5:
+            raise ValueError("A maximum of 5 attachments/references is allowed")
+        return self
 
 
 class SyncAnswerRequest(BaseModel):
@@ -297,6 +336,7 @@ class SyncEventEnvelope(BaseModel):
         "draft",
         "preview",
         "applied",
+        "undone",
         "usage",
         "warning",
         "error",
@@ -320,6 +360,20 @@ class SyncEventsResponse(BaseModel):
     from_seq: int
     last_seq: int
     events: list[SyncEventEnvelope]
+
+
+class SyncContextSearchResult(BaseModel):
+    kind: Literal["capture", "item"]
+    id: uuid.UUID
+    label: str
+    subtitle: str | None = None
+    status: str | None = None
+    capture_type: str | None = None
+    updated_at: datetime
+
+
+class SyncContextSearchResponse(BaseModel):
+    results: list[SyncContextSearchResult] = Field(default_factory=list)
 
 
 class SyncAgentsResponse(BaseModel):

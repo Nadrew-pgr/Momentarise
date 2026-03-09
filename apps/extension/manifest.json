@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Momentarise Fast Capture",
+  "version": "1.0",
+  "description": "Capturez vos pensées et liens instantanément dans Momentarise.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

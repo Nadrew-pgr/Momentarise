@@ -1,9 +1,19 @@
 import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useAppToast } from "@/lib/store";
 
 export function AppToast() {
-  const { visible, message, actionLabel, onAction, hide } = useAppToast();
+  const { t } = useTranslation();
+  const {
+    visible,
+    message,
+    actionLabel,
+    onAction,
+    secondaryActionLabel,
+    onSecondaryAction,
+    hide,
+  } = useAppToast();
 
   useEffect(() => {
     if (!visible) return;
@@ -32,8 +42,19 @@ export function AppToast() {
                 <Text className="text-xs font-medium text-foreground">{actionLabel}</Text>
               </Pressable>
             ) : null}
+            {secondaryActionLabel && onSecondaryAction ? (
+              <Pressable
+                onPress={() => {
+                  onSecondaryAction();
+                  hide();
+                }}
+                className="rounded border border-input px-2.5 py-1.5"
+              >
+                <Text className="text-xs font-medium text-foreground">{secondaryActionLabel}</Text>
+              </Pressable>
+            ) : null}
             <Pressable onPress={hide} className="rounded border border-input px-2.5 py-1.5">
-              <Text className="text-xs text-muted-foreground">OK</Text>
+              <Text className="text-xs text-muted-foreground">{t("common.ok")}</Text>
             </Pressable>
           </View>
         </View>

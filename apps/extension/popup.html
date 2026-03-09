@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>✨ Momentarise</h1>
+    </header>
+
+    <div class="content">
+      <textarea id="note-input" placeholder="Note rapide ou pensée du moment..."></textarea>
+      
+      <div class="actions">
+        <button id="capture-page" class="secondary-btn">
+          <span class="icon">🔗</span> Capturer l'URL
+        </button>
+        <button id="send-btn" class="primary-btn">Envoyer</button>
+      </div>
+    </div>
+
+    <div id="status-message" class="status hide"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -42,6 +42,8 @@ class AiPreferencesResponse(BaseModel):
     capture_provider_preferences: CaptureProviderPreferences
     capture_default_agent_id: UUID | None = None
     capture_agent_routing_rules: dict = Field(default_factory=dict)
+    editor_default_agent_id: UUID | None = None
+    editor_agent_routing_rules: dict = Field(default_factory=dict)
     capture_research_policy: CaptureResearchPolicy = "proposal_only"
     sync_model: str = "auto"
     sync_reasoning_level: str | None = None
@@ -55,6 +57,8 @@ class AiPreferencesUpdateRequest(BaseModel):
     capture_provider_preferences: CaptureProviderPreferences | None = None
     capture_default_agent_id: UUID | None = None
     capture_agent_routing_rules: dict | None = None
+    editor_default_agent_id: UUID | None = None
+    editor_agent_routing_rules: dict | None = None
     capture_research_policy: CaptureResearchPolicy | None = None
     sync_model: str | None = None
     sync_reasoning_level: str | None = None

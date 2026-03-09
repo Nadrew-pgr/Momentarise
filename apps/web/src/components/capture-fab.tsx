@@ -118,7 +118,8 @@ export function CaptureFab() {
         onSuccess: (created) => {
           setPendingActionKey(null);
           setFabOpen(false);
-          router.push(`/inbox/captures/${created.id}`);
+          const itemQuery = created.item_id ? `?item_id=${encodeURIComponent(created.item_id)}` : "";
+          router.push(`/inbox/captures/${created.id}/note${itemQuery}`);
         },
         onError: (error) => {
           setPendingActionKey(null);

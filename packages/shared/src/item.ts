@@ -18,26 +18,10 @@ export const linkRelationTypeSchema = z.enum([
   "part_of_sequence",
 ]);
 
-/** ProseMirror/BlockNote block node - minimal structure for Phase 1+ */
-export type ProseMirrorNode = {
-  type: string;
-  block_id?: string | null;
-  content?: ProseMirrorNode[] | null;
-  attrs?: Record<string, unknown> | null;
-  text?: string | null;
-  marks?: Record<string, unknown>[] | null;
-};
+/** BlockNote node payload stored as raw JSON to preserve rich formatting metadata. */
+export type ProseMirrorNode = Record<string, unknown>;
 
-export const proseMirrorNodeSchema: z.ZodType<ProseMirrorNode> = z.lazy(() =>
-  z.object({
-    type: z.string(),
-    block_id: z.string().optional().nullable(),
-    content: z.array(proseMirrorNodeSchema).optional().nullable(),
-    attrs: z.record(z.string(), z.unknown()).optional().nullable(),
-    text: z.string().optional().nullable(),
-    marks: z.array(z.record(z.string(), z.unknown())).optional().nullable(),
-  })
-);
+export const proseMirrorNodeSchema = z.record(z.string(), z.unknown());
 
 /** Item blocks: array of ProseMirror-compatible nodes */
 export const itemBlocksSchema = z.array(proseMirrorNodeSchema);

@@ -104,7 +104,7 @@ export function ActionsRail({
 
       <div className="sync-chat-rail-scroll min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-8">
         {newestFeedback ? (
-          <div className="sync-chat-action-feedback rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300">
+          <div className="sync-chat-action-feedback sync-chat-feedback-banner-positive rounded-xl border px-3 py-2 text-xs">
             {newestFeedback.kind === "applied" ? labels.appliedSuccess : labels.undoneSuccess}
           </div>
         ) : null}
@@ -116,7 +116,7 @@ export function ActionsRail({
               "rounded-xl border px-3 py-2 text-xs",
               notice.level === "error"
                 ? "border-destructive/40 bg-destructive/10 text-destructive"
-                : "border-amber-400/40 bg-amber-400/10 text-amber-300"
+                : "sync-chat-feedback-banner-warning"
             )}
           >
             {notice.message}
@@ -137,10 +137,11 @@ export function ActionsRail({
               </p>
               <p className="text-sm">{renderPreviewSummary(latestPreview)}</p>
               <div className="flex gap-2 pt-1">
-                <Button size="sm" onClick={onApply} disabled={!canApply || isApplying}>
+                <Button type="button" size="sm" onClick={onApply} disabled={!canApply || isApplying}>
                   {labels.apply}
                 </Button>
                 <Button
+                  type="button"
                   size="sm"
                   variant="outline"
                   onClick={onUndo}
@@ -210,6 +211,7 @@ export function ActionsRail({
 
           <div className="mt-3">
             <Button
+              type="button"
               size="sm"
               variant="outline"
               onClick={onUndo}

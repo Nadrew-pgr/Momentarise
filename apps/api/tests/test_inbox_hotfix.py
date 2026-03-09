@@ -3,7 +3,7 @@ import unittest
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
 os.environ.setdefault("JWT_SECRET", "test-secret")
@@ -11,11 +11,19 @@ os.environ.setdefault("JWT_SECRET", "test-secret")
 from fastapi import HTTPException
 
 from src.api.v1.inbox import (
+    apply_capture,
     _get_capture_or_404,
     _request_id_from_request,
     _suggest_from_capture,
     _to_capture_out,
+    preview_capture,
+    process_capture,
+    refresh_note_summary,
+    reprocess_capture,
+    restore_capture,
+    update_capture,
 )
+from src.schemas.inbox import ApplyCaptureRequest, UpdateCaptureRequest
 
 
 def build_capture(*, status: str, deleted_at: datetime | None):
@@ -38,7 +46,8 @@ class InboxHotfixTests(unittest.TestCase):
         self.assertFalse(out.archived)
         self.assertIsNone(out.archived_reason)
         self.assertEqual(out.treated_bucket, "treated")
-        self.assertEqual(out.suggested_actions[0].type, "review")
+        self.assertEqual(out.suggested_actions, [])
+        self.assertIsNone(out.primary_action)
 
     def test_to_capture_out_marks_deleted_as_archived(self) -> None:
         capture = build_capture(status="ready", deleted_at=datetime.now(UTC))
@@ -62,6 +71,8 @@ class InboxHotfixTests(unittest.TestCase):
         self.assertEqual(out.treated_bucket, "untreated")
         self.assertEqual(out.source_type, "text")
         self.assertEqual(out.pipeline_state, "ready")
+        self.assertEqual(out.suggested_actions, [])
+        self.assertIsNone(out.primary_action)
 
     def test_to_capture_out_filters_summarize_actions(self) -> None:
         capture = build_capture(status="ready", deleted_at=None)
@@ -118,6 +129,15 @@ class InboxHotfixTests(unittest.TestCase):
         self.assertEqual(preview.capture_id, capture.id)
         self.assertTrue(bool(preview.suggested_title))
 
+    def test_to_capture_out_title_prefers_manual_then_ai(self) -> None:
+        capture = build_capture(status="ready", deleted_at=None)
+        capture.meta = {"manual_title": "Titre Manuel", "ai_title": "Titre IA"}
+        out = _to_capture_out(capture, suggestions=[])
+        self.assertEqual(out.title, "Titre Manuel")
+        capture.meta = {"ai_title": "Titre IA"}
+        out = _to_capture_out(capture, suggestions=[])
+        self.assertEqual(out.title, "Titre IA")
+
 
 class InboxLookupCompatibilityTests(unittest.IsolatedAsyncioTestCase):
     async def test_get_capture_or_404_accepts_item_id_lookup(self) -> None:
@@ -172,6 +192,148 @@ class InboxLookupCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HTTPException) as exc:
             await _get_capture_or_404(db, workspace_id, item_id)
         self.assertEqual(exc.exception.status_code, 404)
+
+
+class InboxApiContractTests(unittest.IsolatedAsyncioTestCase):
+    async def test_process_endpoint_is_gone(self) -> None:
+        with self.assertRaises(HTTPException) as exc:
+            await process_capture(
+                capture_id=uuid.uuid4(),
+                workspace=SimpleNamespace(),
+                db=AsyncMock(),
+            )
+        self.assertEqual(exc.exception.status_code, 410)
+        self.assertEqual(exc.exception.detail, "deprecated_process_flow")
+
+    async def test_restore_endpoint_is_gone(self) -> None:
+        with self.assertRaises(HTTPException) as exc:
+            await restore_capture(
+                capture_id=uuid.uuid4(),
+                workspace=SimpleNamespace(),
+                db=AsyncMock(),
+            )
+        self.assertEqual(exc.exception.status_code, 410)
+        self.assertEqual(exc.exception.detail, "restore_disabled")
+
+    async def test_preview_returns_422_when_no_suggested_actions(self) -> None:
+        capture = build_capture(status="ready", deleted_at=None)
+        db = AsyncMock()
+        workspace = SimpleNamespace(workspace_id=uuid.uuid4())
+        with (
+            patch("src.api.v1.inbox._get_capture_or_404", new=AsyncMock(return_value=capture)),
+            patch("src.api.v1.inbox._load_capture_suggestions", new=AsyncMock(return_value={capture.id: []})),
+        ):
+            with self.assertRaises(HTTPException) as exc:
+                await preview_capture(
+                    capture_id=capture.id,
+                    body=None,
+                    workspace=workspace,
+                    db=db,
+                )
+        self.assertEqual(exc.exception.status_code, 422)
+        self.assertEqual(exc.exception.detail, "no_suggested_actions")
+
+    async def test_apply_returns_422_when_no_suggested_actions(self) -> None:
+        capture = build_capture(status="ready", deleted_at=None)
+        db = AsyncMock()
+        workspace = SimpleNamespace(workspace_id=uuid.uuid4())
+        with (
+            patch("src.api.v1.inbox._get_capture_or_404", new=AsyncMock(return_value=capture)),
+            patch("src.api.v1.inbox._load_capture_suggestions", new=AsyncMock(return_value={capture.id: []})),
+        ):
+            with self.assertRaises(HTTPException) as exc:
+                await apply_capture(
+                    capture_id=capture.id,
+                    body=ApplyCaptureRequest(),
+                    workspace=workspace,
+                    db=db,
+                )
+        self.assertEqual(exc.exception.status_code, 422)
+        self.assertEqual(exc.exception.detail, "no_suggested_actions")
+
+    async def test_reprocess_soft_deletes_previous_results_and_resets_meta(self) -> None:
+        capture = build_capture(status="ready", deleted_at=None)
+        capture.meta = {
+            "artifacts_summary": {"summary": "old"},
+            "pipeline_trace": [{"stage": "old"}],
+            "last_error_code": "old_error",
+            "custom": "keep",
+        }
+        artifact_row = SimpleNamespace(deleted_at=None)
+        suggestion_row = SimpleNamespace(deleted_at=None)
+        job_row = SimpleNamespace(deleted_at=None)
+
+        artifact_result = MagicMock()
+        artifact_result.scalars.return_value.all.return_value = [artifact_row]
+        suggestion_result = MagicMock()
+        suggestion_result.scalars.return_value.all.return_value = [suggestion_row]
+        jobs_result = MagicMock()
+        jobs_result.scalars.return_value.all.return_value = [job_row]
+
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=[artifact_result, suggestion_result, jobs_result])
+        workspace = SimpleNamespace(workspace_id=uuid.uuid4())
+
+        with (
+            patch("src.api.v1.inbox._get_capture_or_404", new=AsyncMock(return_value=capture)),
+            patch("src.api.v1.inbox.resolve_workspace_billing_tier", new=AsyncMock(return_value="free")),
+            patch("src.api.v1.inbox.enqueue_default_jobs", new=AsyncMock(return_value=[])),
+            patch("src.api.v1.inbox.process_capture_jobs", new=AsyncMock(return_value=None)),
+            patch("src.api.v1.inbox._maybe_auto_apply_capture", new=AsyncMock(return_value=None)),
+            patch("src.api.v1.inbox._sync_source_item_from_capture", new=AsyncMock(return_value=None)),
+        ):
+            response = await reprocess_capture(
+                capture_id=capture.id,
+                workspace=workspace,
+                db=db,
+            )
+
+        self.assertEqual(response.status, "queued")
+        self.assertIsNotNone(artifact_row.deleted_at)
+        self.assertIsNotNone(suggestion_row.deleted_at)
+        self.assertIsNotNone(job_row.deleted_at)
+        self.assertNotIn("artifacts_summary", capture.meta)
+        self.assertNotIn("pipeline_trace", capture.meta)
+        self.assertEqual(capture.meta.get("custom"), "keep")
+        self.assertIn("reprocessed_at", capture.meta)
+        db.commit.assert_awaited_once()
+
+    async def test_update_capture_sets_manual_title_lock(self) -> None:
+        capture = build_capture(status="ready", deleted_at=None)
+        capture.meta = {}
+        workspace = SimpleNamespace(workspace_id=uuid.uuid4())
+        with (
+            patch("src.api.v1.inbox._get_capture_or_404", new=AsyncMock(return_value=capture)),
+            patch("src.api.v1.inbox._find_source_item", new=AsyncMock(return_value=None)),
+        ):
+            response = await update_capture(
+                capture_id=capture.id,
+                body=UpdateCaptureRequest(title="Titre test"),
+                workspace=workspace,
+                db=AsyncMock(),
+            )
+        self.assertEqual(response.capture_id, capture.id)
+        self.assertEqual(capture.meta.get("manual_title"), "Titre test")
+        self.assertTrue(capture.meta.get("title_locked"))
+
+    async def test_refresh_note_summary_skips_when_too_short(self) -> None:
+        capture = build_capture(status="ready", deleted_at=None)
+        capture.capture_type = "text"
+        capture.source = "note"
+        capture.meta = {"note_intent": True}
+        item = SimpleNamespace(blocks=[{"type": "paragraph", "content": [{"type": "text", "text": "court"}]}])
+        workspace = SimpleNamespace(workspace_id=uuid.uuid4())
+        with (
+            patch("src.api.v1.inbox._get_capture_or_404", new=AsyncMock(return_value=capture)),
+            patch("src.api.v1.inbox._find_source_item", new=AsyncMock(return_value=item)),
+            patch("src.api.v1.inbox.settings", new=SimpleNamespace(NOTE_SUMMARY_MIN_CHARS=180)),
+        ):
+            response = await refresh_note_summary(
+                capture_id=capture.id,
+                workspace=workspace,
+                db=AsyncMock(),
+            )
+        self.assertEqual(response.status, "skipped_too_short")
 
 
 if __name__ == "__main__":

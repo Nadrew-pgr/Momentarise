@@ -2,6 +2,7 @@ import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Undo, Play } from 'lucide-react-native';
 import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
+import { useTranslation } from "react-i18next";
 
 interface ActionsRailProps {
     pendingPreviews?: { id: string; description?: string }[];
@@ -20,13 +21,14 @@ export function ActionsRail({
     isUndoing = false,
     activeToolName,
 }: ActionsRailProps) {
+    const { t } = useTranslation();
     if (pendingPreviews.length === 0 && !activeToolName) return null;
 
     return (
         <View className="mb-3 pl-4">
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
                 {activeToolName && (
-                    <Animated.View entering={FadeInRight} exiting={FadeOutLeft} className="mr-2">
+                    <Animated.View entering={FadeInRight} exiting={FadeOutLeft} style={{ marginRight: 8 }}>
                         <View className="flex-row items-center bg-muted/60 px-3 py-1.5 rounded-full border border-border/50">
                             <ActivityIndicator size="small" style={{ width: 14, height: 14, marginRight: 6 }} />
                             <Text className="text-[13px] text-muted-foreground font-medium">{activeToolName}...</Text>
@@ -35,7 +37,12 @@ export function ActionsRail({
                 )}
 
                 {pendingPreviews.map((preview) => (
-                    <Animated.View key={preview.id} entering={FadeInRight} exiting={FadeOutLeft} className="mr-2 flex-row gap-2">
+                    <Animated.View
+                        key={preview.id}
+                        entering={FadeInRight}
+                        exiting={FadeOutLeft}
+                        style={{ marginRight: 8, flexDirection: "row", gap: 8 }}
+                    >
                         <TouchableOpacity
                             onPress={() => onApply?.(preview.id)}
                             disabled={isApplying || isUndoing}
@@ -47,7 +54,7 @@ export function ActionsRail({
                                 <Play size={14} className="text-primary-foreground mr-1" />
                             )}
                             <Text className={`text-[13px] font-semibold ${isApplying ? 'text-muted-foreground' : 'text-primary-foreground'}`}>
-                                Apply Preview
+                                {t("pages.sync.actions.applyPreview")}
                             </Text>
                         </TouchableOpacity>
 
@@ -62,7 +69,7 @@ export function ActionsRail({
                                 <Undo size={14} className="text-foreground mr-1" />
                             )}
                             <Text className={`text-[13px] font-semibold ${isUndoing ? 'text-muted-foreground' : 'text-foreground'}`}>
-                                Revert
+                                {t("pages.sync.actions.undo")}
                             </Text>
                         </TouchableOpacity>
                     </Animated.View>

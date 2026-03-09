@@ -35,6 +35,7 @@ class _ProviderAdapter:
         model: str,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None,
+        tool_choice: str | dict[str, Any] | None,
     ) -> dict[str, Any]:
         raise NotImplementedError
 
@@ -49,6 +50,7 @@ class _OpenAILikeAdapter(_ProviderAdapter):
         model: str,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None,
+        tool_choice: str | dict[str, Any] | None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": model,
@@ -57,7 +59,7 @@ class _OpenAILikeAdapter(_ProviderAdapter):
         }
         if tools:
             payload["tools"] = tools
-            payload["tool_choice"] = "auto"
+            payload["tool_choice"] = tool_choice or "auto"
         return payload
 
     def parse_response(self, data: dict[str, Any], model: str) -> dict[str, Any]:
@@ -148,6 +150,7 @@ class _AnthropicAdapter(_ProviderAdapter):
         model: str,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None,
+        tool_choice: str | dict[str, Any] | None,
     ) -> dict[str, Any]:
         system_messages, anthropic_messages = _convert_messages_for_anthropic(messages)
         payload: dict[str, Any] = {
@@ -160,7 +163,12 @@ class _AnthropicAdapter(_ProviderAdapter):
         anthropic_tools = _convert_tools_for_anthropic(tools)
         if anthropic_tools:
             payload["tools"] = anthropic_tools
-            payload["tool_choice"] = {"type": "auto"}
+            if tool_choice == "required":
+                payload["tool_choice"] = {"type": "any"}
+            elif isinstance(tool_choice, dict):
+                payload["tool_choice"] = tool_choice
+            else:
+                payload["tool_choice"] = {"type": "auto"}
 
         return payload
 
@@ -261,6 +269,7 @@ class LiteLLMClient:
         model: str | None = None,
         messages: list[dict[str, Any]] | None = None,
         tools: list[dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         provider, target_model = cls._resolve_provider_and_model(model)
         print(f"[SYNC-DEBUG] LLM routing: requested={model!r} → provider={provider!r}, model={target_model!r}", flush=True)
@@ -286,6 +295,21 @@ class LiteLLMClient:
             )
 
         api_key = (adapter.get_api_key() or "").strip()
+        reroute_warning: str | None = None
+        if not api_key and settings.SYNC_ENABLE_FALLBACK:
+            reroute = cls._resolve_reroute_with_available_key(
+                requested_provider=provider,
+                requested_model=target_model,
+            )
+            if reroute is not None:
+                provider, target_model, reroute_warning = reroute
+                adapter = cls.PROVIDERS[provider]
+                api_key = (adapter.get_api_key() or "").strip()
+                print(
+                    f"[SYNC-DEBUG] Rerouted missing-key model → provider={provider!r}, model={target_model!r}",
+                    flush=True,
+                )
+
         if not api_key:
             warning = f"{adapter.provider.upper()} API key missing, fallback enabled."
             if settings.SYNC_ENABLE_FALLBACK:
@@ -301,7 +325,12 @@ class LiteLLMClient:
                 retryable=False,
             )
 
-        payload = adapter.build_payload(model=target_model, messages=request_messages, tools=tools)
+        payload = adapter.build_payload(
+            model=target_model,
+            messages=request_messages,
+            tools=tools,
+            tool_choice=tool_choice,
+        )
         headers = adapter.build_headers(api_key)
 
         try:
@@ -341,7 +370,10 @@ class LiteLLMClient:
             ) from exc
 
         try:
-            return adapter.parse_response(data, target_model)
+            parsed = adapter.parse_response(data, target_model)
+            if reroute_warning:
+                parsed["warning"] = reroute_warning
+            return parsed
         except LiteLLMClientError as exc:
             print(f"[SYNC-DEBUG] parse_response error: {exc.message}", flush=True)
             if settings.SYNC_ENABLE_FALLBACK:
@@ -409,6 +441,31 @@ class LiteLLMClient:
     @staticmethod
     async def _backoff(attempt: int) -> None:
         await asyncio.sleep(min(0.25 * attempt, 1.0))
+
+    @classmethod
+    def _resolve_reroute_with_available_key(
+        cls,
+        *,
+        requested_provider: str,
+        requested_model: str,
+    ) -> tuple[str, str, str] | None:
+        from src.sync.model_registry import resolve_auto_model
+
+        auto_model = resolve_auto_model("sync", user_tier="free")
+        reroute_provider, reroute_model = cls._resolve_provider_and_model(auto_model)
+        reroute_adapter = cls.PROVIDERS.get(reroute_provider)
+        reroute_api_key = (reroute_adapter.get_api_key() or "").strip() if reroute_adapter else ""
+        if not reroute_api_key:
+            return None
+
+        if reroute_provider == requested_provider and reroute_model == requested_model:
+            return None
+
+        warning = (
+            f"Selected model '{requested_model}' is unavailable for '{requested_provider}'. "
+            f"Using '{reroute_model}' instead."
+        )
+        return reroute_provider, reroute_model, warning
 
     @classmethod
     def _resolve_provider_and_model(cls, model: str | None) -> tuple[str, str]:

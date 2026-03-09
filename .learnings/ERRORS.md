@@ -430,3 +430,308 @@ sqlalchemy.exc.InvalidRequestError: One or more mappers failed to initialize - c
 - Use `src.core.deps` for user and workspace dependency extraction.
 - Provide explicit `ForeignKey("workspaces.id")` to the `workspace_id` column mapping inside the child ORM model (`Project` and `Series`).
 ---
+
+## [ERR-20260304-001] Next dev — lock .next/dev/lock déjà pris
+**Logged**: 2026-03-04T08:51:30Z
+**Priority**: low
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+`npm run dev` sur `apps/web` échoue avec “Unable to acquire lock …/.next/dev/lock” quand une autre instance Next dev tourne déjà sur le même dossier.
+
+### Error
+```
+Unable to acquire lock at .../apps/web/.next/dev/lock, is another instance of next dev running?
+```
+
+### Context
+- Command: `cd apps/web && npm run dev`
+- Related Files: `apps/web/.next/dev/lock`
+- Observed: port 3000 occupé + lock détenu par un process `node`.
+
+### Suggested Fix
+- Identifier le PID qui détient le lock avec `lsof apps/web/.next/dev/lock`.
+- Tuer uniquement ce PID (ex: `kill <pid>`) puis relancer `npm run dev`.
+- Éviter `pkill -f "next dev"` pour ne pas stopper d’autres apps Next en cours.
+---
+
+## [ERR-20260304-002] Next dev — lock + port 3000 occupé
+**Logged**: 2026-03-04T09:10:00Z
+**Priority**: low
+**Status**: pending
+**Area**: frontend
+
+### Summary
+Relancer `npm run dev` sur `apps/web` échoue car une autre instance Next ou un autre process occupe déjà le port 3000 et le lock `.next/dev/lock`.
+
+### Error
+```
+⚠ Port 3000 is in use by process 40815, using available port 3001 instead.
+⨯ Unable to acquire lock at /Users/andrewpougary/DevLocal/Momentarise/apps/web/.next/dev/lock, is another instance of next dev running?
+```
+
+### Context
+- Command: `cd apps/web && npm run dev`
+- Related Files: `apps/web/.next/dev/lock`
+- Observed: Next tente le port 3001 mais échoue à cause du lock déjà pris, probablement par une autre instance `next dev` sur le même dossier.
+
+### Suggested Fix
+- Vérifier s’il y a déjà un `npm run dev` pour `apps/web` dans un autre terminal et, si oui, l’utiliser ou l’arrêter proprement (Ctrl+C).
+- Une fois l’ancienne instance arrêtée, relancer `npm run dev` dans `apps/web`.
+- En dernier recours seulement, supprimer le fichier `.next/dev/lock` après s’être assuré qu’aucune instance `next dev` pour ce projet ne tourne encore.
+---
+
+## [ERR-20260304-001] Debug log file missing
+**Logged**: 2026-03-04T09:30:00Z
+**Priority**: low
+**Status**: pending
+**Area**: frontend
+
+### Summary
+Attempt to clear the debug log file for the current Cursor debug session failed because the file does not exist yet.
+
+### Error
+```
+Error deleting file : File not found: /Users/andrewpougary/DevLocal/Momentarise/.cursor/debug-364720.log
+```
+
+### Context
+- Command: Delete tool on `/Users/andrewpougary/DevLocal/Momentarise/.cursor/debug-364720.log`
+- Related Files: `.cursor/debug-364720.log`
+- Observed: The debug log file is not present before the first instrumented run.
+
+### Suggested Fix
+- Treat this as expected on the first run of a debug session; no manual action needed.
+- Only investigate if future deletions fail when the file should already contain logs.
+---
+
+## [ERR-20260305-001] Expo mobile lance depuis la racine du monorepo
+**Logged**: 2026-03-05T10:43:01+01:00
+**Priority**: medium
+**Status**: resolved
+**Area**: mobile / tooling
+
+### Summary
+Le bundling iOS echoue avec `Unable to resolve "../../App"` quand Expo est lance depuis la racine `Momentarise/` au lieu de `apps/mobile/`.
+
+### Error
+```
+Unable to resolve "../../App" from "node_modules/expo/AppEntry.js"
+```
+
+### Context
+- Command: lancement Expo depuis `/Users/andrewpougary/DevLocal/Momentarise`
+- Related Files: `apps/mobile/index.js`, `apps/mobile/package.json`, `package.json`
+- Observed: Expo utilise `expo/AppEntry.js` (entrypoint par defaut) et cherche `../../App`, qui n'existe pas a la racine du monorepo.
+
+### Suggested Fix
+- Demarrer Expo depuis `apps/mobile` (ou via workspace npm): `npm run start -w apps/mobile`.
+- Ajouter des scripts racine dedies pour eviter l'erreur de dossier (`mobile:start`, `mobile:ios`, `mobile:android`, `mobile:web`).
+---
+
+## [ERR-20260305-002] zsh glob sur route Next.js avec parenthèses et crochets
+**Logged**: 2026-03-05T22:20:00+01:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs / tooling
+
+### Summary
+Une commande `sed` sur un fichier route Next.js a echoue car le chemin n'etait pas quote et zsh a interprete `()` / `[]` comme des patterns de glob.
+
+### Error
+```
+zsh:1: no matches found: apps/web/src/app/(dashboard)/inbox/items/[id]/page.tsx
+```
+
+### Context
+- Command: `sed -n '1,320p' apps/web/src/app/(dashboard)/inbox/items/[id]/page.tsx`
+- Related Files: `apps/web/src/app/(dashboard)/inbox/items/[id]/page.tsx`
+- Reproducible: yes
+
+### Suggested Fix
+Toujours quoter les chemins Next.js contenant `()` et `[]` en shell zsh, par exemple:
+`sed -n '1,320p' \"apps/web/src/app/(dashboard)/inbox/items/[id]/page.tsx\"`
+
+### Metadata
+- See Also: `ERR-20260305-001`
+---
+
+## [ERR-20260306-001] MCP Stitch startup failure due to header/env mismatch
+**Logged**: 2026-03-06T12:08:00+01:00
+**Priority**: medium
+**Status**: pending
+**Area**: config
+
+### Summary
+Le serveur MCP `stitch` est configure et active, mais le runtime de session echoue au demarrage en demandant une variable d'environnement manquante.
+
+### Error
+```
+resources/list failed: failed to get client: MCP startup failed: Environment variable X-Goog-Api-Key for MCP server 'stitch' is not set
+```
+
+### Context
+- Command: `list_mcp_resources(server="stitch")` et `list_mcp_resource_templates(server="stitch")`
+- Related Files: `~/.codex/config.toml`, `~/.cursor/mcp.json`
+- Reproducible: yes
+
+### Suggested Fix
+- Redemarrer la session Codex/Cursor apres modification MCP.
+- Verifier que la conf chargee par le runtime utilise bien `http_headers` (ou `env_http_headers` + variable exportee) pour `X-Goog-Api-Key`.
+- Re-tester via `codex mcp get stitch` puis `list_mcp_resources(server="stitch")`.
+
+### Metadata
+- See Also: `LRN-20260228-001`
+---
+
+## [ERR-20260306-002] Note summary refresh returns 500 when model summary is empty
+**Logged**: 2026-03-06T12:10:10+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+`POST /api/v1/inbox/{capture_id}/note-summary/refresh` returned 500 when AI payload had no summary text.
+
+### Error
+```
+RuntimeError: capture_summary_empty
+```
+
+### Context
+- Command: Celery/API processing on capture preprocess and note-summary refresh endpoint
+- Related Files: `apps/api/src/services/capture_ai_service.py`, `apps/api/src/api/v1/inbox.py`
+- Reproducible: yes
+
+### Suggested Fix
+Use deterministic fallback summary/title when AI returns empty summary and handle endpoint fallback without raising 500.
+
+### Resolution
+- Resolved: 2026-03-06
+- Change: Added deterministic fallback in summary generation and guarded `note-summary/refresh` with fallback payload.
+
+### Metadata
+- See Also: `ERR-20260306-003`, `LRN-20260306-001`
+---
+
+## [ERR-20260306-003] Celery async worker loop mismatch with asyncpg sessions
+**Logged**: 2026-03-06T12:10:10+01:00
+**Priority**: critical
+**Status**: resolved
+**Area**: backend
+
+### Summary
+Celery tasks intermittently failed with loop mismatch and asyncpg interface errors due to new asyncio loop per task execution.
+
+### Error
+```
+RuntimeError: ... got Future ... attached to a different loop
+sqlalchemy.exc.InterfaceError: ... cannot perform operation: another operation is in progress
+```
+
+### Context
+- Command: `uv run celery -A src.worker.celery_app:celery_app worker -Q capture_high,capture_default,capture_free -l info`
+- Related Files: `apps/api/src/worker/tasks/capture_tasks.py`, `apps/api/src/worker/tasks/sync_backfill_events.py`
+- Reproducible: yes
+
+### Suggested Fix
+Run async coroutines on a persistent event loop per worker process instead of `asyncio.run(...)` on each task invocation.
+
+### Resolution
+- Resolved: 2026-03-06
+- Change: Replaced per-task `asyncio.run` with process-local persistent loop runner in Celery task modules.
+
+### Metadata
+- See Also: `LRN-20260306-001`
+---
+
+## [ERR-20260306-004] uv commands blocked by sandbox cache permissions
+**Logged**: 2026-03-06T20:45:00+01:00
+**Priority**: medium
+**Status**: resolved
+**Area**: infra
+
+### Summary
+`uv run ...` failed in sandbox because `~/.cache/uv` was not readable from the restricted environment.
+
+### Error
+```
+error: failed to open file `/Users/andrewpougary/.cache/uv/sdists-v9/.git`: Operation not permitted (os error 1)
+```
+
+### Context
+- Command: `cd apps/api && PYTHONPATH=. uv run python -m py_compile ...` and `cd apps/api && PYTHONPATH=. uv run python -m unittest tests.test_event_contracts -v`
+- Related Files: `apps/api/src/api/v1/events.py`, `apps/api/src/api/v1/inbox.py`, `apps/api/src/api/v1/items.py`
+- Reproducible: yes
+
+### Suggested Fix
+Re-run the same `uv` command with elevated sandbox permissions when cache-access errors occur.
+
+### Resolution
+- Resolved: 2026-03-06
+- Change: Re-ran validation commands with escalated permissions and added this runbook entry.
+
+### Metadata
+- See Also: `LRN-20260228-001`
+---
+
+## [ERR-20260306-005] Sync attachments stalled before send (web/mobile)
+**Logged**: 2026-03-06T21:15:00+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: backend/frontend/mobile
+
+### Summary
+Sync attachment flow could appear uploaded but remain unusable: send stayed blocked or failed after attach.
+
+### Error
+```
+User symptom: "ça semble uploader mais c'est tt" (web) and "+" menu opens without effective attach flow (mobile).
+```
+
+### Context
+- Command: runtime UX issue reported during Sync attach tests (web + mobile)
+- Related Files: `apps/api/src/api/v1/inbox.py`, `apps/web/src/components/sync-chat/chat-shell.tsx`, `apps/mobile/app/sync.tsx`
+- Reproducible: yes
+
+### Suggested Fix
+Force inline processing for `sync_attachment`, propagate real capture status for Inbox picks (poll until ready), and replace mobile picker dynamic imports with static imports.
+
+### Resolution
+- Resolved: 2026-03-06
+- Change: Added `sync_attachment` inline path in upload API, non-ready Inbox capture polling on web/mobile, static picker imports on mobile, and explicit stream error feedback.
+
+### Metadata
+- See Also: `LRN-20260306-003`, `ERR-20260306-003`
+---
+
+## [ERR-20260306-006] Sync model list inconsistency due to backend split-brain on port 8000
+**Logged**: 2026-03-06T23:20:00+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: infra/backend
+
+### Summary
+Web/mobile could hit different API instances on the same port (`docker` + local `uvicorn`), causing inconsistent Sync model lists and fallback warnings.
+
+### Error
+```
+User symptom: only Mistral models visible + "MISTRAL API key missing, fallback enabled".
+```
+
+### Context
+- Command: `lsof -nP -iTCP:8000 -sTCP:LISTEN`
+- Related Files: `docker-compose.yml`, `apps/api/src/sync/model_registry.py`, `apps/api/src/core/config.py`
+- Reproducible: yes
+
+### Suggested Fix
+Use a single backend instance per port, ensure Docker API loads `apps/api/.env`, and avoid provider-key-based hiding in `/sync/models`.
+
+### Resolution
+- Resolved: 2026-03-06
+- Change: added `env_file: ./apps/api/.env` to `api` and `api-worker`, rebuilt containers, and removed provider-key gating from Sync model catalog.
+
+### Metadata
+- See Also: `LRN-20260306-004`, `ERR-20260306-005`
+---

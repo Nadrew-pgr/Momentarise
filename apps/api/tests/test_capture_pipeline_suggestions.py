@@ -1,11 +1,13 @@
 import os
 import unittest
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
 os.environ.setdefault("JWT_SECRET", "test-secret")
 
 from src.services.capture_pipeline import (
+    _build_artifacts_summary,
     _build_action_suggestions,
     _derive_category_and_tags,
     _should_run_ocr_for_asset,
@@ -17,6 +19,7 @@ def build_capture(*, capture_type: str = "file", meta: dict | None = None):
     return SimpleNamespace(
         capture_type=capture_type,
         meta=meta or {},
+        raw_content="",
     )
 
 
@@ -58,11 +61,10 @@ class CapturePipelineSuggestionTests(unittest.TestCase):
             self.assertEqual(task.payload.get("payment_method"), "PayPal")
         self.assertNotIn("summarize", [item.type for item in suggestions])
 
-    def test_returns_review_when_no_action_is_detected(self) -> None:
+    def test_returns_empty_when_no_action_is_detected(self) -> None:
         capture = build_capture(capture_type="text")
         suggestions = _build_action_suggestions(capture, "Random text with no actionable marker.")
-        self.assertGreaterEqual(len(suggestions), 1)
-        self.assertEqual(suggestions[0].type, "review")
+        self.assertEqual(suggestions, [])
 
     def test_derives_finance_category_and_tags_from_invoice_text(self) -> None:
         capture = build_capture(capture_type="file")
@@ -124,6 +126,57 @@ class CapturePipelineSuggestionTests(unittest.TestCase):
         self.assertEqual(
             job_types_for_capture("photo"),
             ["ingest", "vlm_enrich", "transcribe_or_extract", "preprocess", "suggest_actions"],
+        )
+
+    def test_artifacts_summary_prefers_key_points_over_transcript(self) -> None:
+        capture = build_capture(capture_type="voice")
+        now = datetime.now(UTC)
+        artifacts = [
+            SimpleNamespace(
+                artifact_type="transcript",
+                content_json={"text": "Transcribed from voice-123.webm.", "fallback_used": True},
+                created_at=now - timedelta(seconds=2),
+            ),
+            SimpleNamespace(
+                artifact_type="summary",
+                content_json={
+                    "text": "Client asks for contract renegotiation.",
+                    "key_points": ["Renegotiate rates", "Need legal review"],
+                },
+                created_at=now - timedelta(seconds=1),
+            ),
+        ]
+        summary = _build_artifacts_summary(
+            capture=capture,  # type: ignore[arg-type]
+            semantic_text="",
+            artifacts=artifacts,  # type: ignore[arg-type]
+            analysis=None,
+        )
+        self.assertEqual(summary["summary"], "Client asks for contract renegotiation.")
+        self.assertEqual(
+            summary["key_clauses"],
+            ["Renegotiate rates", "Need legal review"],
+        )
+
+    def test_artifacts_summary_uses_real_transcript_when_available(self) -> None:
+        capture = build_capture(capture_type="voice")
+        now = datetime.now(UTC)
+        artifacts = [
+            SimpleNamespace(
+                artifact_type="transcript",
+                content_json={"text": "Discussed delivery timeline and budget constraints."},
+                created_at=now,
+            ),
+        ]
+        summary = _build_artifacts_summary(
+            capture=capture,  # type: ignore[arg-type]
+            semantic_text="",
+            artifacts=artifacts,  # type: ignore[arg-type]
+            analysis=None,
+        )
+        self.assertEqual(
+            summary["key_clauses"],
+            ["Discussed delivery timeline and budget constraints."],
         )
 
 

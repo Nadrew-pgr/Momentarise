@@ -2,31 +2,49 @@ import React, { useRef } from "react";
 import { View, TextInput, Text, KeyboardAvoidingView, Platform, TouchableOpacity, TouchableWithoutFeedback, StyleSheet, Keyboard } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeOut, FadeInDown, FadeOutDown, ZoomIn, ZoomOut } from "react-native-reanimated";
-import { ArrowUp, Plus, X, Camera, FileText, Link2, Inbox, Square } from "lucide-react-native";
+import { ArrowUp, Plus, X, Camera, FileText, Mic, Inbox, Square } from "lucide-react-native";
 import { SpeechInput } from "./speech-input";
+
+export type ComposerPlusActionKey = "photo" | "file" | "voice" | "inbox";
+
+type ComposerPlusActionLabelMap = Partial<Record<ComposerPlusActionKey, string>>;
 
 interface ComposerProps {
     value: string;
     onChange: (val: string) => void;
+    onSelectionChange?: (selection: { start: number; end: number }) => void;
     onSend: () => void;
     onStop: () => void;
     isStreaming: boolean;
     placeholder?: string;
     disabled?: boolean;
     onAudioRecorded?: (uri: string) => Promise<string>;
-    onPlusPress?: () => void;
+    onPlusAction?: (key: ComposerPlusActionKey) => void;
+    onHeightChange?: (height: number) => void;
+    canSend?: boolean;
+    addAttachmentLabel?: string;
+    stopLabel?: string;
+    sendLabel?: string;
+    plusActionLabels?: ComposerPlusActionLabelMap;
 }
 
 export function Composer({
     value,
     onChange,
+    onSelectionChange,
     onSend,
     onStop,
     isStreaming,
     placeholder = "Ask anything...",
     disabled = false,
     onAudioRecorded,
-    onPlusPress,
+    onPlusAction,
+    onHeightChange,
+    canSend = true,
+    addAttachmentLabel = "Add attachment",
+    stopLabel = "Stop generating",
+    sendLabel = "Send message",
+    plusActionLabels = {},
 }: ComposerProps) {
     const insets = useSafeAreaInsets();
     const inputRef = useRef<TextInput>(null);
@@ -34,11 +52,11 @@ export function Composer({
     const [isKeyboardVisible, setKeyboardVisible] = React.useState(false);
     const [isPlusMenuOpen, setIsPlusMenuOpen] = React.useState(false);
 
-    const PLUS_MENU_ITEMS = [
-        { icon: Camera, label: "Photo", key: "photo" },
-        { icon: FileText, label: "File", key: "file" },
-        { icon: Link2, label: "Link", key: "link" },
-        { icon: Inbox, label: "Inbox", key: "inbox" },
+    const PLUS_MENU_ITEMS: { icon: typeof Camera; label: string; key: ComposerPlusActionKey }[] = [
+        { icon: Camera, label: plusActionLabels.photo ?? "Photo", key: "photo" },
+        { icon: FileText, label: plusActionLabels.file ?? "File", key: "file" },
+        { icon: Mic, label: plusActionLabels.voice ?? "Voice", key: "voice" },
+        { icon: Inbox, label: plusActionLabels.inbox ?? "Inbox", key: "inbox" },
     ];
 
     React.useEffect(() => {
@@ -66,6 +84,9 @@ export function Composer({
                 exiting={FadeOutDown.duration(200)}
                 className="absolute bottom-0 left-0 right-0 px-4"
                 style={{ paddingBottom }}
+                onLayout={(event) => {
+                    onHeightChange?.(event.nativeEvent.layout.height);
+                }}
             >
                 {/* Plus Menu Popup */}
                 {isPlusMenuOpen && (
@@ -80,7 +101,7 @@ export function Composer({
                                 key={item.key}
                                 onPress={() => {
                                     setIsPlusMenuOpen(false);
-                                    onPlusPress?.();
+                                    onPlusAction?.(item.key);
                                 }}
                                 className={`flex-row items-center px-4 py-3 ${i < PLUS_MENU_ITEMS.length - 1 ? 'border-b border-border/30' : ''}`}
                                 activeOpacity={0.6}
@@ -105,7 +126,7 @@ export function Composer({
                             onPress={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
                             className={`flex h-9 w-9 items-center justify-center rounded-full ${isPlusMenuOpen ? 'bg-primary' : 'bg-muted'}`}
                             accessibilityRole="button"
-                            accessibilityLabel="Add attachment"
+                            accessibilityLabel={addAttachmentLabel}
                         >
                             {isPlusMenuOpen ? (
                                 <Animated.View entering={ZoomIn.duration(150)} exiting={ZoomOut.duration(100)}>
@@ -123,6 +144,9 @@ export function Composer({
                         ref={inputRef}
                         value={value}
                         onChangeText={onChange}
+                        onSelectionChange={(event) => {
+                            onSelectionChange?.(event.nativeEvent.selection);
+                        }}
                         placeholder={placeholder}
                         placeholderTextColor="#888888"
                         multiline
@@ -138,7 +162,7 @@ export function Composer({
                                 onPress={onStop}
                                 className="bg-muted-foreground flex h-9 w-9 items-center justify-center rounded-full"
                                 accessibilityRole="button"
-                                accessibilityLabel="Stop generating"
+                                accessibilityLabel={stopLabel}
                             >
                                 <Square size={16} color="#FFFFFF" fill="currentColor" />
                             </TouchableOpacity>
@@ -146,12 +170,13 @@ export function Composer({
                             <Animated.View entering={ZoomIn} exiting={ZoomOut}>
                                 <TouchableOpacity
                                     onPress={() => {
-                                        if (hasContent && !disabled) onSend();
+                                        if (hasContent && !disabled && canSend) onSend();
                                     }}
-                                    disabled={disabled}
+                                    disabled={disabled || !canSend}
                                     className="flex h-9 w-9 items-center justify-center rounded-full transition-colors bg-primary"
                                     accessibilityRole="button"
-                                    accessibilityLabel="Send message"
+                                    accessibilityLabel={sendLabel}
+                                    style={{ opacity: canSend ? 1 : 0.45 }}
                                 >
                                     <ArrowUp
                                         size={18}

@@ -9,6 +9,8 @@ dependencies = [
     "sqlalchemy[asyncio]",
     "asyncpg",
     "alembic",
+    "celery",
+    "redis",
     "pydantic[email]",
     "pydantic-settings",
     "pyjwt",

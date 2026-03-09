@@ -1,8 +1,10 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from src.schemas.business_block import BUSINESS_BLOCK_SCHEMA_VERSION, BusinessBlock
 
 from src.schemas.timeline import EventOut
 
@@ -61,3 +63,37 @@ class StopTrackingResponse(BaseModel):
     event_id: uuid.UUID
     is_tracking: bool = False
     actual_time_acc: int  # seconds, from actual_time_acc_seconds
+
+
+class EventContentResponse(BaseModel):
+    event_id: uuid.UUID
+    item_id: uuid.UUID
+    schema_version: Literal[BUSINESS_BLOCK_SCHEMA_VERSION] = BUSINESS_BLOCK_SCHEMA_VERSION
+    blocks: list[BusinessBlock]
+
+
+class EventContentUpdateRequest(BaseModel):
+    schema_version: Literal[BUSINESS_BLOCK_SCHEMA_VERSION] = BUSINESS_BLOCK_SCHEMA_VERSION
+    blocks: list[BusinessBlock]
+
+
+class EventAnalyticsMetrics(BaseModel):
+    completion_rate: float = 0
+    effort_seconds: int = 0
+    training_volume: float = 0
+    energy_score: float = 0
+    inbox_refs_count: int = 0
+    block_count: int = 0
+
+
+class EventAnalyticsResponse(BaseModel):
+    event_id: uuid.UUID
+    period: Literal["week", "month"]
+    compare: Literal["previous"] = "previous"
+    current: EventAnalyticsMetrics
+    previous: EventAnalyticsMetrics
+    delta: EventAnalyticsMetrics
+    current_start: date
+    current_end: date
+    previous_start: date
+    previous_end: date

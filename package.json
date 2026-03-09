@@ -1,9 +1,13 @@
 {
   "name": "momentarise",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "lane:check": "node scripts/check-lane-boundary.mjs",
+    "sync:doctor": "node scripts/check-sync-runtime.mjs",
     "mobile:start": "npm run start -w apps/mobile",
     "mobile:ios": "npm run ios -w apps/mobile",
     "mobile:android": "npm run android -w apps/mobile",
@@ -11,5 +15,6 @@
   },
   "devDependencies": {
     "tailwindcss": "^4"
-  }
+  },
+  "packageManager": "pnpm@9.15.9+sha512.68046141893c66fad01c079231128e9afb89ef87e2691d69e4d40eee228988295fd4682181bae55b58418c3a253bde65a505ec7c5f9403ece5cc3cd37dcf2531"
 }

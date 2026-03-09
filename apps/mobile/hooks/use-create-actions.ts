@@ -161,7 +161,8 @@ export function useCreateActions(onClose: () => void) {
       {
         onSuccess: (created) => {
           onClose();
-          router.push(`/inbox/${created.id}`);
+          const query = created.item_id ? `?item_id=${encodeURIComponent(created.item_id)}` : "";
+          router.push(`/inbox/${created.id}/note${query}`);
         },
         onError: (error) => {
           setUserError(error instanceof Error ? error.message : t("create.error"));

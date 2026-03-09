@@ -16,7 +16,7 @@ class SystemPromptTests(unittest.TestCase):
                 user_message="Plan my week",
                 allowed_tools=[
                     {
-                        "name": "item.preview",
+                        "name": "item_preview",
                         "description": "Preview item updates",
                         "requires_confirm": False,
                         "is_write": False,

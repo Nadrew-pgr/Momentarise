@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import type { Block } from "@blocknote/core";
-import type { ProseMirrorNode } from "@momentarise/shared";
+import { businessBlockTypeValues, type ProseMirrorNode } from "@momentarise/shared";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -20,6 +20,21 @@ import {
 import { Button } from "@/components/ui/button";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+const BUSINESS_BLOCK_TYPE_SET = new Set<string>(businessBlockTypeValues);
+
+function isBusinessBlocksPayload(value: unknown): value is Array<{ type: string; payload: Record<string, unknown> }> {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  return value.every((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const block = entry as Record<string, unknown>;
+    return (
+      typeof block.type === "string" &&
+      BUSINESS_BLOCK_TYPE_SET.has(block.type) &&
+      !!block.payload &&
+      typeof block.payload === "object"
+    );
+  });
+}
 
 export default function InboxItemDetailPage() {
   const { t } = useTranslation();
@@ -76,6 +91,7 @@ export default function InboxItemDetailPage() {
     if (saveState === "error") return t("pages.item.saveError");
     return null;
   }, [saveState, t]);
+  const isBusinessItem = useMemo(() => isBusinessBlocksPayload(item?.blocks), [item?.blocks]);
 
   const handleDelete = useCallback(() => {
     deleteItem.mutate(undefined, {
@@ -183,14 +199,26 @@ export default function InboxItemDetailPage() {
             .join(" ")}
         >
           <div className="h-full overflow-visible bg-background">
-            <BlockEditor
-              key={item.id}
-              editorKey={item.id}
-              value={item.blocks}
-              onChange={handleBlocksChange}
-              editable
-              className="h-full"
-            />
+            {isBusinessItem ? (
+              <div className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
+                <p className="text-sm text-muted-foreground">
+                  This item now uses Moment business blocks. Edit it from `Moment &gt; Contenu`.
+                </p>
+                <pre className="max-h-[55vh] overflow-auto rounded-md bg-background p-2 text-[11px] text-foreground">
+                  {JSON.stringify(item.blocks, null, 2)}
+                </pre>
+              </div>
+            ) : (
+              <BlockEditor
+                key={item.id}
+                editorKey={item.id}
+                value={item.blocks}
+                onChange={handleBlocksChange}
+                editable
+                enableAI
+                className="h-full"
+              />
+            )}
           </div>
           {hasLinks ? (
             <aside className="rounded-lg border border-border bg-card p-3">

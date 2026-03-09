@@ -1,9 +1,14 @@
+from pathlib import Path
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_API_ROOT = Path(__file__).resolve().parents[2]
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    # Load env from apps/api/.env regardless of current working directory.
+    model_config = SettingsConfigDict(env_file=str(_API_ROOT / ".env"), env_file_encoding="utf-8")
 
     APP_ENV: str = "development"
     DATABASE_URL: str
@@ -34,11 +39,21 @@ class Settings(BaseSettings):
     CAPTURE_CONTEXT_ENRICHMENT_ENABLED: bool = False
     CAPTURE_WEB_RESEARCH_ENABLED: bool = False
     CAPTURE_BADGES_V2_ENABLED: bool = True
+    CAPTURE_ASYNC_WORKER_ENABLED: bool = False
 
     # Capture storage
     CAPTURE_STORAGE_DIR: str = "/tmp/momentarise_captures"
     CAPTURE_MAX_UPLOAD_BYTES: int = 25_000_000
     CAPTURE_EXTERNAL_TOKEN: str | None = None
+    NOTE_SUMMARY_MIN_CHARS: int = 180
+
+    # Celery / queue runtime
+    CELERY_BROKER_URL: str | None = None
+    CELERY_TASK_MAX_RETRIES: int = 3
+    CELERY_TASK_SOFT_TIME_LIMIT_SECONDS: int = 780
+    CELERY_TASK_TIME_LIMIT_SECONDS: int = 900
+    CELERY_WORKER_PREFETCH_MULTIPLIER: int = 1
+    CELERY_TASK_ALWAYS_EAGER: bool = False
 
     # Provider settings
     OPENAI_API_KEY: str | None = None

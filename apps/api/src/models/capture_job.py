@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text, text
+from sqlalchemy import DateTime, ForeignKey, Integer, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -10,6 +10,14 @@ from src.models.base import Base, BaseMixin
 
 class CaptureJob(BaseMixin, Base):
     __tablename__ = "capture_jobs"
+    __table_args__ = (
+        UniqueConstraint(
+            "capture_id",
+            "run_id",
+            "job_type",
+            name="uq_capture_jobs_capture_run_job",
+        ),
+    )
 
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
@@ -17,7 +25,10 @@ class CaptureJob(BaseMixin, Base):
     capture_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("inbox_captures.id"), nullable=False
     )
+    run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     job_type: Mapped[str] = mapped_column(Text, nullable=False)
+    queue_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    task_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         Text,
         nullable=False,
