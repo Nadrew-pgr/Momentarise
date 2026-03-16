@@ -9,6 +9,7 @@ import {
     Text,
     TouchableWithoutFeedback,
 } from "react-native";
+import { Sparkles } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTranslation } from "react-i18next";
@@ -18,15 +19,17 @@ import {
     BLOCK_DISPLAY_META,
     QUICK_UPDATE_LABELS,
     STARTER_KITS,
-    applyQuickUpdateDraft,
+    applyRuntimeUpdateDraft,
     buildStarterKitBlocks,
     businessBlockTypeValues,
     createBusinessBlock,
     eventContentResponseSchema,
     eventContentUpdateRequestSchema,
     insertBusinessBlocks,
+    resolveContentRenderMode,
     sanitizeBusinessBlocks,
     type BusinessBlock,
+    type ContentRenderMode,
 } from "@momentarise/shared";
 import {
     useCreateEvent,
@@ -104,7 +107,6 @@ type QuickUpdateState = {
     status: string;
     energy: string;
     progressDelta: string;
-    blockers: string;
     nextAction: string;
 };
 
@@ -139,9 +141,6 @@ function buildQuickUpdateState(blocks: BusinessBlock[]): QuickUpdateState {
     const progressBlock = blocks.find(
         (block) => block.type === "metric_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.progressDelta
     );
-    const blockersBlock = blocks.find(
-        (block) => block.type === "text_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.blockers
-    );
     const nextActionBlock = blocks.find(
         (block) => block.type === "task_block" && (block.label ?? "") === QUICK_UPDATE_LABELS.nextAction
     );
@@ -153,7 +152,6 @@ function buildQuickUpdateState(blocks: BusinessBlock[]): QuickUpdateState {
             progressBlock && progressBlock.type === "metric_block" && progressBlock.payload.current != null
                 ? String(progressBlock.payload.current)
                 : "",
-        blockers: blockersBlock && blockersBlock.type === "text_block" ? blockersBlock.payload.text ?? "" : "",
         nextAction:
             nextActionBlock && nextActionBlock.type === "task_block" ? nextActionBlock.payload.title ?? "" : "",
     };
@@ -188,11 +186,12 @@ export default function MomentDetailPage() {
     const [activeContentBlockId, setActiveContentBlockId] = useState<string | null>(null);
     const [showAddBlockSheet, setShowAddBlockSheet] = useState(false);
     const [showQuickUpdateSheet, setShowQuickUpdateSheet] = useState(false);
+    const [futureAiPrompt, setFutureAiPrompt] = useState("");
+    const [contentModeOverride, setContentModeOverride] = useState<ContentRenderMode | null>(null);
     const [quickUpdate, setQuickUpdate] = useState<QuickUpdateState>({
         status: "on_track",
         energy: "",
         progressDelta: "",
-        blockers: "",
         nextAction: "",
     });
 
@@ -231,6 +230,10 @@ export default function MomentDetailPage() {
     useEffect(() => {
         setQuickUpdate(buildQuickUpdateState(blocks));
     }, [blocks]);
+
+    useEffect(() => {
+        setContentModeOverride(null);
+    }, [eventId]);
 
     const persistBlocks = useCallback(
         async (targetEventId: string, nextBlocks: BusinessBlock[]) => {
@@ -307,6 +310,17 @@ export default function MomentDetailPage() {
         const actual = draftEvent?.actualTimeAccSeconds ?? 0;
         return Math.max(estimated - actual, 0);
     }, [draftEvent?.actualTimeAccSeconds, draftEvent?.estimatedTimeSeconds, endDate, startDate]);
+    const contentRenderMode = useMemo(
+        () =>
+            resolveContentRenderMode({
+                startAt: startDate,
+                endAt: endDate,
+                isTracking,
+                override: contentModeOverride,
+            }),
+        [contentModeOverride, endDate, isTracking, startDate]
+    );
+    const isRunMode = contentRenderMode === "run";
 
     const insertSingleBusinessBlock = useCallback(
         (type: (typeof businessBlockTypeValues)[number]) => {
@@ -337,13 +351,12 @@ export default function MomentDetailPage() {
             : undefined;
 
         const next = sanitizeBusinessBlocks(
-            applyQuickUpdateDraft(
+            applyRuntimeUpdateDraft(
                 blocks,
                 {
                     status: quickUpdate.status,
                     energy: parsedEnergy == null ? undefined : parsedEnergy,
                     progressDelta: parsedProgressDelta == null ? undefined : parsedProgressDelta,
-                    blockers: quickUpdate.blockers,
                     nextAction: quickUpdate.nextAction,
                 },
                 makeBlockId
@@ -682,7 +695,7 @@ export default function MomentDetailPage() {
                                             {t("pages.timeline.eventSheet.allDay")}
                                         </Text>
                                     </View>
-                                    <Switch checked={allDay} onCheckedChange={(value) => setAllDay(value)} />
+                                    <Switch checked={allDay} onCheckedChange={(value: boolean) => setAllDay(value)} />
                                 </View>
 
                                 <RecurrenceInput
@@ -755,58 +768,87 @@ export default function MomentDetailPage() {
 
                     {activeTab === "content" ? (
                         <View className="flex-1 min-h-0">
-                            <View className="border-b border-border px-4 pb-4 pt-4">
-                                <Text className="text-[11px] font-bold uppercase tracking-[2px] text-primary">Moment detail</Text>
-                                <Text className="mt-2 text-3xl font-extrabold tracking-tight text-foreground">
+                            <View className={`border-b border-border px-4 ${isRunMode ? "pb-2 pt-2" : "pb-3 pt-3"}`}>
+                                <View className="flex-row items-center justify-between">
+                                    <Text className="text-[11px] font-bold uppercase tracking-[2px] text-muted-foreground">
+                                        {isRunMode ? "Run mode" : "Moment studio"}
+                                    </Text>
+                                    <View className="flex-row rounded-full border border-border bg-muted/60 p-1">
+                                        <Pressable
+                                            onPress={() => setContentModeOverride("builder")}
+                                            className={`rounded-full px-3 py-1.5 ${!isRunMode ? "bg-background" : ""}`}
+                                        >
+                                            <Text className="text-xs font-bold text-foreground">Builder</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => setContentModeOverride("run")}
+                                            className={`rounded-full px-3 py-1.5 ${isRunMode ? "bg-background" : ""}`}
+                                        >
+                                            <Text className="text-xs font-bold text-foreground">Run</Text>
+                                        </Pressable>
+                                    </View>
+                                </View>
+
+                                <Text className={`mt-1 font-extrabold tracking-tight text-foreground ${isRunMode ? "text-lg" : "text-[24px]"}`} numberOfLines={1}>
                                     {title.trim() || "(no title)"}
                                 </Text>
-                                <View className="mt-3 flex-row flex-wrap gap-2">
-                                    {selectedProject ? (
-                                        <View className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1">
-                                            <Text className="text-xs font-bold text-primary">Project: {selectedProject.title}</Text>
-                                        </View>
-                                    ) : null}
-                                    {selectedSeries ? (
-                                        <View className="rounded-full border border-border bg-muted px-3 py-1">
-                                            <Text className="text-xs font-bold text-muted-foreground">Series: {selectedSeries.title}</Text>
-                                        </View>
-                                    ) : null}
-                                </View>
 
-                                <View className="mt-5 flex-row gap-3">
-                                    <View className="flex-1 rounded-[20px] border border-border bg-card px-4 py-4">
-                                        <Text className="text-[10px] font-bold uppercase tracking-[2px] text-muted-foreground">Status</Text>
-                                        <Text className="mt-2 text-2xl font-extrabold text-primary">{completionPercent}%</Text>
-                                        <Text className="text-[11px] font-medium text-muted-foreground">Completion</Text>
+                                {!isRunMode ? (
+                                    <View className="mt-2 flex-row flex-wrap gap-2">
+                                        {selectedProject ? (
+                                            <View className="rounded-full border border-border bg-muted px-3 py-1">
+                                                <Text className="text-xs font-bold text-foreground">Project: {selectedProject.title}</Text>
+                                            </View>
+                                        ) : null}
+                                        {selectedSeries ? (
+                                            <View className="rounded-full border border-border bg-muted px-3 py-1">
+                                                <Text className="text-xs font-bold text-muted-foreground">Series: {selectedSeries.title}</Text>
+                                            </View>
+                                        ) : null}
                                     </View>
-                                    <View className="flex-1 rounded-[20px] border border-border bg-card px-4 py-4">
-                                        <Text className="text-[10px] font-bold uppercase tracking-[2px] text-muted-foreground">Time left</Text>
-                                        <Text className="mt-2 text-2xl font-extrabold text-foreground">{formatSecondsCompact(timeLeftSeconds)}</Text>
-                                        <Text className="text-[11px] font-medium text-muted-foreground">Estimated remaining</Text>
-                                    </View>
-                                    <View className="flex-1 rounded-[20px] border border-border bg-card px-4 py-4">
-                                        <Text className="text-[10px] font-bold uppercase tracking-[2px] text-muted-foreground">Energy</Text>
-                                        <Text className="mt-2 text-2xl font-extrabold text-foreground">
-                                            {energyScore != null ? Math.round(energyScore) : "--"}
-                                        </Text>
-                                        <Text className="text-[11px] font-medium text-muted-foreground">
-                                            {energyScore != null ? `${energyDelta >= 0 ? "+" : ""}${Math.round(energyDelta)} vs previous` : "No data yet"}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {blocksSaveLabel ? (
-                                    <Text className="mt-4 text-xs text-muted-foreground">{blocksSaveLabel}</Text>
                                 ) : null}
+
+                                {!isRunMode ? (
+                                    <View className="mt-2 flex-row items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2">
+                                        <Sparkles size={16} color="hsl(0 0% 45%)" />
+                                        <Input
+                                            value={futureAiPrompt}
+                                            onChangeText={setFutureAiPrompt}
+                                            placeholder="Que voulez-vous faire pendant ce Moment ?"
+                                            className="h-9 flex-1 border-0 bg-transparent px-0"
+                                        />
+                                    </View>
+                                ) : null}
+
+                                <View className="mt-2 flex-row flex-wrap gap-1.5">
+                                    <View className="rounded-full border border-border bg-muted px-2.5 py-1">
+                                        <Text className="text-[10px] font-semibold text-foreground">Status {completionPercent}%</Text>
+                                    </View>
+                                    <View className="rounded-full border border-border bg-muted px-2.5 py-1">
+                                        <Text className="text-[10px] font-semibold text-foreground">{formatSecondsCompact(timeLeftSeconds)} left</Text>
+                                    </View>
+                                    <View className="rounded-full border border-border bg-muted px-2.5 py-1">
+                                        <Text className="text-[10px] font-semibold text-foreground">
+                                            Energy {energyScore != null ? Math.round(energyScore) : "--"}
+                                            {energyScore != null ? ` (${energyDelta >= 0 ? "+" : ""}${Math.round(energyDelta)})` : ""}
+                                        </Text>
+                                    </View>
+                                    {blocksSaveLabel ? (
+                                        <View className="rounded-full border border-border bg-muted/60 px-2.5 py-1">
+                                            <Text className="text-[10px] text-muted-foreground">{blocksSaveLabel}</Text>
+                                        </View>
+                                    ) : null}
+                                </View>
                             </View>
 
-                            <View className="flex-1 min-h-0 px-4 pt-4">
+                            <View className="flex-1 min-h-0 px-4 pt-3">
                                 <BusinessBlocksEditor
                                     value={blocks}
                                     onChange={scheduleSaveBlocks}
                                     editable
                                     activeBlockId={activeContentBlockId}
                                     onActiveBlockChange={setActiveContentBlockId}
+                                    renderMode={contentRenderMode}
                                 />
                             </View>
                         </View>
@@ -825,17 +867,21 @@ export default function MomentDetailPage() {
                     {activeTab === "content" ? (
                         <View className="absolute bottom-0 left-0 right-0 border-t border-border bg-background/95 px-4 pb-4 pt-3">
                             <View className="flex-row gap-3">
-                                <Pressable
-                                    onPress={() => setShowAddBlockSheet(true)}
-                                    className="flex-1 flex-row items-center justify-center gap-2 rounded-[20px] border border-border bg-muted px-4 py-4"
-                                >
-                                    <Text className="text-base font-bold text-foreground">Add block</Text>
-                                </Pressable>
+                                {!isRunMode ? (
+                                    <Pressable
+                                        onPress={() => setShowAddBlockSheet(true)}
+                                        className="flex-1 flex-row items-center justify-center gap-2 rounded-[20px] border border-border bg-muted px-4 py-3.5"
+                                    >
+                                        <Text className="text-sm font-bold text-foreground">Add block</Text>
+                                    </Pressable>
+                                ) : null}
                                 <Pressable
                                     onPress={() => setShowQuickUpdateSheet(true)}
-                                    className="flex-1 flex-row items-center justify-center gap-2 rounded-[20px] bg-primary px-4 py-4"
+                                    className="flex-1 flex-row items-center justify-center gap-2 rounded-[20px] bg-primary px-4 py-3.5"
                                 >
-                                    <Text className="text-base font-bold text-primary-foreground">Quick update</Text>
+                                    <Text className="text-sm font-bold text-primary-foreground">
+                                        {isRunMode ? "Quick update" : "Update"}
+                                    </Text>
                                 </Pressable>
                             </View>
                         </View>
@@ -905,8 +951,8 @@ export default function MomentDetailPage() {
                         <TouchableWithoutFeedback>
                             <View className="rounded-t-[32px] border border-border bg-card px-5 pb-8 pt-4">
                                 <View className="mb-4 self-center h-1.5 w-12 rounded-full bg-muted" />
-                                <Text className="text-[11px] font-bold uppercase tracking-[2px] text-primary">Quick update</Text>
-                                <Text className="mt-2 text-2xl font-extrabold text-foreground">Patch the frequent signals</Text>
+                                <Text className="text-[11px] font-bold uppercase tracking-[2px] text-primary">Runtime update</Text>
+                                <Text className="mt-2 text-2xl font-extrabold text-foreground">Patch live signals</Text>
 
                                 <View className="mt-5 gap-3">
                                     <View className="flex-row gap-2">
@@ -937,11 +983,6 @@ export default function MomentDetailPage() {
                                         keyboardType="numeric"
                                         placeholder="Progress delta %"
                                     />
-                                    <Textarea
-                                        value={quickUpdate.blockers}
-                                        onChangeText={(text) => setQuickUpdate((prev) => ({ ...prev, blockers: text }))}
-                                        placeholder="Blockers"
-                                    />
                                     <Input
                                         value={quickUpdate.nextAction}
                                         onChangeText={(text) => setQuickUpdate((prev) => ({ ...prev, nextAction: text }))}
@@ -952,7 +993,7 @@ export default function MomentDetailPage() {
                                         onPress={applyQuickUpdate}
                                         className="mt-2 rounded-[20px] bg-primary px-4 py-4"
                                     >
-                                        <Text className="text-center text-base font-bold text-primary-foreground">Apply quick update</Text>
+                                        <Text className="text-center text-base font-bold text-primary-foreground">Apply update</Text>
                                     </Pressable>
                                 </View>
                             </View>

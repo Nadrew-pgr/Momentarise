@@ -12,10 +12,20 @@ Application "Life OS" : Capture → Transformer → Planifier → Exécuter → 
 
 - **Docker Desktop** (pour PostgreSQL)
 - **Python 3.12+** + **uv** (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- **Node.js 20+** + **npm** (pour web et mobile)
+- **Node.js 20+** + **pnpm** (pour gérer le monorepo web et mobile)
 - **Expo Go** sur iPhone/Android (pour tester le mobile)
 
 ## Démarrage rapide
+
+### 0. Installer pnpm proprement sur macOS
+Si `pnpm` n'est pas installé, il ne faut **pas** utiliser `sudo npm install -g pnpm`.
+Il faut l'installer dans le répertoire global de l'utilisateur :
+
+```bash
+npm install -g pnpm --prefix ~/.npm-global
+export PATH="$HOME/.npm-global/bin:$PATH"
+# (Ajoutez la ligne export PATH... à votre ~/.zshrc)
+```
 
 ### 1. Base de données
 
@@ -43,8 +53,9 @@ La doc OpenAPI interactive : `http://localhost:8000/docs`.
 
 ```bash
 cd apps/web
-npm install
-npm run dev
+pnpm install
+pnpm run dev
+# Ou depuis la racine : pnpm run --filter web dev
 ```
 
 L'app web est accessible sur `http://localhost:3000`.
@@ -53,8 +64,9 @@ L'app web est accessible sur `http://localhost:3000`.
 
 ```bash
 cd apps/mobile
-npm install
-npx expo start
+pnpm install
+pnpm run start
+# Ou depuis la racine : pnpm run --filter mobile start
 ```
 
 Scanner le QR code avec l'app Expo Go sur votre téléphone.
@@ -94,6 +106,8 @@ Momentarise/
 │   ├── distilled/             # Ledger d'idées trié
 │   ├── inbox_raw/             # Conversations brutes
 │   └── docs/                  # Documentation opérationnelle
+├── pnpm-workspace.yaml         # Configuration du monorepo pnpm
+├── package.json                # Scripts globaux pnpm
 ├── apps/
 │   ├── api/                    # Backend FastAPI
 │   │   ├── .env                # Variables d'environnement
@@ -101,10 +115,10 @@ Momentarise/
 │   │   ├── alembic/            # Migrations DB
 │   │   └── src/                # Code source
 │   ├── web/                    # Frontend Next.js
-│   │   ├── package.json        # Dépendances Node (npm)
+│   │   ├── package.json        # Dépendances Node (pnpm)
 │   │   └── src/                # Code source
 │   └── mobile/                 # Frontend Expo
-│       ├── package.json        # Dépendances Node (npm)
+│       ├── package.json        # Dépendances Node (pnpm)
 │       └── app/                # Écrans (file-based routing)
 ├── .cursor/
 │   └── rules/                  # Conventions pour le mode auto
@@ -131,11 +145,10 @@ Momentarise/
 | Appliquer migrations | `apps/api/` | `uv run alembic upgrade head` |
 | Seeder | `apps/api/` | `uv run python -m src.seed` |
 | Lancer l'API | `apps/api/` | `uv run uvicorn src.main:app --reload --port 8000` |
-| Installer deps Web | `apps/web/` | `npm install` |
-| Lancer le web | `apps/web/` | `npm run dev` |
-| Installer deps Mobile | `apps/mobile/` | `npm install` |
-| Lancer le mobile | `apps/mobile/` | `npx expo start` |
-| Vérifier la lane (red zone) | `Momentarise/` | `npm run lane:check` |
+| Installer deps pnpm | `Momentarise/` | `pnpm install` |
+| Lancer le web | `Momentarise/` | `pnpm run --filter web dev` |
+| Lancer le mobile | `Momentarise/` | `pnpm run --filter mobile start` |
+| Vérifier la lane (red zone) | `Momentarise/` | `pnpm run lane:check` |
 
 ## Dépannage rapide
 

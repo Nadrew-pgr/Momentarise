@@ -359,6 +359,7 @@ export function SyncChatShell() {
     Record<string, SyncContextSearchResult>
   >({});
   const [mentionState, setMentionState] = useState<ComposerMentionState | null>(null);
+  const [composerContainerHeight, setComposerContainerHeight] = useState(128);
   const [composerSelection, setComposerSelection] = useState<{ start: number; end: number }>({
     start: 0,
     end: 0,
@@ -1853,6 +1854,7 @@ export function SyncChatShell() {
           logAriaLabel={t("pages.sync.aria.log")}
           historyLoadingLabel={t("pages.sync.history.loading")}
           onRetry={handleRetry}
+          scrollButtonBottomOffset={composerContainerHeight + 24}
         />
 
         <Composer
@@ -1890,6 +1892,9 @@ export function SyncChatShell() {
           onAttachLocal={handleOpenLocalAttach}
           onAttachInbox={handleOpenInboxPicker}
           selectionOverride={composerSelectionOverride}
+          onContainerHeightChange={(height) => {
+            setComposerContainerHeight((prev) => (prev === height ? prev : height));
+          }}
           beforeComposer={
             latestQuestion || contextEntries.length > 0 || isMentionPopoverVisible ? (
               <div className="space-y-4">

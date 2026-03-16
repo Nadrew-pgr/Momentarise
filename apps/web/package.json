@@ -25,7 +25,7 @@
     "@fullcalendar/react": "^6.1.20",
     "@fullcalendar/rrule": "^6.1.20",
     "@fullcalendar/timegrid": "^6.1.20",
-    "@momentarise/shared": "*",
+    "@momentarise/shared": "workspace:*",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@remixicon/react": "^4.9.0",
     "@rive-app/react-webgl2": "^4.27.0",

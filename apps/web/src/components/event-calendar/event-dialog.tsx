@@ -900,43 +900,30 @@ export function EventDialog({
 
         {activeTab === "content" ? (
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <div className="rounded-[28px] border border-border bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--accent))_100%)] p-5 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-muted-foreground">
-                    Content studio
+            <div className="rounded-[24px] border border-border bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--accent))_100%)] p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                    {isRunMode ? "Run mode" : "Content studio"}
                   </div>
-                  <h3 className="text-2xl font-extrabold tracking-tight text-foreground">
-                    Build the moment with business blocks
+                  <h3 className="mt-1 text-lg font-extrabold tracking-tight text-foreground">
+                    {title.trim() || "Untitled moment"}
                   </h3>
-                  <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Use structured blocks for preparation, logging, follow-up and linked references.
-                  </p>
                 </div>
-                <div className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold text-muted-foreground">
-                  {blocks.length} block{blocks.length === 1 ? "" : "s"}
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-3 md:grid-cols-3">
-                <div className="rounded-2xl border border-border bg-background/90 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Status</p>
-                  <p className="mt-2 text-2xl font-extrabold tracking-tight text-foreground">{completionPercent}%</p>
-                  <p className="text-xs font-medium text-muted-foreground">Completion</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-background/90 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Time left</p>
-                  <p className="mt-2 text-2xl font-extrabold tracking-tight text-foreground">{formatSecondsCompact(timeLeftSeconds)}</p>
-                  <p className="text-xs font-medium text-muted-foreground">Estimated remaining</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-background/90 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Energy</p>
-                  <p className="mt-2 text-2xl font-extrabold tracking-tight text-foreground">
-                    {energyScore != null ? Math.round(energyScore) : "--"}
-                  </p>
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {energyScore != null ? `${energyDelta >= 0 ? "+" : ""}${Math.round(energyDelta)} vs previous` : "No data yet"}
-                  </p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold text-foreground">
+                    Status {completionPercent}%
+                  </span>
+                  <span className="inline-flex items-center rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold text-foreground">
+                    {formatSecondsCompact(timeLeftSeconds)} left
+                  </span>
+                  <span className="inline-flex items-center rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold text-foreground">
+                    Energy {energyScore != null ? Math.round(energyScore) : "--"}
+                    {energyScore != null ? ` (${energyDelta >= 0 ? "+" : ""}${Math.round(energyDelta)})` : ""}
+                  </span>
+                  <span className="inline-flex items-center rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+                    {blocks.length} block{blocks.length === 1 ? "" : "s"}
+                  </span>
                 </div>
               </div>
 
@@ -1087,15 +1074,17 @@ export function EventDialog({
                 </div>
 
                 <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:items-center">
-                  <div className="relative min-w-0 flex-1">
-                    <RiSparklingLine className="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      value={futureAiPrompt}
-                      onChange={(event) => setFutureAiPrompt(event.target.value)}
-                      placeholder="Que voulez-vous faire pendant ce Moment ?"
-                      className="h-10 rounded-2xl border-border bg-background pl-10 shadow-none"
-                    />
-                  </div>
+                  {!isRunMode ? (
+                    <div className="relative min-w-0 flex-1">
+                      <RiSparklingLine className="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={futureAiPrompt}
+                        onChange={(event) => setFutureAiPrompt(event.target.value)}
+                        placeholder="Que voulez-vous faire pendant ce Moment ?"
+                        className="h-10 rounded-2xl border-border bg-background pl-10 shadow-none"
+                      />
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-2 xl:justify-end">
                     <div className="inline-flex items-center gap-2 rounded-full border border-border bg-accent px-3 py-2 text-xs font-semibold text-foreground">
                       <span className="text-muted-foreground">Status</span>

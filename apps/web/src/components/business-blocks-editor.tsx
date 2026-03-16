@@ -12,6 +12,29 @@ import {
   RiArrowUpLine,
   RiDeleteBinLine,
   RiFileCopyLine,
+  RiFileTextLine,
+  RiListCheck2,
+  RiTable2,
+  RiListUnordered,
+  RiTimerLine,
+  RiBarChartHorizontalLine,
+  RiBookOpenLine,
+  RiLinkM,
+  RiAttachment2,
+  RiInboxLine,
+  RiCheckboxCircleLine,
+  RiPulseLine,
+  RiLineChartLine,
+  RiFlagLine,
+  RiMapPinLine,
+  RiGitBranchLine,
+  RiFlaskLine,
+  RiAlertLine,
+  RiShieldLine,
+  RiQuestionLine,
+  RiHeartPulseLine,
+  RiGlobalLine,
+  RiExternalLinkLine,
 } from "@remixicon/react";
 
 import { useInboxSearch } from "@/hooks/use-inbox";
@@ -226,9 +249,9 @@ export function BusinessBlocksEditor({
 
   return (
     <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", className)}>
-      <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto pr-2">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto pr-2">
         {blocks.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-border bg-background/80 px-6 py-12 text-center text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-dashed border-border bg-background/80 px-6 py-10 text-center text-sm text-muted-foreground">
             Start from a starter kit or add your first block from the studio rail.
           </div>
         ) : null}
@@ -237,266 +260,270 @@ export function BusinessBlocksEditor({
           const meta = BLOCK_DISPLAY_META[block.type];
           const isActive = block.id === resolvedActiveBlockId;
           const preview = getBusinessBlockPreview(block);
+          const isAdvanced = advancedBlockIds[block.id] ?? false;
+
+          const Icons: Record<string, React.ElementType> = {
+            FileTextLine: RiFileTextLine,
+            ListCheck2: RiListCheck2,
+            Table2: RiTable2,
+            ListUnordered: RiListUnordered,
+            TimerLine: RiTimerLine,
+            BarChartHorizontalLine: RiBarChartHorizontalLine,
+            BookOpenLine: RiBookOpenLine,
+            LinkM: RiLinkM,
+            Attachment2: RiAttachment2,
+            InboxLine: RiInboxLine,
+            CheckboxCircleLine: RiCheckboxCircleLine,
+            PulseLine: RiPulseLine,
+            LineChartLine: RiLineChartLine,
+            FlagLine: RiFlagLine,
+            MapPinLine: RiMapPinLine,
+            GitBranchLine: RiGitBranchLine,
+            FlaskLine: RiFlaskLine,
+            AlertLine: RiAlertLine,
+            ShieldLine: RiShieldLine,
+            QuestionLine: RiQuestionLine,
+            HeartPulseLine: RiHeartPulseLine,
+          };
+          const IconComponent = Icons[meta.icon as string] || RiFileTextLine;
+
+          const getBlockStat = (): string | null => {
+            if (block.type === "checklist_block") {
+              const done = block.payload.items.filter((i) => i.done).length;
+              return `${done}/${block.payload.items.length}`;
+            }
+            if (block.type === "metric_block") {
+              const cur = block.payload.current ?? "--";
+              return block.payload.target != null ? `${cur}/${block.payload.target}` : `${cur}`;
+            }
+            if (block.type === "scale_block") return `${block.payload.value}/${block.payload.max}`;
+            if (block.type === "task_block") return block.payload.status === "done" ? "✓" : block.payload.status === "in_progress" ? "…" : null;
+            if (block.type === "timer_block") return block.payload.running ? "▶" : `${block.payload.elapsed_sec}s`;
+            if (block.type === "milestone_block") return block.payload.done ? "✓" : null;
+            if (block.type === "status_block") return block.payload.state.replace("_", " ");
+            return null;
+          };
+          const stat = getBlockStat();
 
           return (
             <section
               key={block.id}
               className={cn(
-                "group rounded-[22px] border bg-background/95 p-3.5 shadow-sm transition-all",
-                isActive
-                  ? "border-primary/20 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]"
-                  : "border-border/80 hover:border-border hover:shadow-md"
+                "transition-all",
+                isRunMode
+                  ? cn("border-b border-border/30 px-1 py-3", isActive && "bg-accent/5")
+                  : cn(
+                    "mb-3 rounded-2xl border bg-background/95 p-3 shadow-sm",
+                    isActive
+                      ? "border-primary/20 shadow-md"
+                      : "border-border/80 hover:border-border hover:shadow-md"
+                  )
               )}
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2">
                 <button
                   type="button"
                   className="min-w-0 flex-1 text-left"
                   onClick={() => setActiveBlock(block.id)}
                 >
-                  <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0 space-y-1.5">
-                      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
-                        {meta.eyebrow}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center">
+                        {isRunMode ? (
+                          <span className="mr-1.5 shrink-0 text-muted-foreground/70">
+                            <IconComponent className="h-3.5 w-3.5" />
+                          </span>
+                        ) : null}
+                        <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                          {meta.eyebrow}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2.5">
-                        <h3 className="truncate text-base font-extrabold tracking-tight text-foreground">
-                          {(block.label ?? "").trim() || meta.title}
-                        </h3>
-                        <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-                          #{index + 1}
-                        </span>
-                      </div>
+                      <h3 className="truncate text-sm font-bold text-foreground">
+                        {(block.label ?? "").trim() || meta.title}
+                      </h3>
                     </div>
-                    <p className="max-w-xl text-sm font-medium leading-relaxed text-muted-foreground lg:text-right">
-                      {preview}
-                    </p>
+                    {stat ? (
+                      <span className="shrink-0 text-xs font-semibold text-muted-foreground">{stat}</span>
+                    ) : !isActive ? (
+                      <span className="shrink-0 truncate text-xs text-muted-foreground max-w-[200px]">{preview}</span>
+                    ) : null}
                   </div>
                 </button>
 
-                <div className={cn(
-                  "flex shrink-0 items-center gap-1 self-start transition-opacity",
-                  isActive ? "opacity-100" : "opacity-70 lg:opacity-0 lg:group-hover:opacity-100"
-                )}>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 rounded-full"
-                    onClick={() => moveBlock(index, -1)}
-                    disabled={!editable || index === 0}
-                  >
-                    <RiArrowUpLine className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 rounded-full"
-                    onClick={() => moveBlock(index, 1)}
-                    disabled={!editable || index === blocks.length - 1}
-                  >
-                    <RiArrowDownLine className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 rounded-full"
-                    onClick={() => duplicateBlock(index)}
-                    disabled={!editable}
-                  >
-                    <RiFileCopyLine className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 rounded-full text-destructive"
-                    onClick={() => deleteBlock(index)}
-                    disabled={!editable}
-                  >
-                    <RiDeleteBinLine className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <div className="rounded-full border border-border bg-accent px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-foreground/70">
-                  {meta.title}
-                </div>
-                {!isActive ? <div className="text-[11px] font-medium text-muted-foreground">Click to edit</div> : null}
+                {
+                  !isRunMode ? (
+                    <div className={cn(
+                      "flex shrink-0 items-center gap-0.5 self-start transition-opacity",
+                      isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    )}>
+                      <Button type="button" size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => moveBlock(index, -1)} disabled={!editable || index === 0}>
+                        <RiArrowUpLine className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button type="button" size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => moveBlock(index, 1)} disabled={!editable || index === blocks.length - 1}>
+                        <RiArrowDownLine className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button type="button" size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => duplicateBlock(index)} disabled={!editable}>
+                        <RiFileCopyLine className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button type="button" size="icon" variant="ghost" className="h-7 w-7 rounded-full text-destructive" onClick={() => deleteBlock(index)} disabled={!editable}>
+                        <RiDeleteBinLine className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ) : null
+                }
               </div>
 
               {isActive ? (
-                <div className="mt-4 space-y-4">
-                  {renderMode === "builder" ? (
-                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-accent/40 px-3 py-2">
-                      <p className="text-[11px] font-semibold text-muted-foreground">
-                        Keep only the essential fields visible. Use advanced settings when needed.
-                      </p>
-                      <Button
+                <div className={cn("mt-3", isRunMode ? "space-y-2" : "space-y-3")}>
+                  {!isRunMode ? (
+                    <div className="flex items-center justify-end">
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 rounded-full px-3 text-xs"
+                        className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
                         onClick={() => toggleAdvanced(block.id)}
                       >
-                        {advancedBlockIds[block.id] ? "Hide advanced" : "Advanced"}
-                      </Button>
+                        {isAdvanced ? "Hide advanced" : "Advanced"}
+                      </button>
                     </div>
                   ) : null}
 
-                  {renderMode === "builder" && advancedBlockIds[block.id] ? (
-                    <div className="space-y-2 rounded-2xl border border-border bg-accent/20 p-3">
-                      <Label className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Label</Label>
-                      <Input
-                        value={block.label ?? ""}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) => ({ ...prev, label: event.target.value || null }))
-                        }
-                        disabled={!editable}
-                        placeholder="Optional label"
-                        className="h-10 rounded-2xl border-slate-200 bg-background"
-                      />
-                    </div>
+                  {!isRunMode && isAdvanced ? (
+                    <Input
+                      value={block.label ?? ""}
+                      onChange={(event) => patchBlock(index, (prev) => ({ ...prev, label: event.target.value || null }))}
+                      disabled={!editable}
+                      placeholder="Custom label"
+                      className="h-8 rounded-lg border-border bg-accent/20 text-sm"
+                    />
                   ) : null}
 
                   {block.type === "text_block" ? (
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                        {isRunMode ? "Update" : "Content"}
-                      </Label>
-                      <Textarea
-                        value={block.payload.text}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "text_block"
-                              ? { ...prev, payload: { ...prev.payload, text: event.target.value } }
-                              : prev
-                          )
+                    <Textarea
+                      value={block.payload.text}
+                      onChange={(event) =>
+                        patchBlock(index, (prev) =>
+                          prev.type === "text_block"
+                            ? { ...prev, payload: { ...prev.payload, text: event.target.value } }
+                            : prev
+                        )
+                      }
+                      rows={isRunMode ? 1 : 4}
+                      disabled={!editable}
+                      placeholder={isRunMode ? "Draft content here..." : "Content"}
+                      className={cn(
+                        "text-sm resize-none",
+                        isRunMode
+                          ? "min-h-[24px] rounded-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 leading-relaxed text-foreground"
+                          : "min-h-[90px] rounded-xl border-border bg-accent/20"
+                      )}
+                      onInput={(e) => {
+                        if (isRunMode) {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = "auto";
+                          target.style.height = `${target.scrollHeight}px`;
                         }
-                        rows={isRunMode ? 4 : 6}
-                        disabled={!editable}
-                        className={cn(
-                          "rounded-[24px] border-slate-200 bg-slate-50 px-4 py-4 text-base leading-relaxed",
-                          isRunMode ? "min-h-[104px]" : "min-h-[140px]"
-                        )}
-                      />
-                    </div>
+                      }}
+                    />
                   ) : null}
 
                   {block.type === "checklist_block" ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                        <div>
-                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progress</p>
-                          <p className="text-lg font-bold text-slate-900">
-                            {block.payload.items.filter((item) => item.done).length}/{block.payload.items.length}
-                          </p>
-                        </div>
-                        {!isRunMode ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="rounded-full"
-                            onClick={() =>
-                              patchBlock(index, (prev) =>
-                                prev.type === "checklist_block"
-                                  ? {
-                                      ...prev,
-                                      payload: {
-                                        ...prev.payload,
-                                        items: [...prev.payload.items, { id: makeId(), text: "", done: false }],
-                                      },
-                                    }
-                                  : prev
-                              )
+                    <div>
+                      {block.payload.items.map((item, itemIndex) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-2 border-b border-border/20 py-2 last:border-b-0"
+                        >
+                          <Checkbox
+                            checked={item.done}
+                            onCheckedChange={(checked) =>
+                              patchBlock(index, (prev) => {
+                                if (prev.type !== "checklist_block") return prev;
+                                const items = [...prev.payload.items];
+                                items[itemIndex] = { ...items[itemIndex], done: checked === true };
+                                return { ...prev, payload: { ...prev.payload, items } };
+                              })
+                            }
+                          />
+                          <Input
+                            value={item.text}
+                            onChange={(event) =>
+                              patchBlock(index, (prev) => {
+                                if (prev.type !== "checklist_block") return prev;
+                                const items = [...prev.payload.items];
+                                items[itemIndex] = { ...items[itemIndex], text: event.target.value };
+                                return { ...prev, payload: { ...prev.payload, items } };
+                              })
                             }
                             disabled={!editable}
-                          >
-                            <RiAddLine className="mr-1 h-4 w-4" /> Add item
-                          </Button>
-                        ) : null}
-                      </div>
-
-                      <div className={cn("space-y-3", isRunMode ? "space-y-2" : "space-y-3")}>
-                        {block.payload.items.map((item, itemIndex) => (
-                          <div
-                            key={item.id}
-                            className={cn(
-                              "flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3",
-                              isRunMode ? "py-2.5" : "py-3"
-                            )}
-                          >
-                            <Checkbox
-                              checked={item.done}
-                              onCheckedChange={(checked) =>
-                                patchBlock(index, (prev) => {
-                                  if (prev.type !== "checklist_block") return prev;
-                                  const items = [...prev.payload.items];
-                                  items[itemIndex] = { ...items[itemIndex], done: checked === true };
-                                  return { ...prev, payload: { ...prev.payload, items } };
-                                })
-                              }
-                            />
-                            <Input
-                              value={item.text}
-                              onChange={(event) =>
-                                patchBlock(index, (prev) => {
-                                  if (prev.type !== "checklist_block") return prev;
-                                  const items = [...prev.payload.items];
-                                  items[itemIndex] = { ...items[itemIndex], text: event.target.value };
-                                  return { ...prev, payload: { ...prev.payload, items } };
-                                })
+                            className="h-8 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
+                          />
+                          {!isRunMode ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                patchBlock(index, (prev) =>
+                                  prev.type === "checklist_block"
+                                    ? { ...prev, payload: { ...prev.payload, items: prev.payload.items.filter((_, idx) => idx !== itemIndex) } }
+                                    : prev
+                                )
                               }
                               disabled={!editable}
-                              className={cn(
-                                "flex-1 rounded-xl border-slate-200 bg-white",
-                                isRunMode ? "h-9 text-sm" : "h-10"
-                              )}
-                            />
-                            {!isRunMode ? (
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 rounded-full text-destructive"
-                                onClick={() =>
-                                  patchBlock(index, (prev) =>
-                                    prev.type === "checklist_block"
-                                      ? {
-                                          ...prev,
-                                          payload: {
-                                            ...prev.payload,
-                                            items: prev.payload.items.filter((_, idx) => idx !== itemIndex),
-                                          },
-                                        }
-                                      : prev
-                                  )
-                                }
-                                disabled={!editable}
-                              >
-                                <RiDeleteBinLine className="h-4 w-4" />
-                              </Button>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
+                              className="text-xs text-destructive/60 hover:text-destructive"
+                            >
+                              ×
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                      {!isRunMode ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            patchBlock(index, (prev) =>
+                              prev.type === "checklist_block"
+                                ? { ...prev, payload: { ...prev.payload, items: [...prev.payload.items, { id: makeId(), text: "", done: false }] } }
+                                : prev
+                            )
+                          }
+                          disabled={!editable}
+                          className="mt-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          + Add item
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
 
                   {block.type === "table_block" ? (
                     <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Columns</Label>
-                        <Input
-                          value={block.payload.columns.join(", ")}
-                          onChange={(event) =>
-                            patchBlock(index, (prev) =>
-                              prev.type === "table_block"
-                                ? {
+                      <div className="overflow-x-auto rounded-[16px] border border-border/20 bg-transparent">
+                        <table className="w-full text-left text-sm">
+                          <thead className="border-b border-border/20 bg-accent/50">
+                            <tr>
+                              {block.payload.columns.map((column) => (
+                                <th key={column} className="px-4 py-3 font-semibold text-muted-foreground">{column}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/20">
+                            {block.payload.rows.map((row, rowIndex) => (
+                              <tr key={`${block.id}-row-${rowIndex}`}>
+                                {row.map((cell, cellIndex) => (
+                                  <td key={`${block.id}-${rowIndex}-${cellIndex}`} className="px-4 py-3 text-foreground">{cell}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {!isRunMode ? (
+                        <div className="grid gap-3">
+                          <Input
+                            value={block.payload.columns.join(", ")}
+                            onChange={(event) =>
+                              patchBlock(index, (prev) =>
+                                prev.type === "table_block"
+                                  ? {
                                     ...prev,
                                     payload: {
                                       ...prev.payload,
@@ -506,41 +533,19 @@ export function BusinessBlocksEditor({
                                         .filter(Boolean),
                                     },
                                   }
-                                : prev
-                            )
-                          }
-                          disabled={!editable}
-                          className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                        />
-                      </div>
-                      <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50">
-                        <table className="w-full text-left text-sm">
-                          <thead className="bg-slate-100">
-                            <tr>
-                              {block.payload.columns.map((column) => (
-                                <th key={column} className="px-4 py-3 font-bold text-slate-600">{column}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {block.payload.rows.map((row, rowIndex) => (
-                              <tr key={`${block.id}-row-${rowIndex}`} className="border-t border-slate-200">
-                                {row.map((cell, cellIndex) => (
-                                  <td key={`${block.id}-${rowIndex}-${cellIndex}`} className="px-4 py-3 text-slate-700">{cell}</td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Rows</Label>
-                        <Textarea
-                          value={block.payload.rows.map((row) => row.join(" | ")).join("\n")}
-                          onChange={(event) =>
-                            patchBlock(index, (prev) =>
-                              prev.type === "table_block"
-                                ? {
+                                  : prev
+                              )
+                            }
+                            disabled={!editable}
+                            placeholder="Columns (comma separated)"
+                            className="h-8 rounded-lg border-border bg-accent text-sm"
+                          />
+                          <Textarea
+                            value={block.payload.rows.map((row) => row.join(" | ")).join("\n")}
+                            onChange={(event) =>
+                              patchBlock(index, (prev) =>
+                                prev.type === "table_block"
+                                  ? {
                                     ...prev,
                                     payload: {
                                       ...prev.payload,
@@ -551,1170 +556,661 @@ export function BusinessBlocksEditor({
                                         .map((line) => line.split("|").map((cell) => cell.trim())),
                                     },
                                   }
-                                : prev
-                            )
-                          }
-                          rows={5}
-                          disabled={!editable}
-                          className="rounded-[24px] border-slate-200 bg-slate-50"
-                        />
-                      </div>
+                                  : prev
+                              )
+                            }
+                            rows={5}
+                            disabled={!editable}
+                            placeholder="Rows (pipe | separated)"
+                            className="rounded-lg border-border bg-accent text-sm"
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 
                   {block.type === "fields_block" ? (
-                    <div className="space-y-3">
+                    <div>
                       {toFieldPairs(block.payload.fields).map((pair, pairIndex) => (
-                        <div key={`${pair.key}-${pairIndex}`} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-2">
-                          <Input
-                            value={pair.key}
-                            onChange={(event) =>
-                              patchBlock(index, (prev) => {
-                                if (prev.type !== "fields_block") return prev;
-                                const pairs = toFieldPairs(prev.payload.fields);
-                                pairs[pairIndex] = { ...pairs[pairIndex], key: event.target.value };
-                                return { ...prev, payload: { ...prev.payload, fields: fromFieldPairs(pairs) } };
-                              })
-                            }
-                            disabled={!editable}
-                            placeholder="Field"
-                            className="h-10 rounded-xl border-slate-200 bg-white"
-                          />
-                          <Input
-                            value={pair.value}
-                            onChange={(event) =>
-                              patchBlock(index, (prev) => {
-                                if (prev.type !== "fields_block") return prev;
-                                const pairs = toFieldPairs(prev.payload.fields);
-                                pairs[pairIndex] = { ...pairs[pairIndex], value: event.target.value };
-                                return { ...prev, payload: { ...prev.payload, fields: fromFieldPairs(pairs) } };
-                              })
-                            }
-                            disabled={!editable}
-                            placeholder="Value"
-                            className="h-10 rounded-xl border-slate-200 bg-white"
-                          />
+                        <div key={`${pair.key}-${pairIndex}`} className={cn(
+                          "flex items-center gap-2 border-b border-border/20 py-1.5 last:border-b-0"
+                        )}>
+                          {isRunMode ? (
+                            <>
+                              <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{pair.key}:</span>
+                              <Input
+                                value={pair.value}
+                                onChange={(event) => patchBlock(index, (prev) => {
+                                  if (prev.type !== "fields_block") return prev;
+                                  const pairs = toFieldPairs(prev.payload.fields);
+                                  pairs[pairIndex] = { ...pairs[pairIndex], value: event.target.value };
+                                  return { ...prev, payload: { ...prev.payload, fields: fromFieldPairs(pairs) } };
+                                })}
+                                disabled={!editable}
+                                placeholder="Value..."
+                                className="h-7 flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <Input
+                                value={pair.key}
+                                onChange={(event) => patchBlock(index, (prev) => {
+                                  if (prev.type !== "fields_block") return prev;
+                                  const pairs = toFieldPairs(prev.payload.fields);
+                                  pairs[pairIndex] = { ...pairs[pairIndex], key: event.target.value };
+                                  return { ...prev, payload: { ...prev.payload, fields: fromFieldPairs(pairs) } };
+                                })}
+                                disabled={!editable}
+                                placeholder="Field"
+                                className="h-8 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0 px-1"
+                              />
+                              <Input
+                                value={pair.value}
+                                onChange={(event) => patchBlock(index, (prev) => {
+                                  if (prev.type !== "fields_block") return prev;
+                                  const pairs = toFieldPairs(prev.payload.fields);
+                                  pairs[pairIndex] = { ...pairs[pairIndex], value: event.target.value };
+                                  return { ...prev, payload: { ...prev.payload, fields: fromFieldPairs(pairs) } };
+                                })}
+                                disabled={!editable}
+                                placeholder="Value"
+                                className="h-8 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0 px-1"
+                              />
+                            </>
+                          )}
                         </div>
                       ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() =>
-                          patchBlock(index, (prev) => {
+                      {!isRunMode ? (
+                        <button
+                          type="button"
+                          onClick={() => patchBlock(index, (prev) => {
                             if (prev.type !== "fields_block") return prev;
                             const pairs = [...toFieldPairs(prev.payload.fields), { key: "", value: "" }];
                             return { ...prev, payload: { ...prev.payload, fields: fromFieldPairs(pairs) } };
-                          })
-                        }
-                        disabled={!editable}
-                      >
-                        <RiAddLine className="mr-1 h-4 w-4" /> Add field
-                      </Button>
+                          })}
+                          disabled={!editable}
+                          className="mt-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          + Add field
+                        </button>
+                      ) : null}
                     </div>
-                  ) : null}
+                  ) : null
+                  }
 
                   {block.type === "timer_block" ? (
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <Label className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Duration</Label>
+                    isRunMode ? (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-foreground">
+                          {block.payload.elapsed_sec}s{block.payload.duration_sec != null ? ` / ${block.payload.duration_sec}s` : ""}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => patchBlock(index, (prev) =>
+                            prev.type === "timer_block"
+                              ? { ...prev, payload: { ...prev.payload, running: !prev.payload.running } }
+                              : prev
+                          )}
+                          className={cn(
+                            "rounded-full px-3 py-1 text-xs font-semibold",
+                            block.payload.running
+                              ? "bg-destructive/10 text-destructive"
+                              : "bg-primary/10 text-primary"
+                          )}
+                        >
+                          {block.payload.running ? "Stop" : "Start"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
                         <Input
                           type="number"
                           value={block.payload.duration_sec ?? ""}
-                          onChange={(event) =>
-                            patchBlock(index, (prev) =>
-                              prev.type === "timer_block"
-                                ? {
-                                    ...prev,
-                                    payload: {
-                                      ...prev.payload,
-                                      duration_sec: parseNumberOrNullWithConstraints(event.target.value, { min: 0, integer: true }),
-                                    },
-                                  }
-                                : prev
-                            )
-                          }
+                          onChange={(event) => patchBlock(index, (prev) =>
+                            prev.type === "timer_block"
+                              ? { ...prev, payload: { ...prev.payload, duration_sec: parseNumberOrNullWithConstraints(event.target.value, { min: 0, integer: true }) } }
+                              : prev
+                          )}
                           disabled={!editable}
-                          className="h-10 rounded-xl border-slate-200 bg-white"
+                          placeholder="Duration (s)"
+                          className="h-8 flex-1 rounded-lg border-border text-sm"
                         />
-                      </div>
-                      <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <Label className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Elapsed</Label>
                         <Input
                           type="number"
                           value={block.payload.elapsed_sec}
-                          onChange={(event) =>
-                            patchBlock(index, (prev) =>
-                              prev.type === "timer_block"
-                                ? {
-                                    ...prev,
-                                    payload: {
-                                      ...prev.payload,
-                                      elapsed_sec: parseNumberOrNullWithConstraints(event.target.value, { min: 0, integer: true }) ?? 0,
-                                    },
-                                  }
-                                : prev
-                            )
-                          }
+                          onChange={(event) => patchBlock(index, (prev) =>
+                            prev.type === "timer_block"
+                              ? { ...prev, payload: { ...prev.payload, elapsed_sec: parseNumberOrNullWithConstraints(event.target.value, { min: 0, integer: true }) ?? 0 } }
+                              : prev
+                          )}
                           disabled={!editable}
-                          className="h-10 rounded-xl border-slate-200 bg-white"
+                          placeholder="Elapsed (s)"
+                          className="h-8 flex-1 rounded-lg border-border text-sm"
                         />
-                      </div>
-                      <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <span className="text-sm font-semibold text-slate-700">Running</span>
-                        <Checkbox
-                          checked={block.payload.running}
-                          onCheckedChange={(checked) =>
-                            patchBlock(index, (prev) =>
+                        <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                          <Checkbox
+                            checked={block.payload.running}
+                            onCheckedChange={(checked) => patchBlock(index, (prev) =>
                               prev.type === "timer_block"
                                 ? { ...prev, payload: { ...prev.payload, running: checked === true } }
                                 : prev
-                            )
-                          }
-                        />
-                      </label>
-                    </div>
+                            )}
+                          />
+                          Running
+                        </label>
+                      </div>
+                    )
                   ) : null}
 
                   {block.type === "scale_block" ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                        <div>
-                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Current value</p>
-                          <p className="text-2xl font-extrabold tracking-tight text-slate-900">{block.payload.value}/{block.payload.max}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
-                          <div>Min: {block.payload.min}</div>
-                          <div>Max: {block.payload.max}</div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {scaleSteps(block.payload.min, block.payload.max).map((step) => (
-                          <button
-                            key={`${block.id}-step-${step}`}
-                            type="button"
-                            onClick={() =>
-                              patchBlock(index, (prev) =>
-                                prev.type === "scale_block"
-                                  ? { ...prev, payload: { ...prev.payload, value: step } }
-                                  : prev
-                              )
-                            }
-                            className={cn(
-                              "h-10 flex-1 rounded-full border text-xs font-bold transition-colors",
-                              step <= block.payload.value
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-slate-200 bg-slate-100 text-slate-500"
+                    <div className="space-y-2">
+                      {isRunMode || block.payload.display_mode === "slider" ? (
+                        <div className="space-y-1">
+                          <input
+                            type="range"
+                            min={block.payload.min}
+                            max={block.payload.max}
+                            step={block.payload.step ?? 1}
+                            value={block.payload.value}
+                            onChange={(event) => patchBlock(index, (prev) =>
+                              prev.type === "scale_block" ? { ...prev, payload: { ...prev.payload, value: Number(event.target.value) } } : prev
                             )}
                             disabled={!editable}
-                          >
-                            {step}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <Input
-                          value={String(block.payload.anchors.low ?? "")}
-                          onChange={(event) =>
-                            patchBlock(index, (prev) =>
-                              prev.type === "scale_block"
-                                ? {
-                                    ...prev,
-                                    payload: {
-                                      ...prev.payload,
-                                      anchors: { ...prev.payload.anchors, low: event.target.value },
-                                    },
-                                  }
-                                : prev
-                            )
-                          }
-                          disabled={!editable}
-                          placeholder="Low anchor"
-                          className="h-10 rounded-xl border-slate-200 bg-slate-50"
-                        />
-                        <Input
-                          value={String(block.payload.anchors.high ?? "")}
-                          onChange={(event) =>
-                            patchBlock(index, (prev) =>
-                              prev.type === "scale_block"
-                                ? {
-                                    ...prev,
-                                    payload: {
-                                      ...prev.payload,
-                                      anchors: { ...prev.payload.anchors, high: event.target.value },
-                                    },
-                                  }
-                                : prev
-                            )
-                          }
-                          disabled={!editable}
-                          placeholder="High anchor"
-                          className="h-10 rounded-xl border-slate-200 bg-slate-50"
-                        />
-                      </div>
+                            className="h-2 w-full cursor-pointer accent-primary"
+                          />
+                          <div className="flex items-center justify-between text-[10px] font-medium text-muted-foreground">
+                            <span>{String(block.payload.anchors.low ?? block.payload.min)}</span>
+                            <span>{String(block.payload.anchors.high ?? block.payload.max)}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {scaleSteps(block.payload.min, block.payload.max, block.payload.step ?? 1).map((step) => (
+                            <button
+                              key={`${block.id}-step-${step}`}
+                              type="button"
+                              onClick={() => patchBlock(index, (prev) =>
+                                prev.type === "scale_block" ? { ...prev, payload: { ...prev.payload, value: step } } : prev
+                              )}
+                              className={cn(
+                                "h-7 min-w-[28px] rounded-full border px-2 text-xs font-semibold transition-colors",
+                                step <= block.payload.value
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border bg-accent text-muted-foreground"
+                              )}
+                              disabled={!editable}
+                            >
+                              {step}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {!isRunMode ? (
+                        <div className="flex items-center gap-2">
+                          <Input value={block.payload.unit ?? ""} onChange={(e) => patchBlock(index, (p) => p.type === "scale_block" ? { ...p, payload: { ...p.payload, unit: e.target.value || null } } : p)} disabled={!editable} placeholder="Unit" className="h-8 flex-1 rounded-lg border-border text-sm" />
+                          <Input type="number" value={block.payload.target ?? ""} onChange={(e) => patchBlock(index, (p) => p.type === "scale_block" ? { ...p, payload: { ...p.payload, target: parseNumberOrNull(e.target.value) } } : p)} disabled={!editable} placeholder="Target" className="h-8 flex-1 rounded-lg border-border text-sm" />
+                          <Select value={block.payload.display_mode ?? "slider"} onValueChange={(v) => patchBlock(index, (p) => p.type === "scale_block" ? { ...p, payload: { ...p.payload, display_mode: v === "steps" ? "steps" : "slider" } } : p)} disabled={!editable}>
+                            <SelectTrigger className="h-8 flex-1 rounded-lg border-border text-sm"><SelectValue placeholder="Mode" /></SelectTrigger>
+                            <SelectContent><SelectItem value="slider">Slider</SelectItem><SelectItem value="steps">Steps</SelectItem></SelectContent>
+                          </Select>
+                        </div>
+                      ) : null}
+                      {!isRunMode && isAdvanced ? (
+                        <div className="flex items-center gap-2">
+                          <Input type="number" value={block.payload.min} onChange={(e) => patchBlock(index, (p) => p.type === "scale_block" ? { ...p, payload: { ...p.payload, min: parseNumberOrNull(e.target.value) ?? 1 } } : p)} disabled={!editable} placeholder="Min" className="h-8 flex-1 rounded-lg border-border text-sm" />
+                          <Input type="number" value={block.payload.max} onChange={(e) => patchBlock(index, (p) => p.type === "scale_block" ? { ...p, payload: { ...p.payload, max: parseNumberOrNull(e.target.value) ?? 10 } } : p)} disabled={!editable} placeholder="Max" className="h-8 flex-1 rounded-lg border-border text-sm" />
+                          <Input type="number" value={block.payload.step ?? 1} onChange={(e) => patchBlock(index, (p) => p.type === "scale_block" ? { ...p, payload: { ...p.payload, step: parseNumberOrNullWithConstraints(e.target.value, { min: 0.01 }) ?? 1 } } : p)} disabled={!editable} placeholder="Step" className="h-8 flex-1 rounded-lg border-border text-sm" />
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 
                   {block.type === "key_value_block" ? (
-                    <div className="space-y-3">
+                    <div>
                       {block.payload.pairs.map((pair, pairIndex) => (
-                        <div key={`${block.id}-pair-${pairIndex}`} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-2">
-                          <Input
-                            value={pair.key}
-                            onChange={(event) =>
-                              patchBlock(index, (prev) => {
-                                if (prev.type !== "key_value_block") return prev;
-                                const pairs = [...prev.payload.pairs];
-                                pairs[pairIndex] = { ...pairs[pairIndex], key: event.target.value };
-                                return { ...prev, payload: { ...prev.payload, pairs } };
-                              })
-                            }
-                            disabled={!editable}
-                            placeholder="Key"
-                            className="h-10 rounded-xl border-slate-200 bg-white"
-                          />
-                          <Input
-                            value={pair.value}
-                            onChange={(event) =>
-                              patchBlock(index, (prev) => {
-                                if (prev.type !== "key_value_block") return prev;
-                                const pairs = [...prev.payload.pairs];
-                                pairs[pairIndex] = { ...pairs[pairIndex], value: event.target.value };
-                                return { ...prev, payload: { ...prev.payload, pairs } };
-                              })
-                            }
-                            disabled={!editable}
-                            placeholder="Value"
-                            className="h-10 rounded-xl border-slate-200 bg-white"
-                          />
+                        <div key={`${block.id}-pair-${pairIndex}`} className="flex items-center gap-2 border-b border-border/20 py-1.5 last:border-b-0">
+                          {isRunMode ? (
+                            <>
+                              <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{pair.key}:</span>
+                              <Input
+                                value={pair.value}
+                                onChange={(e) => patchBlock(index, (p) => { if (p.type !== "key_value_block") return p; const pairs = [...p.payload.pairs]; pairs[pairIndex] = { ...pairs[pairIndex], value: e.target.value }; return { ...p, payload: { ...p.payload, pairs } }; })}
+                                disabled={!editable}
+                                placeholder="Value..."
+                                className="h-7 flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <Input value={pair.key} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "key_value_block") return p; const pairs = [...p.payload.pairs]; pairs[pairIndex] = { ...pairs[pairIndex], key: e.target.value }; return { ...p, payload: { ...p.payload, pairs } }; })} disabled={!editable} placeholder="Key" className="h-8 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0 px-1" />
+                              <Input value={pair.value} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "key_value_block") return p; const pairs = [...p.payload.pairs]; pairs[pairIndex] = { ...pairs[pairIndex], value: e.target.value }; return { ...p, payload: { ...p.payload, pairs } }; })} disabled={!editable} placeholder="Value" className="h-8 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0 px-1" />
+                              <button type="button" onClick={() => patchBlock(index, (p) => p.type === "key_value_block" ? { ...p, payload: { ...p.payload, pairs: p.payload.pairs.filter((_, i) => i !== pairIndex) } } : p)} disabled={!editable} className="text-xs text-destructive/60 hover:text-destructive">×</button>
+                            </>
+                          )}
                         </div>
                       ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "key_value_block"
-                              ? { ...prev, payload: { ...prev.payload, pairs: [...prev.payload.pairs, { key: "", value: "" }] } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                      >
-                        <RiAddLine className="mr-1 h-4 w-4" /> Add pair
-                      </Button>
+                      {!isRunMode ? (
+                        <button type="button" onClick={() => patchBlock(index, (p) => p.type === "key_value_block" ? { ...p, payload: { ...p.payload, pairs: [...p.payload.pairs, { key: "", value: "" }] } } : p)} disabled={!editable} className="mt-1 text-xs font-medium text-primary hover:underline">+ Add pair</button>
+                      ) : null}
                     </div>
                   ) : null}
 
                   {block.type === "link_block" ? (
-                    <div className="space-y-3">
+                    <div>
                       {block.payload.links.map((link, linkIndex) => (
-                        <div key={`${block.id}-link-${linkIndex}`} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[1fr,1fr,auto]">
-                          <Input
-                            value={link.title ?? ""}
-                            onChange={(event) =>
-                              patchBlock(index, (prev) => {
-                                if (prev.type !== "link_block") return prev;
-                                const links = [...prev.payload.links];
-                                links[linkIndex] = { ...links[linkIndex], title: event.target.value || null };
-                                return { ...prev, payload: { ...prev.payload, links } };
-                              })
-                            }
-                            disabled={!editable}
-                            placeholder="Title"
-                            className="h-10 rounded-xl border-slate-200 bg-white"
-                          />
-                          <Input
-                            value={link.url}
-                            onChange={(event) =>
-                              patchBlock(index, (prev) => {
-                                if (prev.type !== "link_block") return prev;
-                                const links = [...prev.payload.links];
-                                links[linkIndex] = { ...links[linkIndex], url: event.target.value };
-                                return { ...prev, payload: { ...prev.payload, links } };
-                              })
-                            }
-                            disabled={!editable}
-                            placeholder="https://"
-                            className="h-10 rounded-xl border-slate-200 bg-white"
-                          />
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-10 w-10 rounded-full text-destructive"
-                            onClick={() =>
-                              patchBlock(index, (prev) =>
-                                prev.type === "link_block"
-                                  ? { ...prev, payload: { ...prev.payload, links: prev.payload.links.filter((_, idx) => idx !== linkIndex) } }
-                                  : prev
-                              )
-                            }
-                            disabled={!editable}
-                          >
-                            <RiDeleteBinLine className="h-4 w-4" />
-                          </Button>
+                        <div key={`${block.id}-link-${linkIndex}`} className="flex items-center gap-2 border-b border-border/20 py-1.5 last:border-b-0">
+                          {isRunMode ? (
+                            <>
+                              <RiLinkM className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              <Input value={link.title ?? ""} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "link_block") return p; const links = [...p.payload.links]; links[linkIndex] = { ...links[linkIndex], title: e.target.value || null }; return { ...p, payload: { ...p.payload, links } }; })} disabled={!editable} placeholder="Link title" className="h-7 w-[120px] font-medium border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0" />
+                              <span className="text-muted-foreground/30">|</span>
+                              <Input value={link.url} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "link_block") return p; const links = [...p.payload.links]; links[linkIndex] = { ...links[linkIndex], url: e.target.value }; return { ...p, payload: { ...p.payload, links } }; })} disabled={!editable} placeholder="URL" className="h-7 flex-1 border-0 bg-transparent px-1 text-xs text-muted-foreground shadow-none focus-visible:ring-0" />
+                              {link.url ? (
+                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="shrink-0 p-1 text-muted-foreground hover:text-foreground">
+                                  <RiExternalLinkLine className="h-3.5 w-3.5" />
+                                </a>
+                              ) : null}
+                            </>
+                          ) : (
+                            <>
+                              <Input value={link.title ?? ""} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "link_block") return p; const links = [...p.payload.links]; links[linkIndex] = { ...links[linkIndex], title: e.target.value || null }; return { ...p, payload: { ...p.payload, links } }; })} disabled={!editable} placeholder="Title" className="h-8 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0 px-1" />
+                              <Input value={link.url} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "link_block") return p; const links = [...p.payload.links]; links[linkIndex] = { ...links[linkIndex], url: e.target.value }; return { ...p, payload: { ...p.payload, links } }; })} disabled={!editable} placeholder="https://" className="h-8 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0 px-1" />
+                              <button type="button" onClick={() => patchBlock(index, (p) => p.type === "link_block" ? { ...p, payload: { ...p.payload, links: p.payload.links.filter((_, i) => i !== linkIndex) } } : p)} disabled={!editable} className="text-xs text-destructive/60 hover:text-destructive">×</button>
+                            </>
+                          )}
                         </div>
                       ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "link_block"
-                              ? { ...prev, payload: { ...prev.payload, links: [...prev.payload.links, { title: null, url: "https://" }] } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                      >
-                        <RiAddLine className="mr-1 h-4 w-4" /> Add link
-                      </Button>
+                      {editable ? (
+                        <button type="button" onClick={() => patchBlock(index, (p) => p.type === "link_block" ? { ...p, payload: { ...p.payload, links: [...p.payload.links, { title: null, url: "https://" }] } } : p)} disabled={!editable} className="mt-1 text-xs font-medium text-primary hover:underline">+ Add link</button>
+                      ) : null}
                     </div>
                   ) : null}
 
                   {block.type === "attachment_block" ? (
-                    <div className="space-y-3">
+                    <div>
                       {block.payload.attachments.map((attachment, attachmentIndex) => (
-                        <div key={`${block.id}-attachment-${attachmentIndex}`} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-2">
-                          <Input
-                            value={attachment.name}
-                            onChange={(event) =>
-                              patchBlock(index, (prev) => {
-                                if (prev.type !== "attachment_block") return prev;
-                                const attachments = [...prev.payload.attachments];
-                                attachments[attachmentIndex] = { ...attachments[attachmentIndex], name: event.target.value };
-                                return { ...prev, payload: { ...prev.payload, attachments } };
-                              })
-                            }
-                            disabled={!editable}
-                            placeholder="File name"
-                            className="h-10 rounded-xl border-slate-200 bg-white"
-                          />
-                          <Input
-                            value={attachment.url ?? ""}
-                            onChange={(event) =>
-                              patchBlock(index, (prev) => {
-                                if (prev.type !== "attachment_block") return prev;
-                                const attachments = [...prev.payload.attachments];
-                                attachments[attachmentIndex] = { ...attachments[attachmentIndex], url: event.target.value || null };
-                                return { ...prev, payload: { ...prev.payload, attachments } };
-                              })
-                            }
-                            disabled={!editable}
-                            placeholder="File URL"
-                            className="h-10 rounded-xl border-slate-200 bg-white"
-                          />
-                          <Input
-                            value={attachment.mime ?? ""}
-                            onChange={(event) =>
-                              patchBlock(index, (prev) => {
-                                if (prev.type !== "attachment_block") return prev;
-                                const attachments = [...prev.payload.attachments];
-                                attachments[attachmentIndex] = { ...attachments[attachmentIndex], mime: event.target.value || null };
-                                return { ...prev, payload: { ...prev.payload, attachments } };
-                              })
-                            }
-                            disabled={!editable}
-                            placeholder="MIME type"
-                            className="h-10 rounded-xl border-slate-200 bg-white"
-                          />
-                          <div className="flex items-center gap-3">
-                            <Input
-                              type="number"
-                              value={attachment.size_bytes ?? ""}
-                              onChange={(event) =>
-                                patchBlock(index, (prev) => {
-                                  if (prev.type !== "attachment_block") return prev;
-                                  const attachments = [...prev.payload.attachments];
-                                  attachments[attachmentIndex] = {
-                                    ...attachments[attachmentIndex],
-                                    size_bytes: parseNumberOrNullWithConstraints(event.target.value, { min: 0, integer: true }),
-                                  };
-                                  return { ...prev, payload: { ...prev.payload, attachments } };
-                                })
-                              }
-                              disabled={!editable}
-                              placeholder="Bytes"
-                              className="h-10 rounded-xl border-slate-200 bg-white"
-                            />
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="h-10 w-10 rounded-full text-destructive"
-                              onClick={() =>
-                                patchBlock(index, (prev) =>
-                                  prev.type === "attachment_block"
-                                    ? { ...prev, payload: { ...prev.payload, attachments: prev.payload.attachments.filter((_, idx) => idx !== attachmentIndex) } }
-                                    : prev
-                                )
-                              }
-                              disabled={!editable}
-                            >
-                              <RiDeleteBinLine className="h-4 w-4" />
-                            </Button>
-                          </div>
+                        <div key={`${block.id}-attachment-${attachmentIndex}`} className="flex items-center gap-2 border-b border-border/20 py-2 last:border-b-0">
+                          {isRunMode ? (
+                            <span className="text-sm text-foreground truncate">{attachment.name}{attachment.mime ? ` (${attachment.mime})` : ""}</span>
+                          ) : (
+                            <>
+                              <Input value={attachment.name} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "attachment_block") return p; const a = [...p.payload.attachments]; a[attachmentIndex] = { ...a[attachmentIndex], name: e.target.value }; return { ...p, payload: { ...p.payload, attachments: a } }; })} disabled={!editable} placeholder="Name" className="h-8 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0" />
+                              <Input value={attachment.url ?? ""} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "attachment_block") return p; const a = [...p.payload.attachments]; a[attachmentIndex] = { ...a[attachmentIndex], url: e.target.value || null }; return { ...p, payload: { ...p.payload, attachments: a } }; })} disabled={!editable} placeholder="URL" className="h-8 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0" />
+                              <button type="button" onClick={() => patchBlock(index, (p) => p.type === "attachment_block" ? { ...p, payload: { ...p.payload, attachments: p.payload.attachments.filter((_, i) => i !== attachmentIndex) } } : p)} disabled={!editable} className="text-xs text-destructive/60 hover:text-destructive">×</button>
+                            </>
+                          )}
                         </div>
                       ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "attachment_block"
-                              ? { ...prev, payload: { ...prev.payload, attachments: [...prev.payload.attachments, { name: "", url: null, mime: null, size_bytes: null }] } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                      >
-                        <RiAddLine className="mr-1 h-4 w-4" /> Add attachment
-                      </Button>
+                      {!isRunMode ? (
+                        <button type="button" onClick={() => patchBlock(index, (p) => p.type === "attachment_block" ? { ...p, payload: { ...p.payload, attachments: [...p.payload.attachments, { name: "", url: null, mime: null, size_bytes: null }] } } : p)} disabled={!editable} className="mt-1 text-xs font-medium text-primary hover:underline">+ Add attachment</button>
+                      ) : null}
                     </div>
                   ) : null}
 
                   {block.type === "inbox_block" ? (
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Search inbox</Label>
-                        <Input
-                          value={inboxQueries[block.id] ?? ""}
-                          onFocus={() => setActiveInboxBlockId(block.id)}
-                          onChange={(event) => {
-                            setInboxQueries((prev) => ({ ...prev, [block.id]: event.target.value }));
-                            setActiveInboxBlockId(block.id);
-                          }}
-                          disabled={!editable}
-                          placeholder="Type to search a capture"
-                          className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                        />
-                        {activeInboxBlockId === block.id && (inboxSearch.data?.captures ?? []).length > 0 ? (
-                          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                            {(inboxSearch.data?.captures ?? []).map((entry) => (
-                              <button
-                                key={entry.id}
-                                type="button"
-                                onClick={() => addInboxRef(index, entry)}
-                                className="flex w-full items-center justify-between border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
-                              >
-                                <span className="text-sm font-medium text-slate-900">{entry.title}</span>
-                                <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{entry.capture_type ?? "capture"}</span>
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {block.payload.capture_refs.map((ref) => (
-                          <div key={ref.capture_id} className="flex items-center gap-2 rounded-full border border-border bg-accent px-3 py-2 text-sm text-foreground">
-                            <span className="max-w-[240px] truncate">{ref.title || ref.capture_id}</span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                patchBlock(index, (prev) =>
-                                  prev.type === "inbox_block"
-                                    ? {
-                                        ...prev,
-                                        payload: {
-                                          ...prev.payload,
-                                          capture_refs: prev.payload.capture_refs.filter((entry) => entry.capture_id !== ref.capture_id),
-                                        },
-                                      }
-                                    : prev
-                                )
-                              }
-                              className="text-foreground/70"
-                              disabled={!editable}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="space-y-3">
+                      {!isRunMode ? (
+                        <div className="space-y-1">
+                          <Input
+                            value={inboxQueries[block.id] ?? ""}
+                            onFocus={() => setActiveInboxBlockId(block.id)}
+                            onChange={(event) => {
+                              setInboxQueries((prev) => ({ ...prev, [block.id]: event.target.value }));
+                              setActiveInboxBlockId(block.id);
+                            }}
+                            disabled={!editable}
+                            placeholder="Search to capture..."
+                            className="h-8 rounded-lg border-border bg-accent text-sm"
+                          />
+                          {activeInboxBlockId === block.id && (inboxSearch.data?.captures ?? []).length > 0 ? (
+                            <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+                              {(inboxSearch.data?.captures ?? []).map((entry) => (
+                                <button
+                                  key={entry.id}
+                                  type="button"
+                                  onClick={() => addInboxRef(index, entry)}
+                                  className="flex w-full items-center justify-between border-b border-border/20 px-3 py-2 text-left last:border-b-0 hover:bg-accent"
+                                >
+                                  <span className="text-sm font-medium text-foreground">{entry.title}</span>
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{entry.capture_type ?? "capture"}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {block.payload.capture_refs.length > 0 ? (
+                        <div className="flex flex-col gap-1.5">
+                          {block.payload.capture_refs.map((ref) => (
+                            <div key={ref.capture_id} className="flex items-center gap-2 rounded-lg border border-border/20 bg-accent px-3 py-2 text-sm text-foreground">
+                              <span className="max-w-[240px] truncate">{ref.title || ref.capture_id}</span>
+                              {!isRunMode ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    patchBlock(index, (prev) =>
+                                      prev.type === "inbox_block"
+                                        ? { ...prev, payload: { ...prev.payload, capture_refs: prev.payload.capture_refs.filter((entry) => entry.capture_id !== ref.capture_id) } }
+                                        : prev
+                                    )
+                                  }
+                                  className="ml-auto text-destructive/60 hover:text-destructive"
+                                  disabled={!editable}
+                                >
+                                  ×
+                                </button>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 
                   {block.type === "task_block" ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Input
-                        value={block.payload.title}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "task_block"
-                              ? { ...prev, payload: { ...prev.payload, title: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Task title"
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50 md:col-span-2"
-                      />
-                      <Select
-                        value={block.payload.status}
-                        onValueChange={(value) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "task_block"
-                              ? { ...prev, payload: { ...prev.payload, status: value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                      >
-                        <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-slate-50">
-                          <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todo">To do</SelectItem>
-                          <SelectItem value="in_progress">In progress</SelectItem>
-                          <SelectItem value="done">Done</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="datetime-local"
-                        value={formatDateTimeLocal(block.payload.due_at)}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "task_block"
-                              ? { ...prev, payload: { ...prev.payload, due_at: toIsoOrNull(event.target.value) } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                      />
+                    <div className="space-y-3">
+                      {isRunMode ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-medium text-foreground">{block.payload.title || "Untitled task"}</span>
+                          <button
+                            type="button"
+                            disabled={!editable}
+                            onClick={() => patchBlock(index, (p) => {
+                              if (p.type !== "task_block") return p;
+                              const nextStatus = p.payload.status === "todo" ? "in_progress" : p.payload.status === "in_progress" ? "done" : "todo";
+                              return { ...p, payload: { ...p.payload, status: nextStatus } };
+                            })}
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                              block.payload.status === "done" ? "bg-primary text-primary-foreground hover:bg-primary/90" :
+                                block.payload.status === "in_progress" ? "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20" :
+                                  "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                            )}
+                          >
+                            {block.payload.status.replace("_", " ")}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid gap-2 md:grid-cols-[1fr,auto]">
+                          <Input value={block.payload.title} onChange={(e) => patchBlock(index, (p) => p.type === "task_block" ? { ...p, payload: { ...p.payload, title: e.target.value } } : p)} disabled={!editable} placeholder="Task title" className="h-8 rounded-lg border-border text-sm" />
+                          <Select value={block.payload.status} onValueChange={(v) => patchBlock(index, (p) => p.type === "task_block" ? { ...p, payload: { ...p.payload, status: v } } : p)} disabled={!editable}>
+                            <SelectTrigger className="h-8 w-[120px] rounded-lg border-border text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="todo">To do</SelectItem>
+                              <SelectItem value="in_progress">Doing</SelectItem>
+                              <SelectItem value="done">Done</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      {!isRunMode && advancedBlockIds[block.id] ? (
+                        <Input type="datetime-local" value={formatDateTimeLocal(block.payload.due_at)} onChange={(e) => patchBlock(index, (p) => p.type === "task_block" ? { ...p, payload: { ...p.payload, due_at: toIsoOrNull(e.target.value) } } : p)} disabled={!editable} className="h-8 rounded-lg border-border text-sm" />
+                      ) : null}
                     </div>
                   ) : null}
 
                   {block.type === "status_block" ? (
-                    <div className="space-y-4">
-                      <div className="grid gap-3 md:grid-cols-3">
-                        {[
-                          { value: "on_track", label: "On track" },
-                          { value: "at_risk", label: "At risk" },
-                          { value: "off_track", label: "Off track" },
-                        ].map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() =>
-                              patchBlock(index, (prev) =>
-                                prev.type === "status_block"
-                                  ? { ...prev, payload: { ...prev.payload, state: option.value } }
-                                  : prev
-                              )
-                            }
-                            className={cn(
-                              "rounded-[24px] border px-4 py-4 text-left transition-colors",
-                              block.payload.state === option.value
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-slate-200 bg-slate-50 text-slate-700"
-                            )}
-                            disabled={!editable}
-                          >
-                            <div className="text-[11px] font-black uppercase tracking-[0.16em]">Status</div>
-                            <div className="mt-2 text-base font-bold">{option.label}</div>
-                          </button>
-                        ))}
+                    <div className="space-y-3">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {[
+                            { value: "on_track", label: "On track" },
+                            { value: "at_risk", label: "At risk" },
+                            { value: "off_track", label: "Off track" },
+                          ].map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => patchBlock(index, (p) => p.type === "status_block" ? { ...p, payload: { ...p.payload, state: option.value as any } } : p)}
+                              className={cn(
+                                "h-8 rounded-full border px-3 text-xs font-semibold transition-colors",
+                                block.payload.state === option.value
+                                  ? (option.value === "on_track" ? "border-green-500 bg-green-500 text-white" : option.value === "at_risk" ? "border-yellow-500 bg-yellow-500 text-white" : "border-red-500 bg-red-500 text-white")
+                                  : "border-border bg-accent text-muted-foreground hover:bg-accent/80"
+                              )}
+                              disabled={!editable}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                        {isRunMode && block.payload.note ? (
+                          <p className="text-sm text-muted-foreground">{block.payload.note}</p>
+                        ) : null}
                       </div>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="1"
-                          step="0.1"
-                          value={block.payload.confidence ?? ""}
-                          onChange={(event) =>
-                            patchBlock(index, (prev) =>
-                              prev.type === "status_block"
-                                ? {
-                                    ...prev,
-                                    payload: {
-                                      ...prev.payload,
-                                      confidence: parseNumberOrNullWithConstraints(event.target.value, { min: 0, max: 1 }),
-                                    },
-                                  }
-                                : prev
-                            )
-                          }
-                          disabled={!editable}
-                          placeholder="Confidence (0-1)"
-                          className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                        />
-                        <Textarea
-                          value={block.payload.note ?? ""}
-                          onChange={(event) =>
-                            patchBlock(index, (prev) =>
-                              prev.type === "status_block"
-                                ? { ...prev, payload: { ...prev.payload, note: event.target.value || null } }
-                                : prev
-                            )
-                          }
-                          disabled={!editable}
-                          placeholder="Context note"
-                          rows={3}
-                          className="rounded-[24px] border-slate-200 bg-slate-50"
-                        />
-                      </div>
+                      {!isRunMode && advancedBlockIds[block.id] ? (
+                        <div className="grid gap-2 md:grid-cols-2">
+                          <Input type="number" min="0" max="1" step="0.1" value={block.payload.confidence ?? ""} onChange={(e) => patchBlock(index, (p) => p.type === "status_block" ? { ...p, payload: { ...p.payload, confidence: parseNumberOrNullWithConstraints(e.target.value, { min: 0, max: 1 }) } } : p)} disabled={!editable} placeholder="Confidence (0-1)" className="h-8 rounded-lg border-border text-sm" />
+                          <Input value={block.payload.note ?? ""} onChange={(e) => patchBlock(index, (p) => p.type === "status_block" ? { ...p, payload: { ...p.payload, note: e.target.value || null } } : p)} disabled={!editable} placeholder="Context note" className="h-8 rounded-lg border-border text-sm" />
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 
                   {block.type === "metric_block" ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Input
-                        value={block.payload.name}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "metric_block"
-                              ? { ...prev, payload: { ...prev.payload, name: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Metric name"
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50 md:col-span-2"
-                      />
-                      <Input
-                        type="number"
-                        value={block.payload.current ?? ""}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "metric_block"
-                              ? { ...prev, payload: { ...prev.payload, current: parseNumberOrNull(event.target.value) } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Current"
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                      />
-                      <Input
-                        type="number"
-                        value={block.payload.target ?? ""}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "metric_block"
-                              ? { ...prev, payload: { ...prev.payload, target: parseNumberOrNull(event.target.value) } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Target"
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                      />
-                      <Input
-                        value={block.payload.unit ?? ""}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "metric_block"
-                              ? { ...prev, payload: { ...prev.payload, unit: event.target.value || null } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Unit"
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50 md:col-span-2"
-                      />
+                    <div className="space-y-3">
+                      {isRunMode ? (
+                        <div className="flex items-baseline gap-2">
+                          <Input
+                            type="number"
+                            value={block.payload.current ?? ""}
+                            onChange={(e) => patchBlock(index, (p) => p.type === "metric_block" ? { ...p, payload: { ...p.payload, current: parseNumberOrNull(e.target.value) } } : p)}
+                            disabled={!editable}
+                            placeholder="—"
+                            className="h-10 w-24 border-0 p-0 text-2xl font-extrabold tracking-tight text-foreground shadow-none focus-visible:ring-0 bg-transparent"
+                          />
+                          {block.payload.unit && <span className="text-sm font-semibold text-muted-foreground">{block.payload.unit}</span>}
+                          {block.payload.target != null && (
+                            <span className="ml-2 text-xs font-medium text-muted-foreground">Target: {block.payload.target}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid gap-2 md:grid-cols-[1fr,auto,auto,auto]">
+                          <Input value={block.payload.name} onChange={(e) => patchBlock(index, (p) => p.type === "metric_block" ? { ...p, payload: { ...p.payload, name: e.target.value } } : p)} disabled={!editable} placeholder="Metric name" className="h-8 rounded-lg border-border text-sm" />
+                          <Input type="number" value={block.payload.current ?? ""} onChange={(e) => patchBlock(index, (p) => p.type === "metric_block" ? { ...p, payload: { ...p.payload, current: parseNumberOrNull(e.target.value) } } : p)} disabled={!editable} placeholder="Current" className="h-8 w-24 rounded-lg border-border text-sm" />
+                          <Input type="number" value={block.payload.target ?? ""} onChange={(e) => patchBlock(index, (p) => p.type === "metric_block" ? { ...p, payload: { ...p.payload, target: parseNumberOrNull(e.target.value) } } : p)} disabled={!editable} placeholder="Target" className="h-8 w-24 rounded-lg border-border text-sm" />
+                          <Input value={block.payload.unit ?? ""} onChange={(e) => patchBlock(index, (p) => p.type === "metric_block" ? { ...p, payload: { ...p.payload, unit: e.target.value || null } } : p)} disabled={!editable} placeholder="Unit" className="h-8 w-20 rounded-lg border-border text-sm" />
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
                   {block.type === "goal_block" ? (
                     <div className="space-y-3">
-                      <Textarea
-                        value={block.payload.outcome}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "goal_block"
-                              ? { ...prev, payload: { ...prev.payload, outcome: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Outcome"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
-                      <Input
-                        type="datetime-local"
-                        value={formatDateTimeLocal(block.payload.deadline)}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "goal_block"
-                              ? { ...prev, payload: { ...prev.payload, deadline: toIsoOrNull(event.target.value) } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                      />
-                      <Textarea
-                        value={block.payload.success_criteria.join("\n")}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "goal_block"
-                              ? { ...prev, payload: { ...prev.payload, success_criteria: parseList(event.target.value) } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        rows={4}
-                        placeholder="One success criterion per line"
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
+                      {isRunMode ? (
+                        <div className="text-sm font-medium text-foreground">{block.payload.outcome}</div>
+                      ) : (
+                        <>
+                          <Textarea value={block.payload.outcome} onChange={(e) => patchBlock(index, (p) => p.type === "goal_block" ? { ...p, payload: { ...p.payload, outcome: e.target.value } } : p)} disabled={!editable} placeholder="Outcome" rows={3} className="rounded-[24px] border-border bg-transparent text-sm" />
+                          {advancedBlockIds[block.id] ? (
+                            <div className="grid gap-3">
+                              <Input type="datetime-local" value={formatDateTimeLocal(block.payload.deadline)} onChange={(e) => patchBlock(index, (p) => p.type === "goal_block" ? { ...p, payload: { ...p.payload, deadline: toIsoOrNull(e.target.value) } } : p)} disabled={!editable} className="h-8 rounded-lg border-border text-sm" />
+                              <Textarea value={block.payload.success_criteria.join("\n")} onChange={(e) => patchBlock(index, (p) => p.type === "goal_block" ? { ...p, payload: { ...p.payload, success_criteria: parseList(e.target.value) } } : p)} disabled={!editable} rows={4} placeholder="One success criterion per line" className="rounded-xl border-border bg-transparent text-sm" />
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   ) : null}
 
                   {block.type === "milestone_block" ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Input
-                        value={block.payload.title}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "milestone_block"
-                              ? { ...prev, payload: { ...prev.payload, title: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Milestone title"
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                      />
-                      <Input
-                        type="datetime-local"
-                        value={formatDateTimeLocal(block.payload.target_date)}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "milestone_block"
-                              ? { ...prev, payload: { ...prev.payload, target_date: toIsoOrNull(event.target.value) } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                      />
-                      <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2">
-                        <span className="text-sm font-semibold text-slate-700">Done</span>
-                        <Checkbox
-                          checked={block.payload.done}
-                          onCheckedChange={(checked) =>
-                            patchBlock(index, (prev) =>
-                              prev.type === "milestone_block"
-                                ? { ...prev, payload: { ...prev.payload, done: checked === true } }
-                                : prev
-                            )
-                          }
-                        />
-                      </label>
+                    <div className="space-y-3">
+                      {isRunMode ? (
+                        <div className="flex items-center gap-3">
+                          <Checkbox checked={block.payload.done} onCheckedChange={(c) => patchBlock(index, (p) => p.type === "milestone_block" ? { ...p, payload: { ...p.payload, done: c === true } } : p)} disabled={!editable} />
+                          <span className={cn("text-sm font-medium transition-colors", block.payload.done ? "text-muted-foreground line-through" : "text-foreground")}>{block.payload.title || "Untitled milestone"}</span>
+                          {block.payload.target_date && <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{new Date(block.payload.target_date).toLocaleDateString()}</span>}
+                        </div>
+                      ) : (
+                        <div className="grid gap-2 md:grid-cols-[auto,1fr,auto]">
+                          <Checkbox checked={block.payload.done} onCheckedChange={(c) => patchBlock(index, (p) => p.type === "milestone_block" ? { ...p, payload: { ...p.payload, done: c === true } } : p)} disabled={!editable} className="mt-1" />
+                          <Input value={block.payload.title} onChange={(e) => patchBlock(index, (p) => p.type === "milestone_block" ? { ...p, payload: { ...p.payload, title: e.target.value } } : p)} disabled={!editable} placeholder="Milestone title" className="h-8 rounded-lg border-border text-sm" />
+                          {advancedBlockIds[block.id] ? (
+                            <Input type="datetime-local" value={formatDateTimeLocal(block.payload.target_date)} onChange={(e) => patchBlock(index, (p) => p.type === "milestone_block" ? { ...p, payload: { ...p.payload, target_date: toIsoOrNull(e.target.value) } } : p)} disabled={!editable} className="h-8 rounded-lg border-border text-sm" />
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
                   {block.type === "decision_block" ? (
                     <div className="space-y-3">
-                      <Input
-                        value={block.payload.decision}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "decision_block"
-                              ? { ...prev, payload: { ...prev.payload, decision: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Decision"
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                      />
-                      <Textarea
-                        value={block.payload.why}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "decision_block"
-                              ? { ...prev, payload: { ...prev.payload, why: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Why"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
-                      <Textarea
-                        value={block.payload.alternatives.join("\n")}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "decision_block"
-                              ? { ...prev, payload: { ...prev.payload, alternatives: parseList(event.target.value) } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        rows={3}
-                        placeholder="Alternative per line"
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
+                      {isRunMode ? (
+                        <div className="text-sm font-medium text-foreground">{block.payload.decision}</div>
+                      ) : (
+                        <>
+                          <Input value={block.payload.decision} onChange={(e) => patchBlock(index, (p) => p.type === "decision_block" ? { ...p, payload: { ...p.payload, decision: e.target.value } } : p)} disabled={!editable} placeholder="Decision" className="h-8 rounded-lg border-border text-sm" />
+                          {advancedBlockIds[block.id] ? (
+                            <div className="grid gap-3">
+                              <Textarea value={block.payload.why} onChange={(e) => patchBlock(index, (p) => p.type === "decision_block" ? { ...p, payload: { ...p.payload, why: e.target.value } } : p)} disabled={!editable} placeholder="Why" rows={3} className="rounded-xl border-border bg-transparent text-sm" />
+                              <Textarea value={block.payload.alternatives.join("\n")} onChange={(e) => patchBlock(index, (p) => p.type === "decision_block" ? { ...p, payload: { ...p.payload, alternatives: parseList(e.target.value) } } : p)} disabled={!editable} rows={3} placeholder="Alternative per line" className="rounded-xl border-border bg-transparent text-sm" />
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   ) : null}
 
                   {block.type === "hypothesis_block" ? (
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <Textarea
-                        value={block.payload.statement}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "hypothesis_block"
-                              ? { ...prev, payload: { ...prev.payload, statement: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Statement"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
-                      <Textarea
-                        value={block.payload.test}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "hypothesis_block"
-                              ? { ...prev, payload: { ...prev.payload, test: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Test"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
-                      <Textarea
-                        value={block.payload.signal}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "hypothesis_block"
-                              ? { ...prev, payload: { ...prev.payload, signal: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Success signal"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
+                    <div className="space-y-3">
+                      {isRunMode ? (
+                        <div className="text-sm font-medium text-foreground">{block.payload.statement}</div>
+                      ) : (
+                        <>
+                          <Textarea value={block.payload.statement} onChange={(e) => patchBlock(index, (p) => p.type === "hypothesis_block" ? { ...p, payload: { ...p.payload, statement: e.target.value } } : p)} disabled={!editable} placeholder="Statement" rows={3} className="rounded-xl border-border bg-transparent text-sm" />
+                          {advancedBlockIds[block.id] ? (
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <Textarea value={block.payload.test} onChange={(e) => patchBlock(index, (p) => p.type === "hypothesis_block" ? { ...p, payload: { ...p.payload, test: e.target.value } } : p)} disabled={!editable} placeholder="Test" rows={3} className="rounded-xl border-border bg-transparent text-sm" />
+                              <Textarea value={block.payload.signal} onChange={(e) => patchBlock(index, (p) => p.type === "hypothesis_block" ? { ...p, payload: { ...p.payload, signal: e.target.value } } : p)} disabled={!editable} placeholder="Signal" rows={3} className="rounded-xl border-border bg-transparent text-sm" />
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   ) : null}
 
                   {block.type === "risk_block" ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Textarea
-                        value={block.payload.risk}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "risk_block"
-                              ? { ...prev, payload: { ...prev.payload, risk: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Risk"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
-                      <Textarea
-                        value={block.payload.impact}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "risk_block"
-                              ? { ...prev, payload: { ...prev.payload, impact: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Impact"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
-                      <Textarea
-                        value={block.payload.mitigation}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "risk_block"
-                              ? { ...prev, payload: { ...prev.payload, mitigation: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Mitigation"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
-                      <Input
-                        value={block.payload.owner ?? ""}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "risk_block"
-                              ? { ...prev, payload: { ...prev.payload, owner: event.target.value || null } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Owner"
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                      />
+                    <div className="space-y-3">
+                      {isRunMode ? (
+                        <div className="flex items-start gap-2">
+                          <div className="text-sm font-medium text-foreground flex-1">{block.payload.risk}</div>
+                          {block.payload.impact && <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{block.payload.impact}</span>}
+                        </div>
+                      ) : (
+                        <>
+                          <Textarea value={block.payload.risk} onChange={(e) => patchBlock(index, (p) => p.type === "risk_block" ? { ...p, payload: { ...p.payload, risk: e.target.value } } : p)} disabled={!editable} placeholder="Risk" rows={3} className="rounded-xl border-border bg-transparent text-sm" />
+                          {advancedBlockIds[block.id] ? (
+                            <div className="grid gap-3">
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <Textarea value={block.payload.impact} onChange={(e) => patchBlock(index, (p) => p.type === "risk_block" ? { ...p, payload: { ...p.payload, impact: e.target.value } } : p)} disabled={!editable} placeholder="Impact" rows={2} className="rounded-xl border-border bg-transparent text-sm" />
+                                <Input value={block.payload.owner ?? ""} onChange={(e) => patchBlock(index, (p) => p.type === "risk_block" ? { ...p, payload: { ...p.payload, owner: e.target.value || null } } : p)} disabled={!editable} placeholder="Owner" className="h-8 rounded-lg border-border text-sm" />
+                              </div>
+                              <Textarea value={block.payload.mitigation} onChange={(e) => patchBlock(index, (p) => p.type === "risk_block" ? { ...p, payload: { ...p.payload, mitigation: e.target.value } } : p)} disabled={!editable} placeholder="Mitigation" rows={3} className="rounded-xl border-border bg-transparent text-sm" />
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   ) : null}
 
                   {block.type === "constraint_block" ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Textarea
-                        value={block.payload.constraint}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "constraint_block"
-                              ? { ...prev, payload: { ...prev.payload, constraint: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Constraint"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
-                      <Select
-                        value={block.payload.strictness}
-                        onValueChange={(value) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "constraint_block"
-                              ? { ...prev, payload: { ...prev.payload, strictness: value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                      >
-                        <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-slate-50">
-                          <SelectValue placeholder="Strictness" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="hard">Hard</SelectItem>
-                          <SelectItem value="soft">Soft</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="space-y-3">
+                      {isRunMode ? (
+                        <div className="flex items-start gap-2">
+                          <div className="text-sm font-medium text-foreground flex-1">{block.payload.constraint}</div>
+                          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider", block.payload.strictness === "hard" ? "bg-red-500/10 text-red-500" : "bg-blue-500/10 text-blue-500")}>{block.payload.strictness}</span>
+                        </div>
+                      ) : (
+                        <div className="grid gap-2 md:grid-cols-[1fr,auto]">
+                          <Textarea value={block.payload.constraint} onChange={(e) => patchBlock(index, (p) => p.type === "constraint_block" ? { ...p, payload: { ...p.payload, constraint: e.target.value } } : p)} disabled={!editable} placeholder="Constraint" rows={2} className="rounded-xl border-border bg-transparent text-sm" />
+                          <Select value={block.payload.strictness} onValueChange={(v) => patchBlock(index, (p) => p.type === "constraint_block" ? { ...p, payload: { ...p.payload, strictness: v } } : p)} disabled={!editable}>
+                            <SelectTrigger className="h-8 w-[100px] rounded-lg border-border text-sm"><SelectValue placeholder="Strictness" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="hard">Hard</SelectItem>
+                              <SelectItem value="soft">Soft</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
                   {block.type === "question_block" ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Textarea
-                        value={block.payload.question}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "question_block"
-                              ? { ...prev, payload: { ...prev.payload, question: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Question"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50 md:col-span-2"
-                      />
-                      <Select
-                        value={block.payload.priority}
-                        onValueChange={(value) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "question_block"
-                              ? { ...prev, payload: { ...prev.payload, priority: value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                      >
-                        <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-slate-50">
-                          <SelectValue placeholder="Priority" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        value={block.payload.assignee ?? ""}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "question_block"
-                              ? { ...prev, payload: { ...prev.payload, assignee: event.target.value || null } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Assignee"
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                      />
+                    <div className="space-y-3">
+                      {isRunMode ? (
+                        <div className="flex items-start gap-2">
+                          <div className="text-sm font-medium text-foreground flex-1">{block.payload.question}</div>
+                          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider", block.payload.priority === "high" ? "bg-red-500/10 text-red-500" : block.payload.priority === "medium" ? "bg-yellow-500/10 text-yellow-600" : "bg-slate-100 text-slate-500")}>{block.payload.priority}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <Textarea value={block.payload.question} onChange={(e) => patchBlock(index, (p) => p.type === "question_block" ? { ...p, payload: { ...p.payload, question: e.target.value } } : p)} disabled={!editable} placeholder="Question" rows={3} className="rounded-[24px] border-border bg-transparent text-sm" />
+                          {advancedBlockIds[block.id] ? (
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <Select value={block.payload.priority} onValueChange={(v) => patchBlock(index, (p) => p.type === "question_block" ? { ...p, payload: { ...p.payload, priority: v } } : p)} disabled={!editable}>
+                                <SelectTrigger className="h-8 rounded-lg border-border text-sm"><SelectValue placeholder="Priority" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="low">Low</SelectItem>
+                                  <SelectItem value="medium">Medium</SelectItem>
+                                  <SelectItem value="high">High</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Input value={block.payload.assignee ?? ""} onChange={(e) => patchBlock(index, (p) => p.type === "question_block" ? { ...p, payload: { ...p.payload, assignee: e.target.value || null } } : p)} disabled={!editable} placeholder="Assignee" className="h-8 rounded-lg border-border text-sm" />
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   ) : null}
 
                   {block.type === "set_block" ? (
                     <div className="space-y-4">
-                      <Input
-                        value={block.payload.exercise_name}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "set_block"
-                              ? { ...prev, payload: { ...prev.payload, exercise_name: event.target.value } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Exercise name"
-                        className="h-11 rounded-2xl border-slate-200 bg-slate-50"
-                      />
-                      <div className="space-y-3">
+                      {isRunMode ? (
+                        <div className="text-sm font-medium text-foreground">{block.payload.exercise_name}</div>
+                      ) : (
+                        <Input value={block.payload.exercise_name} onChange={(e) => patchBlock(index, (p) => p.type === "set_block" ? { ...p, payload: { ...p.payload, exercise_name: e.target.value } } : p)} disabled={!editable} placeholder="Exercise name" className="h-8 rounded-lg border-border text-sm" />
+                      )}
+                      <div className="space-y-2">
                         {block.payload.sets.map((setItem, setIndex) => (
-                          <div key={`${block.id}-set-${setIndex}`} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                            <div className="mb-3 flex items-center justify-between">
-                              <div>
-                                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Set {setIndex + 1}</p>
-                                <p className="text-sm font-semibold text-slate-700">Reps, load, rest, RPE</p>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                                  <Checkbox
-                                    checked={setItem.done}
-                                    onCheckedChange={(checked) =>
-                                      patchBlock(index, (prev) => {
-                                        if (prev.type !== "set_block") return prev;
-                                        const sets = [...prev.payload.sets];
-                                        sets[setIndex] = { ...sets[setIndex], done: checked === true };
-                                        return { ...prev, payload: { ...prev.payload, sets } };
-                                      })
-                                    }
-                                  />
-                                  Done
-                                </label>
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 rounded-full text-destructive"
-                                  onClick={() =>
-                                    patchBlock(index, (prev) =>
-                                      prev.type === "set_block"
-                                        ? { ...prev, payload: { ...prev.payload, sets: prev.payload.sets.filter((_, idx) => idx !== setIndex) } }
-                                        : prev
-                                    )
-                                  }
-                                  disabled={!editable}
-                                >
-                                  <RiDeleteBinLine className="h-4 w-4" />
-                                </Button>
-                              </div>
+                          <div key={`${block.id}-set-${setIndex}`} className="flex items-center gap-3 border-b border-border/20 py-2 last:border-b-0">
+                            <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground w-16 shrink-0">
+                              <Checkbox checked={setItem.done} onCheckedChange={(c) => patchBlock(index, (p) => { if (p.type !== "set_block") return p; const s = [...p.payload.sets]; s[setIndex] = { ...s[setIndex], done: c === true }; return { ...p, payload: { ...p.payload, sets: s } }; })} disabled={!editable} />
+                              S{setIndex + 1}
+                            </label>
+                            <div className="grid grid-cols-4 gap-2 flex-1">
+                              {isRunMode ? (
+                                <>
+                                  <div className="text-sm text-foreground">{setItem.reps ? `${setItem.reps} reps` : "-"}</div>
+                                  <div className="text-sm text-foreground">{setItem.load ? `${setItem.load} kg` : "-"}</div>
+                                  <div className="text-sm text-foreground text-center">{setItem.rest_sec ? `${setItem.rest_sec}s` : "-"}</div>
+                                  <div className="text-sm text-foreground text-right">{setItem.rpe ? `RPE ${setItem.rpe}` : "-"}</div>
+                                </>
+                              ) : (
+                                <>
+                                  <Input type="number" value={setItem.reps ?? ""} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "set_block") return p; const s = [...p.payload.sets]; s[setIndex] = { ...s[setIndex], reps: parseNumberOrNullWithConstraints(e.target.value, { min: 0, integer: true }) }; return { ...p, payload: { ...p.payload, sets: s } }; })} disabled={!editable} placeholder="Reps" className="h-8 rounded-lg border-border text-sm" />
+                                  <Input type="number" value={setItem.load ?? ""} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "set_block") return p; const s = [...p.payload.sets]; s[setIndex] = { ...s[setIndex], load: parseNumberOrNullWithConstraints(e.target.value, { min: 0 }) }; return { ...p, payload: { ...p.payload, sets: s } }; })} disabled={!editable} placeholder="Load" className="h-8 rounded-lg border-border text-sm" />
+                                  <Input type="number" value={setItem.rest_sec ?? ""} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "set_block") return p; const s = [...p.payload.sets]; s[setIndex] = { ...s[setIndex], rest_sec: parseNumberOrNullWithConstraints(e.target.value, { min: 0, integer: true }) }; return { ...p, payload: { ...p.payload, sets: s } }; })} disabled={!editable} placeholder="Rest (s)" className="h-8 rounded-lg border-border text-sm" />
+                                  <Input type="number" value={setItem.rpe ?? ""} onChange={(e) => patchBlock(index, (p) => { if (p.type !== "set_block") return p; const s = [...p.payload.sets]; s[setIndex] = { ...s[setIndex], rpe: parseNumberOrNullWithConstraints(e.target.value, { min: 0, max: 10 }) }; return { ...p, payload: { ...p.payload, sets: s } }; })} disabled={!editable} placeholder="RPE" className="h-8 rounded-lg border-border text-sm" />
+                                </>
+                              )}
                             </div>
-                            <div className="grid gap-3 md:grid-cols-4">
-                              <Input
-                                type="number"
-                                value={setItem.reps ?? ""}
-                                onChange={(event) =>
-                                  patchBlock(index, (prev) => {
-                                    if (prev.type !== "set_block") return prev;
-                                    const sets = [...prev.payload.sets];
-                                    sets[setIndex] = { ...sets[setIndex], reps: parseNumberOrNullWithConstraints(event.target.value, { min: 0, integer: true }) };
-                                    return { ...prev, payload: { ...prev.payload, sets } };
-                                  })
-                                }
-                                disabled={!editable}
-                                placeholder="Reps"
-                                className="h-10 rounded-xl border-slate-200 bg-white"
-                              />
-                              <Input
-                                type="number"
-                                value={setItem.load ?? ""}
-                                onChange={(event) =>
-                                  patchBlock(index, (prev) => {
-                                    if (prev.type !== "set_block") return prev;
-                                    const sets = [...prev.payload.sets];
-                                    sets[setIndex] = { ...sets[setIndex], load: parseNumberOrNullWithConstraints(event.target.value, { min: 0 }) };
-                                    return { ...prev, payload: { ...prev.payload, sets } };
-                                  })
-                                }
-                                disabled={!editable}
-                                placeholder="Load"
-                                className="h-10 rounded-xl border-slate-200 bg-white"
-                              />
-                              <Input
-                                type="number"
-                                value={setItem.rest_sec ?? ""}
-                                onChange={(event) =>
-                                  patchBlock(index, (prev) => {
-                                    if (prev.type !== "set_block") return prev;
-                                    const sets = [...prev.payload.sets];
-                                    sets[setIndex] = { ...sets[setIndex], rest_sec: parseNumberOrNullWithConstraints(event.target.value, { min: 0, integer: true }) };
-                                    return { ...prev, payload: { ...prev.payload, sets } };
-                                  })
-                                }
-                                disabled={!editable}
-                                placeholder="Rest sec"
-                                className="h-10 rounded-xl border-slate-200 bg-white"
-                              />
-                              <Input
-                                type="number"
-                                value={setItem.rpe ?? ""}
-                                onChange={(event) =>
-                                  patchBlock(index, (prev) => {
-                                    if (prev.type !== "set_block") return prev;
-                                    const sets = [...prev.payload.sets];
-                                    sets[setIndex] = { ...sets[setIndex], rpe: parseNumberOrNullWithConstraints(event.target.value, { min: 0, max: 10 }) };
-                                    return { ...prev, payload: { ...prev.payload, sets } };
-                                  })
-                                }
-                                disabled={!editable}
-                                placeholder="RPE"
-                                className="h-10 rounded-xl border-slate-200 bg-white"
-                              />
-                            </div>
+                            {!isRunMode ? (
+                              <button type="button" onClick={() => patchBlock(index, (p) => p.type === "set_block" ? { ...p, payload: { ...p.payload, sets: p.payload.sets.filter((_, idx) => idx !== setIndex) } } : p)} className="text-destructive/60 hover:text-destructive shrink-0 ml-1" disabled={!editable}>×</button>
+                            ) : null}
                           </div>
                         ))}
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "set_block"
-                              ? {
-                                  ...prev,
-                                  payload: {
-                                    ...prev.payload,
-                                    sets: [...prev.payload.sets, { reps: null, load: null, rest_sec: null, rpe: null, done: false }],
-                                  },
-                                }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                      >
-                        <RiAddLine className="mr-1 h-4 w-4" /> Add set
-                      </Button>
-                      <Textarea
-                        value={block.payload.notes ?? ""}
-                        onChange={(event) =>
-                          patchBlock(index, (prev) =>
-                            prev.type === "set_block"
-                              ? { ...prev, payload: { ...prev.payload, notes: event.target.value || null } }
-                              : prev
-                          )
-                        }
-                        disabled={!editable}
-                        placeholder="Session notes"
-                        rows={4}
-                        className="rounded-[24px] border-slate-200 bg-slate-50"
-                      />
+                      {!isRunMode ? (
+                        <>
+                          <div>
+                            <button type="button" onClick={() => patchBlock(index, (p) => p.type === "set_block" ? { ...p, payload: { ...p.payload, sets: [...p.payload.sets, { reps: null, load: null, rest_sec: null, rpe: null, done: false }] } } : p)} disabled={!editable} className="text-sm font-semibold text-primary hover:underline">+ Add set</button>
+                          </div>
+                          {advancedBlockIds[block.id] ? (
+                            <Textarea value={block.payload.notes ?? ""} onChange={(e) => patchBlock(index, (p) => p.type === "set_block" ? { ...p, payload: { ...p.payload, notes: e.target.value || null } } : p)} disabled={!editable} placeholder="Session notes" rows={3} className="rounded-xl border-border bg-transparent text-sm" />
+                          ) : null}
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -1722,7 +1218,7 @@ export function BusinessBlocksEditor({
             </section>
           );
         })}
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }

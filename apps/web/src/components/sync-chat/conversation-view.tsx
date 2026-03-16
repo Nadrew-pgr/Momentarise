@@ -69,6 +69,7 @@ interface ConversationViewProps {
   logAriaLabel: string;
   historyLoadingLabel: string;
   onRetry: () => void;
+  scrollButtonBottomOffset?: number;
 }
 
 function mergeMessages(
@@ -131,6 +132,7 @@ export function ConversationView({
   logAriaLabel,
   historyLoadingLabel,
   onRetry,
+  scrollButtonBottomOffset,
 }: ConversationViewProps) {
   const displayMessages = mergeMessages(messages, pendingMessages, streamingBuffer, isStreaming);
   const displayNotices = notices.slice(0, 3);
@@ -146,11 +148,16 @@ export function ConversationView({
     displayNotices.length > 0 ||
     taskEntries.length > 0 ||
     queueEntries.length > 0;
+  const scrollButtonBottom = Math.max(128, Math.round(scrollButtonBottomOffset ?? 128));
+  const conversationBottomPadding = Math.max(150, scrollButtonBottom + 70);
 
   return (
     <div className="sync-chat-scroll-area h-full w-full overflow-hidden">
       <Conversation aria-label={logAriaLabel} className="h-full">
-        <ConversationContent className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-4 px-4 pb-[150px]">
+        <ConversationContent
+          className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-8 px-4"
+          style={{ paddingBottom: `${conversationBottomPadding}px` }}
+        >
           {!hasConversation ? (
             <div className="flex h-full flex-1 flex-col items-center justify-center text-center">
               <AnimatedOrb size={124} className="mb-4 sync-chat-orb-intro" />
@@ -184,10 +191,10 @@ export function ConversationView({
                 </div>
               ) : null}
 
-              {currentReasoning && currentReasoning.content ? (
+              {currentReasoning && (currentReasoning.content || currentReasoning.summary) ? (
                 <Reasoning duration={currentReasoning.durationMs ? Math.ceil(currentReasoning.durationMs / 1000) : undefined}>
                   <ReasoningTrigger />
-                  <ReasoningContent>{currentReasoning.content}</ReasoningContent>
+                  <ReasoningContent>{currentReasoning.content || currentReasoning.summary || " "}</ReasoningContent>
                 </Reasoning>
               ) : null}
 
@@ -197,7 +204,7 @@ export function ConversationView({
                 const messageContextLinks = message.contextLinks ?? [];
 
                 return (
-                  <div className="space-y-2" key={`${message.id}-${message.seq}`}>
+                  <div className="space-y-4" key={`${message.id}-${message.seq}`}>
                     {from === "user" && messageContextLinks.length > 0 ? (
                       <div className="flex w-full justify-end">
                         <div className="flex max-w-[75%] flex-wrap justify-end gap-1.5">
@@ -293,7 +300,7 @@ export function ConversationView({
             </>
           ) : null}
         </ConversationContent>
-        <ConversationScrollButton className="sync-chat-scroll-button" />
+        <ConversationScrollButton className="sync-chat-scroll-button" style={{ bottom: `${scrollButtonBottom}px` }} />
       </Conversation>
     </div>
   );

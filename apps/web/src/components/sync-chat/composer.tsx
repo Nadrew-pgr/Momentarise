@@ -85,6 +85,7 @@ interface ComposerProps {
   beforeComposer?: ReactNode;
   afterComposer?: ReactNode;
   selectionOverride?: { key: number; start: number; end: number } | null;
+  onContainerHeightChange?: (height: number) => void;
 }
 
 export function Composer({
@@ -119,9 +120,11 @@ export function Composer({
   beforeComposer = null,
   afterComposer = null,
   selectionOverride = null,
+  onContainerHeightChange,
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const appliedSelectionKeyRef = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const canSend = useMemo(
     () => value.trim().length > 0 && !disabled && !isStreaming && canSendOverride,
@@ -143,6 +146,23 @@ export function Composer({
     textarea.focus();
     textarea.setSelectionRange(selectionOverride.start, selectionOverride.end);
   }, [selectionOverride]);
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node || !onContainerHeightChange) return;
+
+    const notifyHeight = () => {
+      onContainerHeightChange(Math.ceil(node.getBoundingClientRect().height));
+    };
+    notifyHeight();
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      notifyHeight();
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [onContainerHeightChange]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -178,7 +198,7 @@ export function Composer({
   };
 
   return (
-    <div className="sync-chat-composer-wrap pointer-events-none absolute inset-x-0 bottom-3 z-10 px-4">
+    <div ref={containerRef} className="sync-chat-composer-wrap pointer-events-none absolute inset-x-0 bottom-3 z-10 px-4">
       <TooltipProvider delayDuration={150}>
         {beforeComposer ? <div className="pointer-events-auto mx-auto mb-2 w-full max-w-3xl">{beforeComposer}</div> : null}
         <div className="pointer-events-auto mx-auto w-full max-w-3xl">

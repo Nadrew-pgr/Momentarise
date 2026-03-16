@@ -14,6 +14,8 @@ export interface BlockDisplayMeta {
   type: BusinessBlockType;
   title: string;
   eyebrow: string;
+  /** Remix icon name without the Ri prefix, e.g. "FileTextLine" → RiFileTextLine */
+  icon: string;
 }
 
 export interface RuntimeUpdateDraft {
@@ -51,27 +53,27 @@ export const STARTER_KITS: StarterKitDefinition[] = [
 ];
 
 export const BLOCK_DISPLAY_META: Record<BusinessBlockType, BlockDisplayMeta> = {
-  text_block: { type: "text_block", title: "Text", eyebrow: "Narrative" },
-  checklist_block: { type: "checklist_block", title: "Checklist", eyebrow: "Execution" },
-  table_block: { type: "table_block", title: "Table", eyebrow: "Structure" },
-  fields_block: { type: "fields_block", title: "Fields", eyebrow: "Structure" },
-  timer_block: { type: "timer_block", title: "Timer", eyebrow: "Tracking" },
-  scale_block: { type: "scale_block", title: "Scale", eyebrow: "Signal" },
-  key_value_block: { type: "key_value_block", title: "Key/Value", eyebrow: "Reference" },
-  link_block: { type: "link_block", title: "Links", eyebrow: "Resource" },
-  attachment_block: { type: "attachment_block", title: "Attachments", eyebrow: "Resource" },
-  inbox_block: { type: "inbox_block", title: "Inbox refs", eyebrow: "Connection" },
-  task_block: { type: "task_block", title: "Task", eyebrow: "Action" },
-  status_block: { type: "status_block", title: "Status", eyebrow: "Signal" },
-  metric_block: { type: "metric_block", title: "Metric", eyebrow: "Measurement" },
-  goal_block: { type: "goal_block", title: "Goal", eyebrow: "Direction" },
-  milestone_block: { type: "milestone_block", title: "Milestone", eyebrow: "Progress" },
-  decision_block: { type: "decision_block", title: "Decision", eyebrow: "Alignment" },
-  hypothesis_block: { type: "hypothesis_block", title: "Hypothesis", eyebrow: "Learning" },
-  risk_block: { type: "risk_block", title: "Risk", eyebrow: "Guardrail" },
-  constraint_block: { type: "constraint_block", title: "Constraint", eyebrow: "Guardrail" },
-  question_block: { type: "question_block", title: "Question", eyebrow: "Open loop" },
-  set_block: { type: "set_block", title: "Set", eyebrow: "Workout" },
+  text_block: { type: "text_block", title: "Text", eyebrow: "Narrative", icon: "FileTextLine" },
+  checklist_block: { type: "checklist_block", title: "Checklist", eyebrow: "Execution", icon: "ListCheck2" },
+  table_block: { type: "table_block", title: "Table", eyebrow: "Structure", icon: "Table2" },
+  fields_block: { type: "fields_block", title: "Fields", eyebrow: "Structure", icon: "ListUnordered" },
+  timer_block: { type: "timer_block", title: "Timer", eyebrow: "Tracking", icon: "TimerLine" },
+  scale_block: { type: "scale_block", title: "Scale", eyebrow: "Signal", icon: "BarChartHorizontalLine" },
+  key_value_block: { type: "key_value_block", title: "Key/Value", eyebrow: "Reference", icon: "BookOpenLine" },
+  link_block: { type: "link_block", title: "Links", eyebrow: "Resource", icon: "LinkM" },
+  attachment_block: { type: "attachment_block", title: "Attachments", eyebrow: "Resource", icon: "Attachment2" },
+  inbox_block: { type: "inbox_block", title: "Inbox refs", eyebrow: "Connection", icon: "InboxLine" },
+  task_block: { type: "task_block", title: "Task", eyebrow: "Action", icon: "CheckboxCircleLine" },
+  status_block: { type: "status_block", title: "Status", eyebrow: "Signal", icon: "PulseLine" },
+  metric_block: { type: "metric_block", title: "Metric", eyebrow: "Measurement", icon: "LineChartLine" },
+  goal_block: { type: "goal_block", title: "Goal", eyebrow: "Direction", icon: "FlagLine" },
+  milestone_block: { type: "milestone_block", title: "Milestone", eyebrow: "Progress", icon: "MapPinLine" },
+  decision_block: { type: "decision_block", title: "Decision", eyebrow: "Alignment", icon: "GitBranchLine" },
+  hypothesis_block: { type: "hypothesis_block", title: "Hypothesis", eyebrow: "Learning", icon: "FlaskLine" },
+  risk_block: { type: "risk_block", title: "Risk", eyebrow: "Guardrail", icon: "AlertLine" },
+  constraint_block: { type: "constraint_block", title: "Constraint", eyebrow: "Guardrail", icon: "ShieldLine" },
+  question_block: { type: "question_block", title: "Question", eyebrow: "Open loop", icon: "QuestionLine" },
+  set_block: { type: "set_block", title: "Set", eyebrow: "Workout", icon: "HeartPulseLine" },
 };
 
 export function getBusinessBlockPreview(block: BusinessBlock): string {
@@ -268,7 +270,7 @@ export function buildStarterKitBlocks(
     {
       id: makeId(),
       type: "text_block",
-      label: QUICK_UPDATE_LABELS.blockers,
+      label: "Blockers",
       payload: { text: "", editor_doc: [] },
     },
     {

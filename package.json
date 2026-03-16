@@ -8,10 +8,11 @@
   "scripts": {
     "lane:check": "node scripts/check-lane-boundary.mjs",
     "sync:doctor": "node scripts/check-sync-runtime.mjs",
-    "mobile:start": "npm run start -w apps/mobile",
-    "mobile:ios": "npm run ios -w apps/mobile",
-    "mobile:android": "npm run android -w apps/mobile",
-    "mobile:web": "npm run web -w apps/mobile"
+    "mobile:start": "pnpm run --filter mobile start",
+    "mobile:ios": "pnpm run --filter mobile ios",
+    "mobile:android": "pnpm run --filter mobile android",
+    "mobile:web": "pnpm run --filter mobile web",
+    "web:dev": "pnpm run --filter web dev"
   },
   "devDependencies": {
     "tailwindcss": "^4"

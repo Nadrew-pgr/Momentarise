@@ -1,21 +1,17 @@
-import { AnimatedOrb } from "./animated-orb";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 
 interface TypingIndicatorProps {
   assistantLabel: string;
+  label?: string;
 }
 
-export function TypingIndicator({ assistantLabel }: TypingIndicatorProps) {
+export function TypingIndicator({ assistantLabel, label = "Thinking..." }: TypingIndicatorProps) {
   return (
-    <div className="mr-auto flex max-w-[88%] gap-3 md:max-w-[80%]">
-      <div className="mt-1">
-        <AnimatedOrb size={30} />
-      </div>
-      <div className="rounded-2xl rounded-bl-md border bg-background px-4 py-3 shadow-sm" role="status" aria-label={assistantLabel}>
-        <div className="flex items-center gap-1">
-          <span className="sync-chat-typing-dot" style={{ animationDelay: "0ms" }} />
-          <span className="sync-chat-typing-dot" style={{ animationDelay: "140ms" }} />
-          <span className="sync-chat-typing-dot" style={{ animationDelay: "280ms" }} />
-        </div>
+    <div className="mr-auto flex w-full">
+      <div className="inline-flex items-center px-1 py-1" role="status" aria-label={assistantLabel} aria-live="polite">
+        <Shimmer duration={1.15} className="text-sm leading-6 font-medium">
+          {label}
+        </Shimmer>
       </div>
     </div>
   );

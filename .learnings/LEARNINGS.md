@@ -679,3 +679,127 @@ Sur toute UI "tabs + footer fixe" dans un panneau, attribuer le scroll au body d
 - Related Files: `apps/web/src/components/event-calendar/event-dialog.tsx`
 - See Also: `LRN-20260307-002`
 ---
+## [LRN-20260309-001] best_practice
+**Logged**: 2026-03-09T20:37:04+01:00
+**Priority**: medium
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Pour les chemins contenant des crochets (`[id]`) en zsh, il faut toujours les quoter dans les commandes shell d’exploration/grep.
+
+### Details
+Des commandes de recherche ont échoué avec `zsh: no matches found` sur `apps/mobile/app/moment/[id].tsx` parce que zsh interprète les crochets comme glob pattern. La commande a fonctionné après usage du chemin quoté (`'apps/mobile/app/moment/[id].tsx'`).
+
+### Suggested Action
+Toujours quoter les chemins contenant `[]`, `*` ou caractères de glob quand on appelle `rg`, `sed`, `cat` ou `tsc` avec des chemins explicites.
+
+### Metadata
+- Related Files: `apps/mobile/app/moment/[id].tsx`
+- See Also: `ERR-20260309-001`
+---
+## [LRN-20260309-002] correction
+**Logged**: 2026-03-09T21:18:00+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Dans Sync web, remplacer l'indicateur de streaming sans validation visuelle peut masquer entièrement l'état "Thinking..." et créer une régression UX immédiate.
+
+### Details
+- Correction explicite utilisateur: le shimmer n'était pas visible après suppression du rendu legacy bulle/avatar.
+- La migration visuelle a retiré l'ancien indicateur avant de vérifier le fallback de rendu texte/shimmer sur la surface Sync réelle.
+- Correctif appliqué: indicateur `Thinking...` avec shimmer CSS explicite + fallback lisible, ajustement de spacing conversation, repositionnement du bouton scroll, et fallback d'affichage du raisonnement via `summary` si `content` absent.
+
+### Suggested Action
+Avant suppression d'un composant legacy UI, valider visuellement en même temps le composant remplaçant (loading, streaming, reasoning, scroll affordance) sur un run réel, puis seulement nettoyer les reliquats.
+
+### Metadata
+- Related Files: `apps/web/src/components/sync-chat/typing-indicator.tsx`, `apps/web/src/components/sync-chat/conversation-view.tsx`, `apps/web/src/app/(dashboard)/sync/sync-chat.css`
+- See Also: `LRN-20260309-001`
+---
+## [LRN-20260309-003] correction
+**Logged**: 2026-03-09T21:33:00+01:00
+**Priority**: medium
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Sur Sync web, un ajustement de layout ne doit pas déplacer un affordance critique validé produit (bouton scroll-to-bottom centré au-dessus du composer).
+
+### Details
+- Correction explicite utilisateur: le bouton scroll avait été déplacé à droite alors que la position centrée avait été validée.
+- L'ajustement rapide pour corriger la scrollbar a modifié une convention UX déjà décidée.
+- Correctif appliqué: retour à la position centrée d'origine et augmentation explicite de l'espacement vertical entre messages assistant/user.
+
+### Suggested Action
+Quand un détail d'UI est déjà validé visuellement par l'utilisateur, ne corriger que le bug ciblé et préserver les placements validés; faire une checklist "positions critiques" (composer, scroll button, toast, menu) après patch CSS/layout.
+
+### Metadata
+- Related Files: `apps/web/src/components/sync-chat/conversation-view.tsx`
+- See Also: `LRN-20260309-002`
+---
+## [LRN-20260309-004] correction
+**Logged**: 2026-03-09T21:43:00+01:00
+**Priority**: medium
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Le bouton scroll-to-bottom de Sync web doit être ancré au-dessus du composer avec un offset dépendant de la hauteur réelle du composer, pas une constante fixe.
+
+### Details
+- Correction utilisateur: le bouton devait rester centré au-dessus du composer avec un espace propre, et les messages devaient être plus espacés.
+- Cause: `bottom-[8rem]` fixe dans le composant générique `ConversationScrollButton`, insuffisant quand la hauteur du bloc composer varie (chips contexte, question guidée).
+- Correctif appliqué: mesure runtime de la hauteur du container composer (`ResizeObserver`) puis injection d'un `bottom` dynamique pour le bouton; augmentation du spacing vertical conversation/messages.
+
+### Suggested Action
+Pour les éléments flottants dépendants du composer (scroll button, toasts inline), éviter les offsets statiques et dériver la position depuis la hauteur mesurée du composer.
+
+### Metadata
+- Related Files: `apps/web/src/components/sync-chat/composer.tsx`, `apps/web/src/components/sync-chat/chat-shell.tsx`, `apps/web/src/components/sync-chat/conversation-view.tsx`
+- See Also: `LRN-20260309-003`
+---
+## [LRN-20260309-005] correction
+**Logged**: 2026-03-09T21:51:00+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Dans Sync web, un indicateur de streaming peut "disparaître" si le bas de conversation n'est pas aligné dynamiquement avec la hauteur réelle du composer.
+
+### Details
+- Correction explicite utilisateur: `Thinking...` invisible pendant l'attente sur des runs en mode reasoning.
+- Cause: padding bas conversation statique (`pb-[150px]`) alors que le composer est variable (mentions, pièces jointes, questions), ce qui masque la dernière ligne sous le composer.
+- Correctif appliqué: padding bas dynamique dérivé de l'offset du bouton scroll/composer + shimmer texte robuste (pulse) visible sans dépendance à `background-clip`.
+
+### Suggested Action
+Pour tout élément stream en pied de conversation (typing, erreurs inline, hints), utiliser un inset dynamique basé sur la hauteur réelle du composer plutôt qu'un padding fixe.
+
+### Metadata
+- Related Files: `apps/web/src/components/sync-chat/conversation-view.tsx`, `apps/web/src/app/(dashboard)/sync/sync-chat.css`
+- See Also: `LRN-20260309-004`
+---
+## [LRN-20260310-001] correction
+**Logged**: 2026-03-10T09:07:00+01:00
+**Priority**: medium
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Quand le produit demande explicitement un rendu "AI Elements", il faut conserver le composant source (`Shimmer`) et corriger l'inset/layout autour, pas remplacer l'animation par un fallback visuel différent.
+
+### Details
+- Correction explicite utilisateur: le rendu ressemblait à un simple pulse de texte, pas au shimmer AI Elements attendu.
+- Cause: remplacement temporaire du composant `Shimmer` par une animation CSS custom.
+- Correctif appliqué: retour au composant `@/components/ai-elements/shimmer` dans l'indicateur de typing, avec maintien des correctifs de visibilité (padding bas dynamique de conversation).
+
+### Suggested Action
+Respecter les primitives UI validées produit (AI Elements) et limiter les fallback custom aux cas d'incident, avec rollback explicite dès que l'infrastructure est stabilisée.
+
+### Metadata
+- Related Files: `apps/web/src/components/sync-chat/typing-indicator.tsx`, `apps/web/src/components/sync-chat/conversation-view.tsx`
+- See Also: `LRN-20260309-005`
+---

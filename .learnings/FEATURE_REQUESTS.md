@@ -171,3 +171,25 @@ Permettre d’ajouter des logs et ajustements d’exécution d’un Moment depui
 ### Metadata
 - See Also: `FEAT-20260306-001`, `FEAT-20260302-003`
 ---
+## [FEAT-20260309-001] Moment Content Studio compact Builder/Run (web + mobile)
+**Logged**: 2026-03-09T20:37:04+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Requested Capability
+Refondre `Moment > Contenu` avec un mode `Builder` et un mode `Run`, UI compacte (header réduit, input IA placeholder, métriques en pills), blocks denses, et `Quick update` limité aux signaux runtime (`status`, `energy`, `progress delta`, `next action`) sans entité log séparée.
+
+### User Context
+L’utilisateur a demandé une implémentation complète du plan V2.2 avec vraie refonte mobile, auto-activation run mode (`tracking` ou plage horaire), conserver les endpoints existants, et rendre le studio plus minimaliste et agréable à utiliser.
+
+### Suggested Implementation
+- Étendre `scale_block` de manière additive (`unit`, `target`, `step`, `display_mode`).
+- Introduire `ContentRenderMode` + `resolveContentRenderMode` partagé.
+- Introduire un moteur partagé `applyRuntimeUpdateDraft` utilisé par les sheets Update web/mobile.
+- Basculer `Moment > Contenu` web et mobile sur ce mode partagé, avec toggle manuel `Builder/Run`.
+- Densifier les cards blocks et prioriser le rendu runtime compact (`checklist`, `scale`, `set`, `status`, `task`, `metric`, `inbox`).
+
+### Metadata
+- See Also: `FEAT-20260306-001`, `FEAT-20260307-001`
+---

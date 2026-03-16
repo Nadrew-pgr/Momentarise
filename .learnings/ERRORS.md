@@ -735,3 +735,58 @@ Use a single backend instance per port, ensure Docker API loads `apps/api/.env`,
 ### Metadata
 - See Also: `LRN-20260306-004`, `ERR-20260306-005`
 ---
+## [ERR-20260309-001] zsh glob path with square brackets
+**Logged**: 2026-03-09T20:37:04+01:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+Shell commands failed when targeting `app/moment/[id].tsx` without quoting the path.
+
+### Error
+```
+zsh: no matches found: apps/mobile/app/moment/[id].tsx
+```
+
+### Context
+- Command: `rg ... apps/mobile/app/moment/[id].tsx` and `npx tsc ... app/moment/[id].tsx`
+- Related Files: `apps/mobile/app/moment/[id].tsx`
+- Reproducible: yes
+
+### Suggested Fix
+Quote paths containing bracket characters: `'apps/mobile/app/moment/[id].tsx'`.
+
+### Metadata
+- See Also: `LRN-20260309-001`
+---
+## [ERR-20260311-001] Exploration shell commands assumed unavailable aliases and unsafe quoting
+**Logged**: 2026-03-11T23:20:00+01:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+Two repo-inspection commands failed because `python` was not installed in PATH and a zsh search command used mismatched quotes.
+
+### Error
+```
+zsh:1: command not found: python
+zsh:1: unmatched '
+```
+
+### Context
+- Command: `python - <<'PY' ...` and `rg -n 'href="/me"|...|router.push\('/me' ...`
+- Related Files: `.learnings/ERRORS.md`
+- Reproducible: yes
+
+### Suggested Fix
+Use `python3` explicitly in this environment and prefer simpler search commands or double-quoted shell strings when regex patterns contain mixed quotes.
+
+### Resolution
+- Resolved: 2026-03-11
+- Change: switched repo scans to `python3` and tightened shell quoting for follow-up commands.
+
+### Metadata
+- See Also: `ERR-20260309-001`
+---
