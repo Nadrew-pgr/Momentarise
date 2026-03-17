@@ -790,3 +790,46 @@ Use `python3` explicitly in this environment and prefer simpler search commands 
 ### Metadata
 - See Also: `ERR-20260309-001`
 ---
+
+## [ERR-20260317-001] Vercel build — EUNSUPPORTEDPROTOCOL workspace:* (pnpm monorepo)
+**Logged**: 2026-03-17T20:28:00+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: infra / config
+
+### Summary
+Le déploiement Vercel échoue lors de `npm install` car npm ne reconnaît pas le protocole `workspace:*` propre à pnpm.
+
+### Error
+```
+npm error code EUNSUPPORTEDPROTOCOL
+npm error Unsupported URL Type "workspace:": workspace:*
+Error: Command "npm install" exited with 1
+```
+
+### Context
+- Vercel utilise `npm install` par défaut, même si `packageManager: pnpm@…` est déclaré dans le `package.json` racine.
+- La dépendance `@momentarise/shared: workspace:*` dans `apps/web/package.json` utilise le protocole workspace pnpm, incompatible npm.
+- Le champ `packageManager` est ignoré par Vercel sans activation explicite de Corepack.
+- Commit déclencheur : `3fa1c16` (migration vers pnpm).
+
+### Suggested Fix
+Créer un `vercel.json` à la racine du monorepo :
+```json
+{
+  "rootDirectory": "apps/web",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm run build",
+  "outputDirectory": ".next"
+}
+```
+
+### Resolution
+- Resolved: 2026-03-17
+- Commit: ajout de `vercel.json` à la racine.
+- Notes: Ne pas activer `node-linker=hoisted` globalement (casse Metro/Expo). `installCommand` surchargé suffit, pas besoin d'activer Corepack côté Vercel.
+
+### Metadata
+- Related Files: `vercel.json`, `apps/web/package.json`, `package.json`, `pnpm-workspace.yaml`
+- See Also: `ERR-20260311-001`
+---
