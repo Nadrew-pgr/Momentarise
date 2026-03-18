@@ -1,4 +1,4 @@
 {
-  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "installCommand": "cd ../.. && corepack enable && pnpm install",
   "buildCommand": "pnpm run build"
 }
