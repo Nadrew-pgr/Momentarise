@@ -1,4 +1,4 @@
 {
-  "installCommand": "cd ../.. && rm -rf node_modules apps/*/node_modules && npx -y pnpm@9.15.9 install",
+  "installCommand": "cd ../.. && npx -y pnpm@9.15.9 install --no-frozen-lockfile",
   "buildCommand": "npx -y pnpm@9.15.9 run build"
 }

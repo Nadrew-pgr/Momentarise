@@ -825,9 +825,9 @@ Créer un `vercel.json` à la racine du monorepo :
 ```
 
 ### Resolution
-- Resolved: 2026-03-17
-- Commit: ajout de `vercel.json` à la racine.
-- Notes: Ne pas activer `node-linker=hoisted` globalement (casse Metro/Expo). `installCommand` surchargé suffit, pas besoin d'activer Corepack côté Vercel.
+- Resolved: 2026-03-20
+- Commits: `vercel.json` créé dans `apps/web` (pas à la racine), pnpm@9.15.9 pinné via `npx -y`, `--no-frozen-lockfile` pour la compatibilité lockfile.
+- Notes: `rootDirectory` est un setting dashboard-only, PAS un champ vercel.json. `corepack enable` ne fonctionne pas de manière fiable dans le sandbox Vercel. Le cache de build Vercel peut contenir des node_modules npm d'anciens déploiements — les supprimer dans installCommand si besoin.
 
 ### Metadata
 - Related Files: `vercel.json`, `apps/web/package.json`, `package.json`, `pnpm-workspace.yaml`

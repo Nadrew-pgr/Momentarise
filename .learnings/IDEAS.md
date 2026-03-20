@@ -36,3 +36,7 @@ Ajouter une fonctionnalité "Shop Next" :
 - **Trigger** : Quand l'utilisateur lit ou mentionne un article/produit (ex: dans une recette ou un moment "inbox"), le système l'ajoute automatiquement (ou propose de l'ajouter) à la liste "Prochaines courses prévues".
 - **Usage** : Évite d'oublier des ingrédients ou produits de nécessité cités au fil de l'eau.
 - **Intégration** : Pourrait être un module spécifique de l'Inbox ou une action suggérée par le compagnon IA.
+
+---
+
+- 2026-03-17 Momentarise comme "assistant personnel d'exécution" est une thèse produit plus juste qu'"assistant personnel" au sens vague. Why it matters: cela aligne Sync, les connecteurs, la veille/watchlist, les preuves d'avancement et les Moments autour d'un même contrat d'exécution plutôt que d'un simple chat contextuel. Next step: consolider d'abord le contrat `Watchlist / Signals / Evidence`, puis seulement le plan de build slices/migration.
