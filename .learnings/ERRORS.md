@@ -833,3 +833,30 @@ Créer un `vercel.json` à la racine du monorepo :
 - Related Files: `vercel.json`, `apps/web/package.json`, `package.json`, `pnpm-workspace.yaml`
 - See Also: `ERR-20260311-001`
 ---
+
+## ERR-20260320-001 — Vercel build fail: TypeScript dir type mismatch on Streamdown
+
+### Context
+- Date: 2026-03-20
+- Scenario: Vercel build (`next build`) fails with TypeScript error after pnpm install succeeds.
+- Impact: Deployment bloqué malgré la correction du pnpm install.
+
+### Error
+```
+./src/components/ai-elements/reasoning.tsx:220:8
+Type error: Types of property 'dir' are incompatible.
+  Type 'string | undefined' is not assignable to type '"auto" | "ltr" | "rtl" | undefined'.
+```
+
+### Root Cause
+Dans `ReasoningContent`, les `...props` de `CollapsibleContent` (qui inclut `dir?: string`) étaient spreadées à la fois sur `<CollapsibleContent>` ET `<Streamdown>`. Or `Streamdown` attend `dir?: "auto" | "ltr" | "rtl"` — type plus strict. Localement passait en dev mais échoue en `next build` (type-check strict).
+
+### Resolution
+- Resolved: 2026-03-20
+- Commit: `53260b1` — suppression du `{...props}` sur `<Streamdown>`, seul `<CollapsibleContent>` reçoit les props.
+- Leçon: ne jamais spreader des props d'un composant parent vers un composant enfant de type différent sans filtrage explicite.
+
+### Metadata
+- Related Files: `apps/web/src/components/ai-elements/reasoning.tsx`
+- See Also: `ERR-20260317-001`
+---
