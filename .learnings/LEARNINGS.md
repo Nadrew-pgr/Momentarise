@@ -182,11 +182,11 @@ Liaison sécurisée entre Render (Backend) et Vercel (Frontend), plus intégrati
 ### Details
 - **Render Database Sync** : Pousser un fichier `render.yaml` ne suffit pas, il faut manuellement lancer un "Blueprint Sync" dans Render pour que l'infrastructure fantôme soit allouée. En l'absence de ça, créer la base manuellement via l'API Render reste nécessaire.
 - **Asyncpg & Postgres URL** : Render donne des URL `postgres://` alors que SQLAlchemy/Asyncpg exige `postgresql+asyncpg://`. Le Pydantic `field_validator` sur Pydantic settings est indispensable.
-- **MCP Vercel** : L'intégration MCP Vercel fonctionne parfaitement avec le package `@mistertk/vercel-mcp`, ce qui permet d'éditer les `API_URL` à la volée.
+- **MCP Vercel** : ~~L'ancien package `@mistertk/vercel-mcp` fonctionnait mais exposait 131 tools, dépassant la limite de 100 tools Antigravity/Gemini.~~ → Remplacé par le MCP officiel Vercel (`https://mcp.vercel.com`) avec OAuth navigateur. Voir `LRN-20260320-002`.
 
 ### Suggested Action
 - Toujours vérifier le statut du déploiement Blueprint côté Render.
-- Documenter l'usage des MCP en local pour administrer Vercel (`mcp_config.json`).
+- Utiliser le MCP officiel Vercel (`https://mcp.vercel.com`) via `mcp-remote`, pas de packages tiers.
 
 ---
 
@@ -802,4 +802,76 @@ Respecter les primitives UI validées produit (AI Elements) et limiter les fallb
 ### Metadata
 - Related Files: `apps/web/src/components/sync-chat/typing-indicator.tsx`, `apps/web/src/components/sync-chat/conversation-view.tsx`
 - See Also: `LRN-20260309-005`
+---
+## [LRN-20260320-001] correction — Extraction de patchs docs depuis exports ChatGPT
+**Logged**: 2026-03-20T00:00:00+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: docs
+
+### Summary
+Le parseur de patchs ne doit pas supposer que tout le reste du bloc fenced est du contenu: dans les exports ChatGPT, le contenu utile est souvent délimité par `---` ouvrant/fermant, puis du texte conversationnel continue dans le même bloc.
+
+### Details
+- Hypothèse initiale incorrecte: après `file/op/section` + premier `---`, tout le reste du bloc appartenait au patch.
+- Format réel observé dans `project/inbox_raw/2026-03-10_chatgpt_conv_Sync.md` et `project/inbox_raw/2026-03-20_chatgpt_conv_Sync_Partie_2.md`: le contenu est borné par un premier séparateur `---` ouvrant puis souvent un second séparateur `---` fermant, avec parfois plusieurs séparateurs consécutifs.
+- Correction appliquée: parser l'en-tête séparément, puis extraire uniquement le segment entre le premier et le deuxième séparateur `---+` sur ligne dédiée. Si seul le séparateur ouvrant existe, prendre le reste du bloc.
+
+### Suggested Action
+Pour tout extracteur de docs issus d'exports LLM, valider le parseur sur des exports réels avant de figer le format. Traiter les séparateurs de contenu explicitement plutôt qu'avec un `.*` gourmand.
+
+### Metadata
+- Related Files: `scripts/extract_doc_patches.py`, `project/inbox_raw/2026-03-10_chatgpt_conv_Sync.md`, `project/inbox_raw/2026-03-20_chatgpt_conv_Sync_Partie_2.md`
+- See Also: `LRN-20260228-001`
+---
+
+## [LRN-20260320-002] correction — MCP Vercel : utiliser l'officiel, pas les packages tiers
+**Logged**: 2026-03-20T08:00:00+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: config / infra
+
+### Summary
+Le package communautaire `@mistertk/vercel-mcp` expose 131 tools, ce qui dépasse la limite de 100 tools imposée par Antigravity/Gemini Code Assist. Le MCP officiel Vercel (`https://mcp.vercel.com`) fonctionne via OAuth navigateur et reste dans les limites.
+
+### Details
+- Antigravity (Gemini Code Assist) impose une limite de 100 tools MCP au total.
+- `@mistertk/vercel-mcp` seul en expose 131, rendant impossible l'ajout d'autres MCPs.
+- Le MCP officiel Vercel utilise OAuth (authentification navigateur au premier lancement), pas de token/clé API à copier.
+- Config : `{ "command": "npx", "args": ["-y", "mcp-remote", "https://mcp.vercel.com"] }`
+- Source : https://vercel.com/docs/agent-resources/vercel-mcp#gemini-code-assist
+
+### Suggested Action
+- Toujours préférer les MCP officiels des providers aux packages communautaires.
+- Vérifier le nombre de tools exposés avant d'ajouter un nouveau MCP.
+- Documenter la config dans `mcp_config.json` avec un commentaire ou dans LEARNINGS.md.
+
+### Metadata
+- Related Files: `~/.gemini/antigravity/mcp_config.json`
+- See Also: `LRN-20260302-001`
+---
+
+## [LRN-20260320-003] best_practice — Ne pas spreader les props d'un parent vers un enfant de type plus strict
+**Logged**: 2026-03-20T08:00:00+01:00
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Spreader `{...props}` d'un composant parent (ex: `CollapsibleContent`) sur un composant enfant (ex: `Streamdown`) cause des erreurs TypeScript si les types de props ont des niveaux de spécificité différents (ex: `dir?: string` vs `dir?: "auto" | "ltr" | "rtl"`).
+
+### Details
+- `CollapsibleContent` (Radix) expose `dir?: string` dans ses props.
+- `Streamdown` attend `dir?: "auto" | "ltr" | "rtl"` — un union type plus strict.
+- Spreader `{...props}` sur les deux composants passe en dev (pas de type-check runtime) mais échoue en `next build` (type-check strict TSC).
+- La solution : ne spreader que sur le composant dont les props sont destinées, pas sur les enfants.
+
+### Suggested Action
+- Avant de spreader des props sur un composant enfant, vérifier que les types sont compatibles.
+- Préférer l'extraction explicite (`const { dir, ...rest } = props`) au spread aveugle.
+- Toujours tester `next build` localement avant push — le dev mode ne vérifie pas les types.
+
+### Metadata
+- Related Files: `apps/web/src/components/ai-elements/reasoning.tsx`
+- See Also: `ERR-20260320-001`
 ---
