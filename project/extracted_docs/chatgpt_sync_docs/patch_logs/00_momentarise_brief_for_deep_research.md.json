@@ -1,0 +1,32 @@
+{
+  "file": "00_momentarise_brief_for_deep_research.md",
+  "patch_count": 3,
+  "sections_in_order": [
+    "initial_brief_skeleton",
+    "add_moment_blocks_and_mobile_product_truth",
+    "add_true_positioning_of_business_blocks"
+  ],
+  "patches": [
+    {
+      "index": 1,
+      "file": "00_momentarise_brief_for_deep_research.md",
+      "op": "create",
+      "section": "initial_brief_skeleton",
+      "content": "# 00_momentarise_brief_for_deep_research.md\n\n## Objectif\nDonner à une IA de deep research le contexte minimal mais suffisant pour comprendre Momentarise avant de proposer des plans d’architecture ou de refonte.\n\n## 1. Produit\nMomentarise est une application orientée :\n- capture\n- organisation\n- planification\n- exécution\n- mémoire personnelle / opérationnelle\n- assistant IA central nommé Sync\n\n## 2. Positionnement\nLe produit vise une expérience “OpenClaw-like in-app” :\n- très puissant\n- très contextuel\n- multi-surfaces\n- mais borné à l’environnement de l’application\n\nLe produit ne vise pas un agent système qui contrôle l’ordinateur.\nLe périmètre est l’app, ses données, ses connecteurs, ses objets métier et ses canaux.\n\n## 3. Stack cible\n- Web : Next.js avec BFF\n- Mobile : Expo / React Native\n- Backend métier : FastAPI\n- DB : PostgreSQL\n- LLM Gateway : LiteLLM Proxy\n- Runtime IA : Sync Core\n\n## 4. Objets métier principaux\n- Capture\n- Inbox item\n- Moment\n- Project\n- Series\n- Notifications\n- Automations\n- AgentProfiles\n- mémoire / docs / chunks\n\n## 5. Vision IA\nSync est un runtime unique avec :\n- plusieurs surfaces\n- plusieurs modes\n- plusieurs sous-agents / AgentProfiles\n- plusieurs toolsets\n- mémoire hors contexte\n- preview / apply / undo\n\n## 6. Surfaces principales\n- chat principal\n- capture assistant\n- moment coach\n- canaux externes\n\n## 7. Modes principaux\n- free\n- plan\n- deep_plan\n- assistive\n- automation\n\n## 8. Règle fondamentale\nToute mutation métier importante doit passer par :\npreview -> apply -> undo\n\n## 9. Mémoire\nLa mémoire ne doit pas être injectée en masse.\nElle doit être recherchée à la demande via retrieval et injectée par snippets avec provenance.\n\n## 10. Philosophie OpenClaw à copier\n- PromptComposer modulaire\n- prompt modes `full|minimal|none`\n- bootstrap files injectés\n- context inspector\n- mémoire hors contexte\n- hard enforcement côté code\n- sous-agents spécialisés\n- skills / AgentProfiles\n- logs / replay / snapshots\n\n## 11. Ce que la deep research doit produire\nLa deep research ne doit pas juste proposer “une architecture jolie”.\nElle doit produire :\n- décisions à figer\n- alternatives\n- risques\n- spec DB\n- spec API\n- spec runtime\n- spec UX\n- stratégie de migration depuis Sync actuel\n\n## 12. Ce que la deep research doit éviter\n- repartir de zéro inutilement\n- casser l’existant\n- ignorer les contraintes produit réelles\n- inventer des capacités métier non encore supportées sans les signaler\n- mélanger vision finale et slices implémentables"
+    },
+    {
+      "index": 19,
+      "file": "00_momentarise_brief_for_deep_research.md",
+      "op": "append",
+      "section": "add_moment_blocks_and_mobile_product_truth",
+      "content": "## 13. Vérité produit supplémentaire — mobile et blocs métiers\n\n### Mobile\nMomentarise n’est pas un produit web classique adapté ensuite au mobile.\nLe mobile est une surface centrale pour :\n- capture\n- exécution\n- proactivité\n- widgets\n- notifications\n- quick undo\n- reprogrammation rapide\n\n### Moments\nChaque Moment possède au minimum trois onglets :\n- `Détails`\n- `Contenu`\n- `Coach`\n\n### Contenu du Moment\nL’onglet `Contenu` est un assemblage ordonné de blocs métiers.\nExemples initiaux :\n- `checklist_block`\n- `text_block`\n- `link_block`\n\nÀ terme, les Moments et leurs blocs seront majoritairement construits par l’IA,\nmême si l’utilisateur peut encore les éditer manuellement.\n\n### Conséquence\nSync ne construit pas seulement :\n- des événements calendaires\n- des notes\n- des rappels\n\nIl construit aussi du contenu exécutable à l’intérieur des Moments."
+    },
+    {
+      "index": 25,
+      "file": "00_momentarise_brief_for_deep_research.md",
+      "op": "append",
+      "section": "add_true_positioning_of_business_blocks",
+      "content": "## 14. Vérité produit supplémentaire — blocs métiers\n\nLe système de blocs métiers est une partie structurante de Momentarise.\n\n### Points clés\n- il existe environ 20 à 22 blocs métiers visés\n- les blocs servent à structurer et suivre l’exécution d’un Moment\n- ils restent optionnels pour l’utilisateur\n- ils ne doivent pas créer un sentiment de contrôle forcé\n- ils deviennent très puissants pour les users qui veulent un suivi fin\n- à terme, l’IA doit pouvoir construire et enrichir ces blocs\n- l’UI/UX des blocs est un chantier difficile et central\n\n### Conséquence\nToute architecture Sync ou deep research qui ignore les blocs métiers\nratera une partie importante du produit."
+    }
+  ]
+}

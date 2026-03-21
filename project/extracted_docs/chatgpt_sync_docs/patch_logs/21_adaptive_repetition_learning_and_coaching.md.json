@@ -1,0 +1,16 @@
+{
+  "file": "21_adaptive_repetition_learning_and_coaching.md",
+  "patch_count": 1,
+  "sections_in_order": [
+    "initial_draft"
+  ],
+  "patches": [
+    {
+      "index": 63,
+      "file": "21_adaptive_repetition_learning_and_coaching.md",
+      "op": "create",
+      "section": "initial_draft",
+      "content": "# 21_adaptive_repetition_learning_and_coaching.md\n\n## Statut\nDraft v0.1 — adaptive repetition, learning, and coaching\n\n## Objectif\nDéfinir le rôle produit de :\n- répétitions apprenantes\n- apprentissage dans le temps\n- spaced repetition\n- coaching d’exécution et de progression\n- adaptation inter-itérations\n\nCe document sert à éviter que ces sujets restent implicites alors qu’ils font partie de la vision réelle de Momentarise."
+    }
+  ]
+}

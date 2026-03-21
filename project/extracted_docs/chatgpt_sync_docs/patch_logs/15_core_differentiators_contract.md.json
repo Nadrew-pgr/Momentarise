@@ -1,0 +1,39 @@
+{
+  "file": "15_core_differentiators_contract.md",
+  "patch_count": 4,
+  "sections_in_order": [
+    "initial_draft_part_1",
+    "alignment_with_watchlists_signals_evidence_and_automation_surface",
+    "project_series_watchlist_channel_and_forgetting_guardrails"
+  ],
+  "patches": [
+    {
+      "index": 50,
+      "file": "15_core_differentiators_contract.md",
+      "op": "create",
+      "section": "initial_draft_part_1",
+      "content": "# 15_core_differentiators_contract.md\n\n## Statut\nDraft v0.1 — core differentiators contract\n\n## Objectif\nCadrer les différenciateurs centraux de Momentarise,\nsans retomber dans une encyclopédie floue.\n\nCe document doit préciser :\n- leur rôle produit\n- leur lien avec Sync\n- leur scope V1\n- ce qui les distingue d’une app de todo / calendrier classique\n- ce qu’ils ne doivent pas devenir\n\nLes blocs couverts ici sont :\n- `projects`\n- `series`\n- `deep_plan`\n- `deep_research`\n- `automations`\n- `agents`"
+    },
+    {
+      "index": 53,
+      "file": "15_core_differentiators_contract.md",
+      "op": "replace",
+      "section": "initial_draft_part_1",
+      "content": "# 15_core_differentiators_contract.md\n\n## Statut\nDraft v0.2 — consolidated core differentiators contract\n\n## Objectif\nCadrer les différenciateurs centraux de Momentarise\nde manière assez claire pour guider le build,\nsans transformer le document en encyclopédie floue.\n\nCe document précise :\n- le rôle produit de chaque différenciateur\n- leur lien avec Sync\n- leur scope V1\n- leur niveau d’autonomie\n- leur lien avec les connecteurs et les automations\n- ce qui les distingue d’une simple app de todo/calendrier\n\nLes blocs couverts ici sont :\n- `projects`\n- `series`\n- `deep_plan`\n- `deep_research`\n- `automations`\n- `agents`\n- `connectors`"
+    },
+    {
+      "index": 55,
+      "file": "15_core_differentiators_contract.md",
+      "op": "append",
+      "section": "alignment_with_watchlists_signals_evidence_and_automation_surface",
+      "content": "# 14. ALIGNEMENT AVEC WATCHLISTS, SIGNALS, EVIDENCE ET AUTOMATIONS\n\n## 14.1 Watchlists / Signals / Evidence deviennent un cœur produit explicite\nLe rôle d’assistant personnel de Momentarise ne repose pas seulement sur :\n- les Moments\n- Sync\n- les Projects\n- les Series\n\nIl repose aussi explicitement sur :\n- les **watchlists**\n- les **signals**\n- les **evidences**\n\n### Règle\nCes trois briques ne sont pas des annexes techniques.\nElles font partie du cœur de l’assistant personnel branché sur le réel.\n\n## 14.2 Evidence = optionnelle\nLes evidences sont **optionnelles**.\n\n### Règle\nLe produit ne doit jamais supposer que tous les utilisateurs veulent :\n- des preuves automatiques\n- une lecture instrumentée de leur avancement\n- une logique forte de suivi prévu ↔ réel\n\n### Conséquence\nLes evidences doivent être :\n- activables\n- désactivables\n- réglables\n- et jamais imposées comme norme produit\n\n## 14.3 Automations comme transformation de signal\nLes automations utiles de Momentarise doivent très souvent suivre ce rail :\n\n- source / connecteur\n- watchlist éventuelle\n- signal détecté\n- transformation utile\n- sortie produit\n\n### Sorties typiques\n- digest\n- alerte\n- tâche\n- session\n- relance\n- enrichissement de Project / Series / Moment\n\n### Règle\nUne automation ne vaut que si elle transforme un changement réel en action utile,\npas si elle produit du bruit.\n\n## 14.4 Assistant personnel : preuve produit\nLes trois expériences les plus démonstratives restent :\n\n### A. Capture -> action planifiée utile\nUn mail, un vocal, une note, un doc ou une capture\ndevient une action réellement exploitable.\n\n### B. Watchlist / signal -> action utile\nUn changement externe surveillé\ndevient digest, tâche, session, maintenance ou review.\n\n### C. Exécution avec contexte prêt\nQuand le Moment arrive,\nle bon contexte est déjà rassemblé et Sync aide réellement à avancer.\n\n## 14.5 Proactivité utile\nLa proactivité n’est pas le centre du produit,\nmais une couche essentielle de qualité.\n\n### Formes légitimes\n- widget\n- Today\n- brief\n- micro-relance intelligente\n- message motivant contextuel non répétitif\n\n### Règle\nLa proactivité doit rester :\n- utile\n- contextuelle\n- peu bruyante\n- jamais gnangnan ou hors-sol\n\n## 14.6 Création des automations\nLes automations doivent pouvoir être créées :\n- depuis Sync en langage naturel\n- puis gérées dans une surface dédiée ou mixte\n\n### Règle\nLe chat Sync sert à :\n- exprimer l’intention\n- générer un draft\n- poser quelques questions si besoin\n- montrer un preview\n\nLa surface dédiée sert à :\n- activer / désactiver\n- revoir\n- ajuster\n- comprendre l’historique\n- gérer les réglages fins\n\n## 14.7 Règle d’ensemble\nMomentarise devient crédible comme assistant personnel\nquand ses différenciateurs restent reliés entre eux :\n\n- Projects\n- Series\n- Moments\n- Sync\n- Connectors\n- Automations\n- Watchlists\n- Signals\n- Evidence"
+    },
+    {
+      "index": 61,
+      "file": "15_core_differentiators_contract.md",
+      "op": "append",
+      "section": "project_series_watchlist_channel_and_forgetting_guardrails",
+      "content": "# 15. CLARIFICATIONS COMPLEMENTAIRES\n\n## 15.1 Projects vs Series — clarification canonique\n### Project\nUn `Project` est une unité d’issue / d’objectif / de livrable / de trajectoire de travail.\n\nIl répond à :\n- qu’est-ce que j’essaie d’obtenir\n- quels Moments, captures, recherches et sorties servent ce résultat\n- quelles preuves ou signaux comptent pour cet objectif\n\n### Series\nUne `Series` est un patron récurrent d’exécution, d’apprentissage, de routine ou de format.\n\nElle répond à :\n- qu’est-ce qui revient\n- qu’est-ce qui s’améliore d’une itération à l’autre\n- quelle structure réutiliser ou adapter\n\n### Règle\n- un Project peut contenir plusieurs Series\n- une Series peut exister sans Project\n- un Moment peut être lié à un Project, une Series, les deux, ou aucun\n\n## 15.2 Watchlists proposées à partir du contexte réel\nSync doit pouvoir proposer des watchlists à partir :\n- d’un Project\n- des technos réellement utilisées\n- des providers dépendants\n- des sources jugées critiques\n\n### Règle\nSync propose.\nL’utilisateur accepte.\nLa watchlist n’est pas imposée automatiquement si elle change vraiment le comportement du produit.\n\n## 15.3 Canal préféré / le plus utilisé\nQuand un signal fort ou une proactivité importante doit sortir vers l’utilisateur,\nMomentarise doit privilégier :\n- le canal préféré\n- ou le canal réellement le plus utilisé\nsi ce canal est connecté et autorisé\n\n### Exemple\nDeploy failed d’un projet client -> alerte sur Telegram si c’est le canal principal de l’utilisateur.\n\n## 15.4 Réduction des oublis\nLe produit ne peut pas promettre “plus jamais rien oublié”.\n\n### Règle\nEn revanche, il doit viser à réduire fortement les oublis utiles grâce à :\n- captures\n- watchlists\n- automations\n- relances\n- préparation automatique de contexte\n- digests\n- signaux\n- projets / séries / Moments bien reliés"
+    }
+  ]
+}

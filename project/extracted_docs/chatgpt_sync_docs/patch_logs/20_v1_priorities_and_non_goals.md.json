@@ -1,0 +1,16 @@
+{
+  "file": "20_v1_priorities_and_non_goals.md",
+  "patch_count": 1,
+  "sections_in_order": [
+    "initial_draft"
+  ],
+  "patches": [
+    {
+      "index": 60,
+      "file": "20_v1_priorities_and_non_goals.md",
+      "op": "create",
+      "section": "initial_draft",
+      "content": "# 20_v1_priorities_and_non_goals.md\n\n## Statut\nDraft v0.1 — V1 priorities and non-goals\n\n## Objectif\nDéfinir ce que la V1 de Momentarise doit absolument réussir,\nce qu’elle doit seulement préparer,\net ce qu’elle ne doit pas chercher à finaliser maintenant.\n\nCe document sert à :\n- empêcher un refactor trop large\n- éviter la dérive “vision infinie”\n- protéger les différenciateurs cœur\n- donner un cadre net à Codex, Cursor et autres agents de dev\n\n### Règle\nLa V1 doit être :\n- crédible\n- utile\n- cohérente\n- rapide à implémenter\n- mais pas minimale au point de trahir la vision"
+    }
+  ]
+}

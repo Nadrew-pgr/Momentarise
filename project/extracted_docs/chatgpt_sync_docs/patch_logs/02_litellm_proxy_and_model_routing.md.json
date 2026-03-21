@@ -1,0 +1,47 @@
+{
+  "file": "02_litellm_proxy_and_model_routing.md",
+  "patch_count": 5,
+  "sections_in_order": [
+    "initial",
+    "17_mobile_considerations",
+    "18_litellm_support_caveat_and_gateway_adapter",
+    "mistral_small_4_economic_slot_update"
+  ],
+  "patches": [
+    {
+      "index": 2,
+      "file": "02_litellm_proxy_and_model_routing.md",
+      "op": "create",
+      "section": "initial",
+      "content": "..."
+    },
+    {
+      "index": 7,
+      "file": "02_litellm_proxy_and_model_routing.md",
+      "op": "create",
+      "section": "initial",
+      "content": "# 02_litellm_proxy_and_model_routing.md\n\n## Statut\nDraft v1\n\n## Objectif\nDéfinir l’architecture cible de gateway LLM pour Momentarise, en remplaçant la stratégie\nde faux client multi-provider direct par un vrai **LiteLLM Proxy** centralisé.\n\nCe document doit permettre :\n- une meilleure maintenabilité,\n- une meilleure observabilité,\n- un meilleur contrôle des coûts,\n- un routing propre par mode / surface / user plan,\n- un futur refactor sans casser Sync actuel."
+    },
+    {
+      "index": 13,
+      "file": "02_litellm_proxy_and_model_routing.md",
+      "op": "append",
+      "section": "17_mobile_considerations",
+      "content": "# 17. Mobile — considérations spécifiques\n\n## 17.1 Règle\nLe routing modèle doit tenir compte du fait que le mobile supporte moins bien :\n- longues attentes\n- grosses réponses inutiles\n- itérations bavardes\n- latence floue\n\n## 17.2 Conséquences\nSur mobile, favoriser quand possible :\n- réponses plus compactes\n- previews structurés\n- escalade explicite vers deep_plan si nécessaire\n- reprise facile d’un run interrompu\n- streaming robuste via WebSocket\n\n## 17.3 Règle de coût UX\nUn modèle très fort mais trop lent peut dégrader fortement l’expérience mobile.\nLe routing doit donc intégrer :\n- coût\n- qualité\n- latence perçue\n- densité de sortie"
+    },
+    {
+      "index": 22,
+      "file": "02_litellm_proxy_and_model_routing.md",
+      "op": "append",
+      "section": "18_litellm_support_caveat_and_gateway_adapter",
+      "content": "# 18. LiteLLM — caveat de support réel\n\n## 18.1 Principe\nLiteLLM reste la cible architecturelle pour la gateway LLM.\n\n## 18.2 Mais\nLe support LiteLLM n’est pas parfaitement homogène selon :\n- provider\n- endpoint\n- mode streaming\n- format de reasoning\n- type de modèle\n\n## 18.3 Conséquence\nLe fait d’avoir bricolé un client maison multi-provider a pu venir :\n- de modèles non ou mal supportés\n- de capacités incomplètes\n- d’écarts entre providers\n- de besoins UX/runtime non couverts directement\n\n## 18.4 Décision\nLa stratégie finale ne doit pas être un client métier géant provider-direct.\n\nLa stratégie cible est :\n- LiteLLM Proxy comme gateway centrale\n- + une couche d’adaptation légère côté Momentarise\n- + capabilities matrix\n- + fallbacks et dégradations propres\n\n## 18.5 Règle\nLe code métier doit parler en :\n- familles de tâches\n- capacités nécessaires\n- modes\n- surfaces\n\net non en appels provider bruts partout."
+    },
+    {
+      "index": 58,
+      "file": "02_litellm_proxy_and_model_routing.md",
+      "op": "append",
+      "section": "mistral_small_4_economic_slot_update",
+      "content": "# Mistral Small 4 — slot économique / simple\n\n## Décision consolidée\nPour les workloads relativement simples, fréquents ou quota-sensitive de Sync,\nle modèle économique / intermédiaire à privilégier est :\n\n- **Mistral Small 4**\n\n## Exemples de workloads\n- gestion des captures\n- routing\n- pré-recherche légère avant Moment\n- transformations simples\n- certains usages free tier avec quotas\n\n## Règle\nSi un placeholder antérieur mentionnait un ancien slot type `Small 3` pour ce rôle,\nla référence consolidée à retenir est désormais :\n- **Small 4**"
+    }
+  ]
+}

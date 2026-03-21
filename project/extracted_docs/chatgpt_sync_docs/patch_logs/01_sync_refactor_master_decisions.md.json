@@ -1,0 +1,40 @@
+{
+  "file": "01_sync_refactor_master_decisions.md",
+  "patch_count": 4,
+  "sections_in_order": [
+    "21_additions_from_clarification_round",
+    "27_proactivity_autonomy_and_runtime_notes",
+    "32_mobile_first_class_principle",
+    "33_reasoning_vs_trace"
+  ],
+  "patches": [
+    {
+      "index": 0,
+      "file": "01_sync_refactor_master_decisions.md",
+      "op": "append",
+      "section": "21_additions_from_clarification_round",
+      "content": "# 21. Bootstrap files modifiables par l’utilisateur\n\n## 21.1 Principe\nMomentarise copie la philosophie OpenClaw des bootstrap files injectés à chaque run,\nmais tous les fichiers ne sont pas éditables par l’utilisateur.\n\n## 21.2 Fichiers user-editable\nLes fichiers suivants peuvent être modifiés par l’utilisateur, avec UI dédiée ou mode avancé :\n- `USER.md`\n- `STYLE.md`\n- `WORKFLOW.md`\n- `MEMORY_CURATED.md` plus tard\n- éventuellement certains fichiers d’agent user\n\n## 21.3 Fichiers non éditables par l’utilisateur\nLes fichiers suivants restent système ou fortement protégés :\n- `IDENTITY.md`\n- `BOUNDARIES.md`\n- `TOOLS.md` généré\n- `HEARTBEAT.md`\n- `AGENTS.md` système si présent\n- toute policy de sécurité ou d’autorisation\n\n## 21.4 Règle\nL’utilisateur peut personnaliser le comportement,\nmais ne peut jamais modifier les garde-fous hard ni les permissions réelles."
+    },
+    {
+      "index": 3,
+      "file": "01_sync_refactor_master_decisions.md",
+      "op": "append",
+      "section": "27_proactivity_autonomy_and_runtime_notes",
+      "content": "# 27. Proactivité — philosophie cible\n\n## 27.1 Principe\nLa proactivité de Sync ne doit pas être un simple comportement implicite du modèle.\nElle doit être orchestrée par le runtime.\n\n## 27.2 Mécanismes cibles\nMomentarise doit prévoir une logique proche d’OpenClaw :\n- heartbeat périodique\n- scheduler / cron\n- wakeups\n- delivery policies\n- canal préféré\n- quiet hours\n- ack / ignore / undo\n\n## 27.3 Règle\nLe modèle peut proposer ou décider dans un cadre,\nmais la proactivité effective doit rester gouvernée par :\n- policies\n- horaires\n- permissions\n- budgets\n- anti-spam\n- confidence thresholds"
+    },
+    {
+      "index": 12,
+      "file": "01_sync_refactor_master_decisions.md",
+      "op": "append",
+      "section": "32_mobile_first_class_principle",
+      "content": "# 32. Mobile — principe transverse\n\n## 32.1 Règle\nLe mobile ne doit pas être considéré comme une adaptation tardive du web.\n\nChaque décision d’architecture Sync doit être pensée pour :\n- web\n- mobile\n- canaux externes\n\n## 32.2 Conséquences\nChaque bloc de spec doit vérifier au minimum :\n- contraintes d’espace mobile\n- contraintes d’interaction mobile\n- transport temps réel mobile\n- notifications / widgets\n- reprise de contexte\n- quick actions\n- capture rapide\n\n## 32.3 Règle produit\nLe mobile n’est pas seulement une UI plus petite.\nC’est une surface prioritaire de :\n- capture\n- exécution\n- notification\n- reprise\n- reprogrammation rapide"
+    },
+    {
+      "index": 23,
+      "file": "01_sync_refactor_master_decisions.md",
+      "op": "append",
+      "section": "33_reasoning_vs_trace",
+      "content": "# 33. Reasoning, trace opératoire et UX\n\n## 33.1 Trois niveaux à distinguer\n\n### A. Reasoning modèle brut\nContenu reasoning éventuellement renvoyé par certains modèles / providers.\n\n### B. Reasoning UX visible\nRésumé ou bloc repliable expliquant ce que Sync est en train de faire ou de penser à haut niveau.\n\n### C. Trace opératoire\nListe structurée de :\n- tools utilisés\n- recherches lancées\n- tâches effectuées\n- previews créés\n- artefacts modifiés\n- étapes du run\n\n## 33.2 Règle\nMomentarise ne doit pas dépendre du reasoning brut provider pour son architecture produit.\n\n## 33.3 Priorité\nLa priorité produit doit être :\n1. trace opératoire fiable\n2. reasoning UX résumé si utile\n3. raw reasoning seulement si disponible et pertinent\n\n## 33.4 Conséquence\nLe runtime doit pouvoir générer lui-même une trace compréhensible,\nmême si le provider ne donne aucun reasoning exploitable."
+    }
+  ]
+}

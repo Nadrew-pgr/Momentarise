@@ -1,0 +1,24 @@
+{
+  "file": "06_agents_user_permissions_autonomy.md",
+  "patch_count": 2,
+  "sections_in_order": [
+    "initial",
+    "22_mobile_considerations"
+  ],
+  "patches": [
+    {
+      "index": 11,
+      "file": "06_agents_user_permissions_autonomy.md",
+      "op": "create",
+      "section": "initial",
+      "content": "# 06_agents_user_permissions_autonomy.md\n\n## Statut\nDraft v1\n\n## Objectif\nDéfinir clairement :\n\n- ce qu’est un Agent user dans Momentarise\n- comment il se relie à Sync Core\n- ce que l’utilisateur peut configurer\n- ce qu’il ne peut jamais configurer\n- comment bornes, permissions et autonomie fonctionnent\n- comment éviter qu’un Agent user devienne trop large, trop coûteux ou dangereux\n\nLe but est d’avoir une UX simple côté produit,\ntout en gardant une architecture propre et sécurisée côté runtime."
+    },
+    {
+      "index": 17,
+      "file": "06_agents_user_permissions_autonomy.md",
+      "op": "append",
+      "section": "22_mobile_considerations",
+      "content": "# 22. Mobile — considérations spécifiques\n\n## 22.1 Utilisation mobile des Agents\nLes Agents user doivent être pensés pour des usages mobile réalistes :\n- Moment coach\n- reprise rapide\n- capture -> routage\n- quick review\n- guidance contextuelle\n\n## 22.2 Ce qu’il faut éviter\nSur mobile, éviter :\n- configuration trop complexe\n- listes d’outils incompréhensibles\n- permissions trop techniques\n- prompts avancés exposés trop tôt\n\n## 22.3 Règle UX\nLe mobile doit surtout permettre :\n- choisir un Agent\n- voir ce qu’il sait faire\n- lui faire confiance dans un scope clair\n- annuler / ajuster facilement\nLe mode avancé complet peut rester plutôt web-first."
+    }
+  ]
+}

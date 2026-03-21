@@ -1,0 +1,24 @@
+{
+  "file": "09_moment_business_blocks.md",
+  "patch_count": 2,
+  "sections_in_order": [
+    "initial",
+    "10_major_corrections_on_blocks"
+  ],
+  "patches": [
+    {
+      "index": 21,
+      "file": "09_moment_business_blocks.md",
+      "op": "create",
+      "section": "initial",
+      "content": "# 09_moment_business_blocks.md\n\n## Statut\nDraft v1\n\n## Objectif\nDéfinir le rôle des blocs métiers dans Momentarise,\ncar ils sont au cœur de l’exécution réelle des Moments\net de la valeur de Sync."
+    },
+    {
+      "index": 24,
+      "file": "09_moment_business_blocks.md",
+      "op": "append",
+      "section": "10_major_corrections_on_blocks",
+      "content": "# 10. Corrections importantes sur les blocs métiers\n\n## 10.1 Volume réel\nLes blocs métiers ne sont pas un petit système avec 2 ou 3 blocs initiaux.\nLe système cible comporte déjà environ 20 à 22 blocs métiers.\n\n## 10.2 Nature produit\nLes blocs sont centraux dans la vision avancée de Momentarise,\nmais ils ne sont pas obligatoires pour tous les utilisateurs.\n\n## 10.3 Règle produit\nUn utilisateur qui sait déjà ce qu’il a à faire ne doit pas se sentir obligé\nde tout structurer dans l’app.\n\nLes blocs sont surtout pour les utilisateurs qui veulent :\n- un suivi très fin\n- une exécution très cadrée\n- une trace détaillée\n- une assistance IA plus profonde pendant l’exécution\n\n## 10.4 Positionnement\nMomentarise ne doit pas donner une impression de flicage.\nLes blocs doivent être :\n- puissants\n- optionnels\n- utiles\n- activables selon le niveau d’engagement souhaité par l’utilisateur\n\n## 10.5 IA et blocs\nÀ terme, l’IA doit pouvoir :\n- proposer des blocs\n- construire un contenu de Moment complet\n- assister pendant l’exécution\n- mettre à jour certains blocs\n- pré-remplir certains états si des signaux fiables existent\n\n## 10.6 Exemple futur\nDans un Moment de build, l’IA pourrait plus tard assister ou pré-remplir certains éléments\nà partir de signaux comme :\n- commits projet\n- progression détectée\n- événements liés\n- captures ou notes associées\n\n## 10.7 Règle de prudence\nToute auto-mise à jour d’un bloc doit rester :\n- explicable\n- réversible quand possible\n- cohérente avec le niveau d’autonomie choisi\n\n## 10.8 UX / UI\nLe système de blocs métiers est conceptuellement très fort,\nmais sa représentation UI/UX est difficile.\n\nIl doit donc être traité comme un chantier de conception majeur,\npas comme un simple détail d’écran."
+    }
+  ]
+}

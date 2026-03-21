@@ -1,0 +1,16 @@
+{
+  "file": "10_provider_regions_compliance_and_eu_endpoints.md",
+  "patch_count": 1,
+  "sections_in_order": [
+    "initial"
+  ],
+  "patches": [
+    {
+      "index": 26,
+      "file": "10_provider_regions_compliance_and_eu_endpoints.md",
+      "op": "create",
+      "section": "initial",
+      "content": "# 10_provider_regions_compliance_and_eu_endpoints.md\n\n## Statut\nDraft v1\n\n## Objectif\nDéfinir la stratégie Momentarise concernant :\n- régions provider\n- endpoints EU / régionaux\n- conformité\n- résidence des données\n- processing régional\n- impacts sur l’architecture Sync / LiteLLM Proxy\n\nLe but est de ne pas oublier les contraintes de région, de gouvernance et de conformité\ndans la refonte de Sync."
+    }
+  ]
+}

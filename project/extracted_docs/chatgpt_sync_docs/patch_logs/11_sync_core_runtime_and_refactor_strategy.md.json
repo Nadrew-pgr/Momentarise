@@ -1,0 +1,16 @@
+{
+  "file": "11_sync_core_runtime_and_refactor_strategy.md",
+  "patch_count": 1,
+  "sections_in_order": [
+    "initial"
+  ],
+  "patches": [
+    {
+      "index": 27,
+      "file": "11_sync_core_runtime_and_refactor_strategy.md",
+      "op": "create",
+      "section": "initial",
+      "content": "# 11_sync_core_runtime_and_refactor_strategy.md\n\n## Statut\nDraft v1\n\n## Objectif\nDéfinir le cœur de la refonte de Sync :\n\n- ce qu’est exactement **Sync Core**\n- quels modules il contient\n- comment il orchestre modes, agents, mémoire, tools et automations\n- comment il reste \"OpenClaw-like in-app\"\n- comment migrer depuis Sync actuel sans tout casser\n\nCe document est la colonne vertébrale technique de la refonte."
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "file": "17_connectors_and_automation_product_surface.md",
+  "patch_count": 2,
+  "sections_in_order": [
+    "initial_draft_part_1",
+    "direct_creation_in_dedicated_surfaces_and_channel_preference"
+  ],
+  "patches": [
+    {
+      "index": 56,
+      "file": "17_connectors_and_automation_product_surface.md",
+      "op": "create",
+      "section": "initial_draft_part_1",
+      "content": "# 17_connectors_and_automation_product_surface.md\n\n## Statut\nDraft v0.1 — connectors and automation product surface\n\n## Objectif\nDéfinir comment les connecteurs et les automations existent **côté produit** :\n\n- comment l’utilisateur les découvre\n- comment il les crée\n- comment il les comprend\n- comment il les configure\n- comment il les contrôle\n- comment il voit ce qui s’est déclenché\n- comment tout cela reste lisible sans devenir un panneau d’admin\n\nCe document ne redéfinit pas tout le runtime.\nIl définit la **surface produit visible**."
+    },
+    {
+      "index": 62,
+      "file": "17_connectors_and_automation_product_surface.md",
+      "op": "append",
+      "section": "direct_creation_in_dedicated_surfaces_and_channel_preference",
+      "content": "# 14. CREATION DIRECTE HORS CHAT\n\n## 14.1 Règle\nLes automations ne doivent pas être créables uniquement depuis Sync.\n\n## 14.2 Double entrée\nL’utilisateur peut :\n- créer naturellement depuis Sync\n- ou créer directement depuis la surface dédiée Automations\n\n### Pourquoi\nLe chat est excellent pour exprimer l’intention.\nLa surface dédiée est meilleure pour :\n- les réglages experts\n- la vue d’ensemble\n- la création explicite sans passer par une conversation\n\n## 14.3 Préférence de canal\nLes connecteurs et automations doivent tenir compte :\n- du canal préféré de l’utilisateur\n- ou du canal le plus effectivement utilisé\n\n### Règle\nUne alerte ou une sortie importante doit privilégier ce canal,\ndans la limite des permissions, connexions et politiques du produit."
+    }
+  ]
+}

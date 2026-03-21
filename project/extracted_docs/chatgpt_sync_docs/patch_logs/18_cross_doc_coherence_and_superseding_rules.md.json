@@ -1,0 +1,24 @@
+{
+  "file": "18_cross_doc_coherence_and_superseding_rules.md",
+  "patch_count": 2,
+  "sections_in_order": [
+    "initial_draft",
+    "optional_bucket_track_layer_clarification"
+  ],
+  "patches": [
+    {
+      "index": 57,
+      "file": "18_cross_doc_coherence_and_superseding_rules.md",
+      "op": "create",
+      "section": "initial_draft",
+      "content": "# 18_cross_doc_coherence_and_superseding_rules.md\n\n## Statut\nDraft v0.1 — canonical coherence pass for docs 13 to 17\n\n## Objectif\nServir de couche canonique de cohérence pour :\n- `13_sync_global_product_ux.md`\n- `14_moment_content_model_v1.md`\n- `15_core_differentiators_contract.md`\n- `16_watchlists_signals_and_evidence.md`\n- `17_connectors_and_automation_product_surface.md`\n\nCe document ne remplace pas encore une réécriture totale.\nIl sert à :\n- trancher les ambiguïtés restantes\n- aligner les décisions majeures\n- éviter qu’une IA ou un développeur relise 5 docs et reconstruise une version incohérente\n\n### Règle\nEn cas d’ambiguïté entre les docs 13→17, les décisions de ce document priment jusqu’à la passe finale de réécriture globale."
+    },
+    {
+      "index": 64,
+      "file": "18_cross_doc_coherence_and_superseding_rules.md",
+      "op": "append",
+      "section": "optional_bucket_track_layer_clarification",
+      "content": "# 11. COUCHE OPTIONNELLE `BUCKET / CATEGORY / AXIS / TRACK`\n\n## 11.1 Position\nEntre `Series` et `Moment`, il peut exister une couche légère supplémentaire de spécialisation.\n\nCette couche peut être nommée selon le domaine :\n- bucket\n- category\n- axis\n- track\n- pillar\n- ou autre terme produit plus adapté plus tard\n\n## 11.2 Règle\nCette couche est **optionnelle**.\n\nElle ne doit pas être imposée :\n- à tous les utilisateurs\n- à tous les domaines\n- ni à toutes les surfaces UX\n\n## 11.3 Rôle\nElle sert à distinguer, à l’intérieur d’une même `Series`,\ndes sous-voies récurrentes qui structurent mieux les Moments.\n\n### Exemples\n- dans une Series de contenu :\n  - autorité\n  - build in public\n  - preuve\n- dans une Series sport :\n  - push\n  - pull\n  - legs\n  - skills\n- dans une Series bien-être :\n  - skincare\n  - cheveux\n  - ongles\n  - routine matin / soir\n\n## 11.4 Règle UX\nPar défaut, cette couche n’a pas besoin d’être un objet utilisateur de premier rang.\n\n### Direction\nElle peut d’abord vivre :\n- en backend\n- en metadata\n- en aide au routing Sync\n- en support de préremplissage et d’adaptation\n\npuis devenir plus visible seulement si la valeur UX est claire.\n\n## 11.5 Règle de scope\nDeux Projects différents peuvent avoir :\n- une même Series logique\n- mais des buckets/tracks différents\n\n### Exemple\n`Création de contenu` dans un Project `1M Agence IA`\nn’implique pas les mêmes buckets que `Création de contenu` dans un Project `1M SaaS`.\n\n## 11.6 Hiérarchie consolidée\nLa hiérarchie canonique devient :\n\n- `Project`\n- `Series`\n- `Bucket / Track` optionnel\n- `Moment`\n\n## 11.7 Règle de routing\nQuand Sync route une capture ou prépare un Moment,\nil peut utiliser cette couche si elle existe.\n\nMais il ne doit pas dépendre de son existence pour fonctionner."
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "file": "03_proactivity_scheduler_notifications.md",
+  "patch_count": 5,
+  "sections_in_order": [
+    "initial",
+    "19_mail_and_widgets_precision",
+    "20_widgets_are_also_capture_entrypoints",
+    "21_mobile_considerations"
+  ],
+  "patches": [
+    {
+      "index": 4,
+      "file": "03_proactivity_scheduler_notifications.md",
+      "op": "create",
+      "section": "initial",
+      "content": "..."
+    },
+    {
+      "index": 5,
+      "file": "03_proactivity_scheduler_notifications.md",
+      "op": "create",
+      "section": "initial",
+      "content": "# 03_proactivity_scheduler_notifications.md\n\n## Statut\nDraft v1\n\n## Objectif\nDéfinir le sous-système de :\n- proactivité\n- scheduling\n- notifications\n- autonomie\n- annulation / acknowledgment\n\npour Sync futur, dans une logique :\n- OpenClaw-like côté runtime\n- adaptée au métier Momentarise\n- compatible avec agents, sous-agents, automations, surfaces et canaux"
+    },
+    {
+      "index": 6,
+      "file": "03_proactivity_scheduler_notifications.md",
+      "op": "append",
+      "section": "19_mail_and_widgets_precision",
+      "content": "# 19. Email et widgets — précision V1\n\n## 19.1 Email — périmètre V1\nPour V1, l’email reste principalement :\n- read-only\n- source mémoire\n- source de déclencheurs\n- source de résumés / revues\n\n## 19.2 Email — ce que Sync peut faire en V1\n- lire / résumer un email ou un thread\n- proposer une action\n- créer une note Inbox\n- plus tard préparer un contenu au format email sans envoi réel\n- plus tard préparer un draft\n- plus tard seulement envoyer si le connecteur et les permissions existent\n\n## 19.3 Règle\nEn V1 :\n- pas d’envoi direct d’email\n- pas de draft réel envoyé au provider\n- seulement lecture, résumé, extraction, transformation vers artefacts internes\n\n## 19.4 Widgets iOS / Android\nLa proactivité doit aussi pouvoir se matérialiser dans :\n- widgets iOS\n- widgets Android\n\n## 19.5 Rôle des widgets\nLes widgets servent surtout à :\n- afficher un rappel\n- afficher une prochaine action\n- afficher un Moment imminent\n- afficher une suggestion ou un état\n- offrir un point d’entrée rapide vers l’app\n\n## 19.6 Limite\nLes widgets ne remplacent pas l’app comme surface d’interaction complète.\nIls servent de surface de visibilité / re-entry, pas de runtime principal."
+    },
+    {
+      "index": 8,
+      "file": "03_proactivity_scheduler_notifications.md",
+      "op": "append",
+      "section": "20_widgets_are_also_capture_entrypoints",
+      "content": "# 20. Widgets = proactivité + capture rapide\n\n## 20.1 Double rôle\nLes widgets iOS / Android doivent servir à la fois à :\n- afficher des signaux proactifs\n- offrir une entrée rapide vers la capture\n\n## 20.2 Usages cibles\nExemples :\n- voir un rappel ou une suggestion de Sync\n- ouvrir directement l’écran de capture\n- créer rapidement une note / capture\n- reprendre un Moment imminent\n- ouvrir une suggestion proactive dans l’app\n\n## 20.3 Règle\nLes widgets sont une surface :\n- de visibilité,\n- de re-entry,\n- de capture rapide,\n\nmais pas un runtime conversationnel complet.\n\n## 20.4 Conséquence produit\nLe système de proactivité et le système de capture doivent pouvoir exposer\ndes \"quick entrypoints\" compatibles widgets."
+    },
+    {
+      "index": 14,
+      "file": "03_proactivity_scheduler_notifications.md",
+      "op": "append",
+      "section": "21_mobile_considerations",
+      "content": "# 21. Mobile — considérations spécifiques\n\n## 21.1 Mobile comme surface prioritaire\nLe mobile est une surface majeure pour :\n- proactivité\n- push\n- reprise rapide\n- capture instantanée\n- undo rapide\n- consultation de suggestions\n\n## 21.2 UX mobile attendue\nToute proactivité importante doit pouvoir être :\n- ouverte depuis une push\n- comprise rapidement\n- annulée ou confirmée rapidement\n- reliée à l’écran pertinent dans l’app\n\n## 21.3 Widgets\nLes widgets mobile doivent être pensés comme :\n- surface de visibilité\n- surface de capture rapide\n- surface de reprise\n- point d’entrée vers suggestion / Moment / inbox / capture"
+    }
+  ]
+}

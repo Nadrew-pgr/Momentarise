@@ -1,0 +1,24 @@
+{
+  "file": "04_memory_retrieval_context.md",
+  "patch_count": 2,
+  "sections_in_order": [
+    "initial",
+    "22_mobile_considerations"
+  ],
+  "patches": [
+    {
+      "index": 9,
+      "file": "04_memory_retrieval_context.md",
+      "op": "create",
+      "section": "initial",
+      "content": "# 04_memory_retrieval_context.md\n\n## Statut\nDraft v1\n\n## Objectif\nDéfinir de manière précise :\n- la mémoire de Momentarise,\n- la différence entre mémoire et contexte,\n- le retrieval,\n- les snippets injectés,\n- les voisins / liens,\n- les bootstrap assets,\n- le contrôle utilisateur,\n- l’évolution vers hybrid retrieval sans refonte profonde.\n\nLe but est de copier la philosophie OpenClaw :\n- mémoire hors contexte,\n- context inspector,\n- snippets avec provenance,\n- prompt assets injectés avec limites,\n- hard control côté runtime."
+    },
+    {
+      "index": 15,
+      "file": "04_memory_retrieval_context.md",
+      "op": "append",
+      "section": "22_mobile_considerations",
+      "content": "# 22. Mobile — considérations spécifiques\n\n## 22.1 Règle\nLe mobile ne doit pas recevoir du contexte trop dense ou des réponses inutilement longues.\n\n## 22.2 Conséquences retrieval\nSur mobile, privilégier :\n- snippets plus courts\n- provenance claire mais compacte\n- previews plutôt que longs pavés\n- possibilité d’ouvrir le détail sur demande\n\n## 22.3 Working memory mobile\nLe mobile doit très bien gérer :\n- reprise d’un run\n- capture active\n- question active\n- preview actif\n- Moment en cours\nsans obliger l’utilisateur à relire un énorme historique"
+    }
+  ]
+}

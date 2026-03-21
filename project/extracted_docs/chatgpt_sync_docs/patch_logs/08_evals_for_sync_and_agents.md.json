@@ -1,0 +1,16 @@
+{
+  "file": "08_evals_for_sync_and_agents.md",
+  "patch_count": 1,
+  "sections_in_order": [
+    "initial"
+  ],
+  "patches": [
+    {
+      "index": 20,
+      "file": "08_evals_for_sync_and_agents.md",
+      "op": "create",
+      "section": "initial",
+      "content": "# 08_evals_for_sync_and_agents.md\n\n## Statut\nDraft v1\n\n## Objectif\nDéfinir une stratégie d’évaluation pour Sync, ses sous-agents, ses tools,\nses modes, ses automations et sa mémoire.\n\nLe but est d’éviter un système impressionnant mais impossible à fiabiliser."
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "file": "23_onboarding_activation_and_first_value.md",
+  "patch_count": 1,
+  "sections_in_order": [
+    "initial_draft"
+  ],
+  "patches": [
+    {
+      "index": 66,
+      "file": "23_onboarding_activation_and_first_value.md",
+      "op": "create",
+      "section": "initial_draft",
+      "content": "# 23_onboarding_activation_and_first_value.md\n\n## Statut\nDraft v0.1 — onboarding, activation, and first value\n\n## Objectif\nDéfinir un onboarding qui :\n- révèle vite la valeur de Momentarise\n- configure l’intelligence utile de l’app\n- évite l’effet “app trop compliquée dès le départ”\n- active les bons connecteurs, rails, watchlists et préférences\n- produit une première boucle de valeur réelle\n\nCe document ne décrit pas seulement un onboarding UI.\nIl décrit aussi un **onboarding d’activation produit**."
+    }
+  ]
+}

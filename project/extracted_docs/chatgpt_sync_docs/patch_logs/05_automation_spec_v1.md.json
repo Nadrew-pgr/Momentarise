@@ -1,0 +1,24 @@
+{
+  "file": "05_automation_spec_v1.md",
+  "patch_count": 2,
+  "sections_in_order": [
+    "initial",
+    "23_mobile_considerations"
+  ],
+  "patches": [
+    {
+      "index": 10,
+      "file": "05_automation_spec_v1.md",
+      "op": "create",
+      "section": "initial",
+      "content": "# 05_automation_spec_v1.md\n\n## Statut\nDraft v1\n\n## Objectif\nDéfinir la forme minimale mais propre des automations dans Momentarise, de façon compatible avec :\n\n- Sync Core\n- sous-agents / AgentProfiles\n- proactivité\n- scheduler / heartbeat\n- notifications\n- preview / apply / undo\n- autonomie progressive\n- future UI builder plus avancée\n\nLe but n’est pas de faire un workflow builder géant dès V1.\nLe but est de définir une base solide, compatible avec l’ambition finale."
+    },
+    {
+      "index": 16,
+      "file": "05_automation_spec_v1.md",
+      "op": "append",
+      "section": "23_mobile_considerations",
+      "content": "# 23. Mobile — considérations spécifiques\n\n## 23.1 Lien avec mobile\nLes automations doivent pouvoir produire des résultats utiles pour mobile :\n- push\n- suggestion in-app\n- quick action\n- widget update plus tard\n\n## 23.2 UX mobile\nUne automation V1 ne doit pas générer une expérience trop lourde à consommer sur téléphone.\n\nPrivilégier :\n- résumé court\n- CTA clair\n- preview concis\n- entrée directe vers l’écran utile\n\n## 23.3 Règle\nLes automations mobile-first doivent favoriser :\n- lecture rapide\n- décision rapide\n- undo rapide\n- continuité de contexte"
+    }
+  ]
+}

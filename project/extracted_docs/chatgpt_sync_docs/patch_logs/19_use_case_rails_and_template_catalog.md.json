@@ -1,0 +1,16 @@
+{
+  "file": "19_use_case_rails_and_template_catalog.md",
+  "patch_count": 1,
+  "sections_in_order": [
+    "initial_draft"
+  ],
+  "patches": [
+    {
+      "index": 59,
+      "file": "19_use_case_rails_and_template_catalog.md",
+      "op": "create",
+      "section": "initial_draft",
+      "content": "# 19_use_case_rails_and_template_catalog.md\n\n## Statut\nDraft v0.1 — non-limiting use case rails and template catalog\n\n## Objectif\nCe document ne sert pas à limiter Momentarise à une liste fermée de cas d’usage.\n\nIl sert à :\n- rappeler aux agents de dev, architectes et copilotes de build\n  qu’un certain nombre de rails d’usage doivent être supportables\n- montrer comment les primitives produit peuvent se combiner\n- éviter qu’un refactor réduise Momentarise à un simple calendrier + chat\n- fournir des exemples concrets sans transformer la vision en carcan\n\n### Règle\nCe document est :\n- **illustratif**\n- **non exhaustif**\n- **non limitatif**\n\nIl décrit ce que l’app doit pouvoir faire **entre autres**.\n\nIl ne signifie pas :\n- que tous ces rails doivent être parfaits en V1\n- que chaque use case doit avoir son écran dédié\n- que chaque variation doit être implémentée immédiatement"
+    }
+  ]
+}

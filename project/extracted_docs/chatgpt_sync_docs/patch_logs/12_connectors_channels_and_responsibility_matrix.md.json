@@ -1,0 +1,48 @@
+{
+  "file": "12_connectors_channels_and_responsibility_matrix.md",
+  "patch_count": 5,
+  "sections_in_order": [
+    "part_1_surfaces_and_channels",
+    "calendar_precision_before_part_2",
+    "part_2_connectors_sources_and_triggers",
+    "part_1_revised_extraction_ready",
+    "part_2_revised_extraction_ready"
+  ],
+  "patches": [
+    {
+      "index": 28,
+      "file": "12_connectors_channels_and_responsibility_matrix.md",
+      "op": "create",
+      "section": "part_1_surfaces_and_channels",
+      "content": "# 12_connectors_channels_and_responsibility_matrix.md\n\n## Statut\nDraft v1 — Part 1\n\n## Objectif\nDéfinir précisément, pour chaque système autour de Sync :\n- sa nature exacte\n- son rôle dans Momentarise\n- ses limites V1\n- son lien avec les modes\n- son lien avec mobile / web\n- son niveau d’autorité\n\nCe document sert à éviter de mélanger :\n- surfaces\n- canaux\n- connecteurs\n- sources mémoire\n- outils\n- triggers\n- cibles d’écriture"
+    },
+    {
+      "index": 29,
+      "file": "12_connectors_channels_and_responsibility_matrix.md",
+      "op": "append",
+      "section": "calendar_precision_before_part_2",
+      "content": "# 8. Précision importante avant la part 2 — calendrier interne vs connecteurs calendrier\n\n## 8.1 Vérité produit\nMomentarise possède son **propre calendrier interne**.\nCe calendrier interne n’est pas un simple connecteur externe.\n\n## 8.2 Conséquence\nLe calendrier interne doit être traité comme :\n- un cœur métier\n- une source de vérité produit\n- une cible naturelle de preview / apply / undo\n- une source de triggers\n- un support central de planification et d’exécution\n\n## 8.3 Connecteurs calendrier externes\nLes systèmes suivants doivent être pensés séparément comme connecteurs :\n- Google Calendar\n- Microsoft Calendar\n- calendriers natifs iOS / Android si pertinents\n- autres calendriers externes plus tard\n\n## 8.4 Rôle des connecteurs calendrier externes\nIls peuvent servir à :\n- lire\n- synchroniser\n- enrichir\n- importer\n- exporter\n- détecter conflits / disponibilités\n- refléter certains artefacts internes selon policy\n\n## 8.5 Règle\nLe futur doc part 2 devra distinguer explicitement :\n- `internal_calendar_core`\n- `external_calendar_connectors`\n\npour éviter l’erreur consistant à traiter \"le calendrier\" comme un simple service externe."
+    },
+    {
+      "index": 30,
+      "file": "12_connectors_channels_and_responsibility_matrix.md",
+      "op": "append",
+      "section": "part_2_connectors_sources_and_triggers",
+      "content": "# 8. CALENDRIER INTERNE ET CONNECTEURS CALENDRIER\n\n# 8.1 internal_calendar_core\n\n## Nature\n- cœur métier interne\n- source de vérité produit\n- source mémoire\n- source de triggers\n- cible naturelle de preview / apply / undo\n\n## Rôle produit\nLe calendrier interne Momentarise sert à :\n- porter les Moments\n- porter leur structure temporelle\n- organiser l’exécution\n- supporter plan / deep_plan\n- servir de base au coach et aux suggestions\n- devenir l’espace naturel d’application des previews\n\n## Règle\nLe calendrier interne ne doit jamais être traité comme un simple connecteur.\n\nIl est :\n- un objet métier central\n- une source de vérité produit\n- un pilier du runtime Sync\n\n## Modes pertinents\n- `free`\n- `plan`\n- `deep_plan`\n- `assistive`\n- `automation`\n\n## Mobile / web\n### Mobile\nSurface majeure pour :\n- voir ce qui arrive\n- exécuter\n- ajuster rapidement\n- reprogrammer une partie d’un Moment plus tard\n\n### Web\nSurface forte pour :\n- vue large\n- édition plus dense\n- planification plus complexe\n- lecture d’ensemble"
+    },
+    {
+      "index": 31,
+      "file": "12_connectors_channels_and_responsibility_matrix.md",
+      "op": "replace",
+      "section": "part_1_revised_extraction_ready",
+      "content": "# 12_connectors_channels_and_responsibility_matrix.md\n\n## Statut\nDraft v1.1 — Part 1 revised\n\n## Objectif\nDéfinir précisément, pour chaque système autour de Sync :\n- sa nature exacte\n- son rôle dans Momentarise\n- ses limites V1\n- son lien avec mobile / web\n- son niveau d’autorité\n- son statut par rapport à la mémoire\n- son statut par rapport à la vérité produit\n\nCe document sert à éviter de mélanger :\n- surfaces\n- sous-surfaces\n- channels\n- transports\n- connecteurs\n- sources\n- sinks\n- tools\n- triggers\n- domaines de vérité\n- niveaux d’autorité"
+    },
+    {
+      "index": 32,
+      "file": "12_connectors_channels_and_responsibility_matrix.md",
+      "op": "append",
+      "section": "part_2_revised_extraction_ready",
+      "content": "# 9. CONNECTEURS, OBJETS MÉTIER ET SYSTÈMES RUNTIME — PART 2\n\n## Objectif\nCompléter la taxonomie de la part 1 avec :\n- les objets métier centraux\n- les connecteurs d’enrichissement\n- les sources externes\n- les systèmes runtime non visibles\n- les futures familles de signaux\n\nLa part 2 doit surtout éviter 4 erreurs :\n- traiter le calendrier interne comme un connecteur\n- traiter un provider capability comme un simple connector générique\n- traiter un objet métier comme une simple donnée passive\n- traiter un système runtime comme une surface produit"
+    }
+  ]
+}

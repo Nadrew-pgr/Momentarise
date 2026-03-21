@@ -1,0 +1,16 @@
+{
+  "file": "22_personalized_estimation_and_adaptive_planning.md",
+  "patch_count": 1,
+  "sections_in_order": [
+    "initial_draft"
+  ],
+  "patches": [
+    {
+      "index": 65,
+      "file": "22_personalized_estimation_and_adaptive_planning.md",
+      "op": "create",
+      "section": "initial_draft",
+      "content": "# 22_personalized_estimation_and_adaptive_planning.md\n\n## Statut\nDraft v0.1 — personalized estimation and adaptive planning\n\n## Objectif\nDéfinir comment Momentarise peut devenir plus précis,\nplus personnel et plus utile dans :\n\n- l’estimation de durée\n- l’estimation d’effort\n- l’estimation de charge / progression sport\n- l’ajout de buffers et trajets\n- l’ajustement prévu ↔ réel\n- la replanification intelligente\n\nCe document sert à éviter le flou du type :\n“l’IA apprendra plus tard”.\nIl pose un cadre clair pour ce que le produit doit pouvoir faire,\nsans prétendre que tout est déjà implémenté."
+    }
+  ]
+}

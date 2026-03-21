@@ -1,0 +1,16 @@
+{
+  "file": "16_watchlists_signals_and_evidence.md",
+  "patch_count": 1,
+  "sections_in_order": [
+    "initial_draft_part_1"
+  ],
+  "patches": [
+    {
+      "index": 54,
+      "file": "16_watchlists_signals_and_evidence.md",
+      "op": "create",
+      "section": "initial_draft_part_1",
+      "content": "# 16_watchlists_signals_and_evidence.md\n\n## Statut\nDraft v0.1 — initial contract for watchlists, signals, and evidence\n\n## Objectif\nDéfinir le rôle produit de :\n- `watchlists`\n- `signals`\n- `evidence`\n\net leur lien avec :\n- Sync\n- Projects\n- Series\n- Moments\n- automations\n- connecteurs\n- proactivité\n\nCe document sert à transformer une intuition importante en contrat produit clair :\n\nMomentarise ne doit pas seulement planifier et exécuter.  \nIl doit aussi pouvoir :\n- surveiller ce qui compte\n- détecter les changements utiles\n- les transformer en action\n- et, si l’utilisateur le souhaite, reconnaître certaines preuves d’avancement"
+    }
+  ]
+}

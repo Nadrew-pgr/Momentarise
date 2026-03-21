@@ -1,0 +1,16 @@
+{
+  "file": "07_modes_fsm_and_output_contract.md",
+  "patch_count": 1,
+  "sections_in_order": [
+    "initial"
+  ],
+  "patches": [
+    {
+      "index": 18,
+      "file": "07_modes_fsm_and_output_contract.md",
+      "op": "create",
+      "section": "initial",
+      "content": "# 07_modes_fsm_and_output_contract.md\n\n## Statut\nDraft v1\n\n## Objectif\nDéfinir précisément pour Sync :\n- les modes principaux\n- leurs FSM\n- leurs sorties autorisées\n- leurs transitions\n- leurs différences UX\n- leur comportement sur web et mobile\n\nCe document doit rendre les modes suffisamment clairs pour :\n- guider la refonte de Sync\n- rendre `free`, `plan`, `deep_plan` réellement distincts\n- éviter un toggle cosmétique\n- permettre à une IA de deep research de raisonner sans ambiguïté"
+    }
+  ]
+}

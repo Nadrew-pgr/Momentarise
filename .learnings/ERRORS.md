@@ -860,3 +860,32 @@ Dans `ReasoningContent`, les `...props` de `CollapsibleContent` (qui inclut `dir
 - Related Files: `apps/web/src/components/ai-elements/reasoning.tsx`
 - See Also: `ERR-20260317-001`
 ---
+
+## [ERR-20260320-002] zsh glob mismatch on special route paths during repo audit
+
+**Logged**: 2026-03-20T00:00:00+01:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+Une commande `rg` a échoué parce que le shell a interprété des chemins Expo/Next contenant des crochets ou parenthèses comme des patterns shell.
+
+### Error
+```text
+zsh:1: no matches found: apps/mobile/app/moment/[id].tsx
+zsh:1: no matches found: apps/mobile/app/(tabs)/me.tsx
+```
+
+### Context
+- Command: `rg -n "section_block|select_block|quick update|Quick update|builder|run mode|studio assistant|raw blocks|preset" apps/mobile/app/moment/[id].tsx ...`
+- Command: `sed -n '1,220p' apps/mobile/app/(tabs)/me.tsx`
+- Related Files: `apps/mobile/app/moment/[id].tsx`, `apps/mobile/app/(tabs)/me.tsx`
+- Reproducible: yes
+
+### Suggested Fix
+Toujours quotter ou échapper les chemins Next/Expo contenant des crochets ou parenthèses, par exemple `'apps/mobile/app/moment/[id].tsx'` et `'apps/mobile/app/(tabs)/me.tsx'`.
+
+### Metadata
+- See Also: `ERR-20260320-001`
+---

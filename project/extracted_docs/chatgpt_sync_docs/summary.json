@@ -1,0 +1,30 @@
+{
+  "patch_count": 67,
+  "file_count": 24,
+  "files": [
+    "01_sync_refactor_master_decisions.md",
+    "00_momentarise_brief_for_deep_research.md",
+    "02_litellm_proxy_and_model_routing.md",
+    "03_proactivity_scheduler_notifications.md",
+    "04_memory_retrieval_context.md",
+    "05_automation_spec_v1.md",
+    "06_agents_user_permissions_autonomy.md",
+    "07_modes_fsm_and_output_contract.md",
+    "08_evals_for_sync_and_agents.md",
+    "09_moment_business_blocks.md",
+    "10_provider_regions_compliance_and_eu_endpoints.md",
+    "11_sync_core_runtime_and_refactor_strategy.md",
+    "12_connectors_channels_and_responsibility_matrix.md",
+    "13_sync_global_product_ux.md",
+    "14_moment_content_model_v1.md",
+    "15_core_differentiators_contract.md",
+    "16_watchlists_signals_and_evidence.md",
+    "17_connectors_and_automation_product_surface.md",
+    "18_cross_doc_coherence_and_superseding_rules.md",
+    "19_use_case_rails_and_template_catalog.md",
+    "20_v1_priorities_and_non_goals.md",
+    "21_adaptive_repetition_learning_and_coaching.md",
+    "22_personalized_estimation_and_adaptive_planning.md",
+    "23_onboarding_activation_and_first_value.md"
+  ]
+}
