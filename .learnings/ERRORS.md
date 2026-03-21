@@ -889,3 +889,29 @@ Toujours quotter ou échapper les chemins Next/Expo contenant des crochets ou pa
 ### Metadata
 - See Also: `ERR-20260320-001`
 ---
+
+## ERR-20260321-001 — Mobile crash: react-native-css-interop/jsx-runtime not found
+
+### Context
+- Date: 2026-03-21
+- Scenario: Metro bundling fails immédiatement au lancement de l'app mobile (iOS/Android).
+- Impact: App mobile inutilisable.
+
+### Error
+```
+Unable to resolve module react-native-css-interop/jsx-runtime from apps/mobile/index.js
+```
+
+### Root Cause
+`nativewind@^4.2.2` dépend de `react-native-css-interop@0.2.2` comme dépendance directe, mais pnpm en monorepo ne hoist pas automatiquement les dépendances transitives vers un endroit où Metro peut les résoudre. Le package n'était pas listé explicitement dans `apps/mobile/package.json`.
+
+### Resolution
+- Resolved: 2026-03-21
+- Fix: `pnpm add react-native-css-interop@0.2.2` dans `apps/mobile`
+- Aussi fix: `react-dom@19.1.0` et `react-native-svg@15.12.1` pour matcher les versions attendues par Expo SDK 54.
+- Leçon: dans un monorepo pnpm, les dépendances transitives de packages comme NativeWind doivent être déclarées explicitement dans le package.json de l'app mobile, car Metro ne suit pas les symlinks pnpm comme un bundler Node classique.
+
+### Metadata
+- Related Files: `apps/mobile/package.json`, `apps/mobile/index.js`
+- See Also: `LRN-20260228-003`
+---
