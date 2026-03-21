@@ -1,11 +1,27 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import Chatbot from "@/components/chatbot";
+type ChatPageSearchParams = Record<string, string | string[] | undefined>;
 
-export default function ChatPage() {
-    return (
-        <div className="chat-page -mx-4 -mb-4 flex min-h-0 flex-1 flex-col overflow-hidden">
-            <Chatbot />
-        </div>
-    );
+export default async function ChatPage({
+  searchParams,
+}: {
+  searchParams: Promise<ChatPageSearchParams>;
+}) {
+  const resolvedSearchParams = await searchParams;
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(resolvedSearchParams)) {
+    if (typeof value === "string") {
+      params.append(key, value);
+      continue;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        params.append(key, item);
+      }
+    }
+  }
+
+  const queryString = params.toString();
+  redirect(queryString ? `/sync?${queryString}` : "/sync");
 }
