@@ -329,6 +329,7 @@ export default function SyncScreen() {
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const showToast = useAppToast((state) => state.show);
+  const colorScheme = useColorScheme();
 
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [input, setInput] = useState("");
@@ -1632,7 +1633,7 @@ export default function SyncScreen() {
               onOtherClick={() => {
                 // Future: focus composer or scroll
               }}
-              isDark={useColorScheme() === "dark"}
+              isDark={colorScheme === "dark"}
             />
           )}
 
