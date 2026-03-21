@@ -42,6 +42,7 @@ class SystemPromptTests(unittest.TestCase):
         self.assertIn("## Runtime", prompt)
         self.assertIn("## Current Time", prompt)
         self.assertIn("## Extra Context", prompt)
+        self.assertIn("Never claim an external send/delivery", prompt)
 
     def test_minimal_mode_omits_full_only_sections(self) -> None:
         prompt = build_agent_system_prompt(

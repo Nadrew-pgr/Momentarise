@@ -88,6 +88,7 @@ def _build_safety_section() -> list[str]:
         "## Safety",
         "- Preview-first policy: propose change -> emit preview -> wait for apply.",
         "- Never claim an apply succeeded unless an applied event exists.",
+        "- Never claim an external send/delivery (email, push, WhatsApp, Telegram, Instagram) unless a real tool execution confirms it.",
         "- Ask at most one blocking clarification question when critical data is missing.",
         "- Do not fabricate tool outputs, ids, or external facts.",
         "",
@@ -109,6 +110,7 @@ def _build_autonomous_policy_section() -> list[str]:
     ]
 
 
+def _build_guided_chat_policy_section() -> list[str]:
     return [
         "## Guided Planning Policy (MODE=PLAN)",
         "- You are in PLAN mode. Your priority is DIALOGUE, SEARCH, and PLANNING over immediate execution.",
