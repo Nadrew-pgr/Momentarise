@@ -63,6 +63,9 @@ interface ConversationViewProps {
   previewLabels: PreviewLabels;
   assistantLabel: string;
   emptySubtitle: string;
+  emptyTruthUses: string;
+  emptyTruthCan: string;
+  emptyTruthLimits: string;
   errorTitle: string;
   warningTitle: string;
   retryLabel: string;
@@ -126,6 +129,9 @@ export function ConversationView({
   previewLabels,
   assistantLabel,
   emptySubtitle,
+  emptyTruthUses,
+  emptyTruthCan,
+  emptyTruthLimits,
   errorTitle,
   warningTitle,
   retryLabel,
@@ -162,6 +168,11 @@ export function ConversationView({
             <div className="flex h-full flex-1 flex-col items-center justify-center text-center">
               <AnimatedOrb size={124} className="mb-4 sync-chat-orb-intro" />
               <p className="sync-chat-empty-subtitle mt-1 text-sm text-muted-foreground">{emptySubtitle}</p>
+              <div className="mt-4 max-w-2xl space-y-1.5 text-left">
+                <p className="text-xs text-muted-foreground">{emptyTruthUses}</p>
+                <p className="text-xs text-muted-foreground">{emptyTruthCan}</p>
+                <p className="text-xs text-muted-foreground">{emptyTruthLimits}</p>
+              </div>
             </div>
           ) : null}
 
@@ -194,7 +205,7 @@ export function ConversationView({
               {currentReasoning && (currentReasoning.content || currentReasoning.summary) ? (
                 <Reasoning duration={currentReasoning.durationMs ? Math.ceil(currentReasoning.durationMs / 1000) : undefined}>
                   <ReasoningTrigger />
-                  <ReasoningContent>{currentReasoning.content || currentReasoning.summary || " "}</ReasoningContent>
+                  <ReasoningContent>{currentReasoning.summary || currentReasoning.content || " "}</ReasoningContent>
                 </Reasoning>
               ) : null}
 

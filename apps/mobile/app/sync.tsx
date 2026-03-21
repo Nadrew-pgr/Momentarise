@@ -1504,7 +1504,19 @@ export default function SyncScreen() {
             messages={messages}
             isStreaming={streamMutation.isPending}
             streamingText={streamingText}
-            emptyState={isHydratingRun ? historyLoadingEmptyState : <EmptyState />}
+            emptyState={
+              isHydratingRun ? (
+                historyLoadingEmptyState
+              ) : (
+                <EmptyState
+                  title={t("pages.sync.empty.title")}
+                  subtitle={t("pages.sync.empty.subtitle")}
+                  truthUses={t("pages.sync.empty.truthUses")}
+                  truthCan={t("pages.sync.empty.truthCan")}
+                  truthLimits={t("pages.sync.empty.truthLimits")}
+                />
+              )
+            }
             bottomInset={composerHeight}
             renderPlanPreview={(preview) => (
               <PreviewPlanCard

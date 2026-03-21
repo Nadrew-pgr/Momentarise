@@ -25,6 +25,24 @@ DEFAULT_AI_MODE = "proposal_only"
 DEFAULT_AUTO_APPLY_THRESHOLD = 0.90
 DEFAULT_MAX_ACTIONS = 3
 DEFAULT_CAPTURE_RESEARCH_POLICY = "proposal_only"
+DEFAULT_SYNC_CHANNEL = "in_app"
+DEFAULT_SYNC_AVAILABLE_CHANNELS = ["in_app", "web", "mobile"]
+SYNC_OUTPUT_TYPES = ("sync_response", "alert", "digest", "reminder")
+VALID_SYNC_CHANNELS = {
+    "in_app",
+    "push",
+    "email",
+    "web",
+    "mobile",
+    "whatsapp",
+    "telegram",
+    "instagram_business",
+    "mobile_share_extension",
+    "browser_extension",
+}
+DEFAULT_SYNC_CHANNEL_BY_OUTPUT_TYPE = {
+    output_type: DEFAULT_SYNC_CHANNEL for output_type in SYNC_OUTPUT_TYPES
+}
 
 
 def _default_capture_provider_preferences() -> dict:
@@ -100,6 +118,98 @@ def _merge_provider_preferences(raw: object, fallback: dict | None = None) -> di
     }
 
 
+def _normalize_sync_channel(value: object, fallback: str = DEFAULT_SYNC_CHANNEL) -> str:
+    if isinstance(value, str):
+        candidate = value.strip()
+        if candidate in VALID_SYNC_CHANNELS:
+            return candidate
+    return fallback
+
+
+def _normalize_available_channels(raw: object, preferred_channel: str) -> list[str]:
+    channels: list[str] = []
+    if isinstance(raw, list):
+        for entry in raw:
+            normalized = _normalize_sync_channel(entry, "")
+            if normalized and normalized not in channels:
+                channels.append(normalized)
+    if preferred_channel not in channels:
+        channels.insert(0, preferred_channel)
+    if not channels:
+        return [preferred_channel]
+    return channels
+
+
+def _normalize_channel_by_output_type(raw: object, preferred_channel: str, fallback: dict | None = None) -> dict:
+    base = dict(fallback or DEFAULT_SYNC_CHANNEL_BY_OUTPUT_TYPE)
+    source = raw if isinstance(raw, dict) else {}
+    return {
+        output_type: _normalize_sync_channel(
+            source.get(output_type),
+            _normalize_sync_channel(base.get(output_type), preferred_channel),
+        )
+        for output_type in SYNC_OUTPUT_TYPES
+    }
+
+
+def _default_sync_channel_preferences() -> dict:
+    return {
+        "preferred_channel": DEFAULT_SYNC_CHANNEL,
+        "available_channels": list(DEFAULT_SYNC_AVAILABLE_CHANNELS),
+        "channel_by_output_type": dict(DEFAULT_SYNC_CHANNEL_BY_OUTPUT_TYPE),
+        "input_channel": DEFAULT_SYNC_CHANNEL,
+        "output_channel": DEFAULT_SYNC_CHANNEL,
+    }
+
+
+def _merge_sync_channel_preferences(raw: object, fallback: dict | None = None) -> dict:
+    base_source = fallback if isinstance(fallback, dict) else _default_sync_channel_preferences()
+    base_preferred = _normalize_sync_channel(base_source.get("preferred_channel"), DEFAULT_SYNC_CHANNEL)
+    base_available = _normalize_available_channels(base_source.get("available_channels"), base_preferred)
+    base_channel_by_output_type = _normalize_channel_by_output_type(
+        base_source.get("channel_by_output_type"),
+        base_preferred,
+        DEFAULT_SYNC_CHANNEL_BY_OUTPUT_TYPE,
+    )
+    base_input_channel = _normalize_sync_channel(base_source.get("input_channel"), base_preferred)
+    base_output_channel = _normalize_sync_channel(base_source.get("output_channel"), base_preferred)
+
+    if not isinstance(raw, dict):
+        return {
+            "preferred_channel": base_preferred,
+            "available_channels": base_available,
+            "channel_by_output_type": base_channel_by_output_type,
+            "input_channel": base_input_channel,
+            "output_channel": base_output_channel,
+        }
+
+    preferred_channel = (
+        _normalize_sync_channel(raw.get("preferred_channel"), base_preferred)
+        if "preferred_channel" in raw
+        else base_preferred
+    )
+    available_channels_source = raw.get("available_channels") if "available_channels" in raw else base_available
+    channel_by_output_source = (
+        raw.get("channel_by_output_type")
+        if "channel_by_output_type" in raw
+        else base_channel_by_output_type
+    )
+    input_channel_source = raw.get("input_channel") if "input_channel" in raw else base_input_channel
+    output_channel_source = raw.get("output_channel") if "output_channel" in raw else base_output_channel
+
+    return {
+        "preferred_channel": preferred_channel,
+        "available_channels": _normalize_available_channels(available_channels_source, preferred_channel),
+        "channel_by_output_type": _normalize_channel_by_output_type(
+            channel_by_output_source,
+            preferred_channel,
+            base_channel_by_output_type,
+        ),
+        "input_channel": _normalize_sync_channel(input_channel_source, preferred_channel),
+        "output_channel": _normalize_sync_channel(output_channel_source, preferred_channel),
+    }
+
+
 async def _read_workspace_provider_defaults(db: AsyncSession, workspace_id) -> dict:
     result = await db.execute(
         select(Workspace).where(
@@ -150,7 +260,7 @@ def _to_response(member: WorkspaceMember) -> CalendarPreferencesResponse:
 def _read_ai_preferences(
     member: WorkspaceMember,
     workspace_defaults: dict | None = None,
-) -> tuple[str, float, int, dict, UUID | None, dict, UUID | None, dict, str, str, str | None]:
+) -> tuple[str, float, int, dict, UUID | None, dict, UUID | None, dict, str, str, str | None, dict]:
     mode = DEFAULT_AI_MODE
     threshold = DEFAULT_AUTO_APPLY_THRESHOLD
     max_actions = DEFAULT_MAX_ACTIONS
@@ -162,6 +272,7 @@ def _read_ai_preferences(
     capture_research_policy = DEFAULT_CAPTURE_RESEARCH_POLICY
     sync_model = "auto"
     sync_reasoning_level: str | None = None
+    sync_channel_preferences = _default_sync_channel_preferences()
 
     if isinstance(member.preferences, dict):
         ai_prefs = member.preferences.get("ai")
@@ -206,6 +317,10 @@ def _read_ai_preferences(
             raw_reasoning = ai_prefs.get("sync_reasoning_level")
             if isinstance(raw_reasoning, str) and raw_reasoning.strip():
                 sync_reasoning_level = raw_reasoning.strip()
+            sync_channel_preferences = _merge_sync_channel_preferences(
+                ai_prefs.get("sync_channel_preferences"),
+                sync_channel_preferences,
+            )
 
     return (
         mode,
@@ -219,6 +334,7 @@ def _read_ai_preferences(
         capture_research_policy,
         sync_model,
         sync_reasoning_level,
+        sync_channel_preferences,
     )
 
 
@@ -235,6 +351,7 @@ def _to_ai_response(member: WorkspaceMember, workspace_defaults: dict | None = N
         capture_research_policy,
         sync_model,
         sync_reasoning_level,
+        sync_channel_preferences,
     ) = _read_ai_preferences(
         member,
         workspace_defaults,
@@ -251,6 +368,7 @@ def _to_ai_response(member: WorkspaceMember, workspace_defaults: dict | None = N
         capture_research_policy=capture_research_policy,  # type: ignore[arg-type]
         sync_model=sync_model,
         sync_reasoning_level=sync_reasoning_level,
+        sync_channel_preferences=sync_channel_preferences,  # type: ignore[arg-type]
         updated_at=member.updated_at,
     )
 
@@ -339,6 +457,7 @@ async def update_ai_preferences(
         current_research_policy,
         _,  # sync_model — handled separately below
         _,  # sync_reasoning_level — handled separately below
+        current_sync_channel_preferences,
     ) = _read_ai_preferences(workspace, workspace_defaults)
     ai_preferences["capture_provider_preferences"] = (
         body.capture_provider_preferences.model_dump(mode="json")
@@ -423,6 +542,13 @@ async def update_ai_preferences(
         ai_preferences["sync_model"] = body.sync_model.strip() or "auto"
     if "sync_reasoning_level" in body.model_fields_set:
         ai_preferences["sync_reasoning_level"] = body.sync_reasoning_level
+    if "sync_channel_preferences" in body.model_fields_set and body.sync_channel_preferences is not None:
+        ai_preferences["sync_channel_preferences"] = _merge_sync_channel_preferences(
+            body.sync_channel_preferences.model_dump(mode="json", exclude_none=True),
+            current_sync_channel_preferences,
+        )
+    else:
+        ai_preferences["sync_channel_preferences"] = current_sync_channel_preferences
 
     preferences["ai"] = ai_preferences
 

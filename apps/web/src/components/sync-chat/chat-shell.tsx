@@ -1848,6 +1848,9 @@ export function SyncChatShell() {
           }}
           assistantLabel={t("pages.sync.roles.assistant")}
           emptySubtitle={t("pages.sync.empty.subtitle")}
+          emptyTruthUses={t("pages.sync.empty.truthUses")}
+          emptyTruthCan={t("pages.sync.empty.truthCan")}
+          emptyTruthLimits={t("pages.sync.empty.truthLimits")}
           errorTitle={t("pages.sync.error.title")}
           warningTitle={t("pages.sync.warning.title")}
           retryLabel={t("pages.sync.retry")}

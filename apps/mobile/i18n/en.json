@@ -370,6 +370,13 @@
       "header": {
         "newConversation": "New conversation"
       },
+      "empty": {
+        "title": "Sync is ready",
+        "subtitle": "Tell Sync what to organize, update, or draft.",
+        "truthUses": "Sync uses your workspace context: inbox captures, moments, and recent run history.",
+        "truthCan": "Sync can suggest and preview changes, then apply when you confirm.",
+        "truthLimits": "This screen does not send through WhatsApp, Telegram, Instagram, email, or push yet."
+      },
       "composer": {
         "placeholder": "Ask Sync to plan, change, or organize something...",
         "send": "Send",

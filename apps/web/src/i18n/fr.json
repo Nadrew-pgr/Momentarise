@@ -228,7 +228,10 @@
       },
       "empty": {
         "title": "Sync est prêt",
-        "subtitle": "Demandez à Sync d'organiser, modifier ou préparer quelque chose."
+        "subtitle": "Demandez à Sync d'organiser, modifier ou préparer quelque chose.",
+        "truthUses": "Sync utilise le contexte de votre workspace : captures Inbox, moments et historique récent des runs.",
+        "truthCan": "Sync peut proposer et prévisualiser des changements, puis appliquer quand vous confirmez.",
+        "truthLimits": "Cet écran n’envoie pas encore via WhatsApp, Telegram, Instagram, email ou push."
       },
       "menu": {
         "title": "Actions Sync",

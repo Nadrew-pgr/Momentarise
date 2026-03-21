@@ -9,7 +9,15 @@ import Animated, {
     Easing
 } from 'react-native-reanimated';
 
-export function EmptyState() {
+interface EmptyStateProps {
+    title: string;
+    subtitle: string;
+    truthUses: string;
+    truthCan: string;
+    truthLimits: string;
+}
+
+export function EmptyState({ title, subtitle, truthUses, truthCan, truthLimits }: EmptyStateProps) {
     const scale = useSharedValue(1);
     const opacity = useSharedValue(0.5);
 
@@ -71,8 +79,20 @@ export function EmptyState() {
                 </Animated.View>
 
             </View>
-            <Text className="text-muted-foreground text-[16px] font-medium tracking-wide mt-12">
-                What can I help you build today?
+            <Text className="text-foreground text-[18px] font-semibold tracking-wide mt-12 text-center px-6">
+                {title}
+            </Text>
+            <Text className="text-muted-foreground text-[14px] font-medium mt-2 text-center px-8">
+                {subtitle}
+            </Text>
+            <Text className="text-muted-foreground text-[12px] mt-4 text-center px-8">
+                {truthUses}
+            </Text>
+            <Text className="text-muted-foreground text-[12px] mt-1 text-center px-8">
+                {truthCan}
+            </Text>
+            <Text className="text-muted-foreground text-[12px] mt-1 text-center px-8">
+                {truthLimits}
             </Text>
         </View>
     );
